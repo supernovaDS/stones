@@ -1,0 +1,17 @@
+{
+  "name": "Stones",
+  "short_name": "Stones",
+  "description": "Offline-first task, notes, planning, and workspace app.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f6f2",
+  "theme_color": "#f4f6f2",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
