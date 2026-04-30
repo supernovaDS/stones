@@ -39,30 +39,12 @@ import { clsx } from "clsx";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "./store/useAppStore";
 import { formatShortDate, isOverdue, isToday, todayIso, toDateInput, toInputDate } from "./utils/date";
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useDraggable,
-  useDroppable,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-  useSortable
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+
 
 const navItems = [
   { id: "workspace", label: "Workspace", icon: Workflow },
   { id: "tasks", label: "Tasks", icon: ListChecks },
-  { id: "planner", label: "Planner", icon: CalendarPlus },
   { id: "calendar", label: "Calendar", icon: CalendarDays },
-  { id: "graph", label: "Graph", icon: Network },
   { id: "insights", label: "Insights", icon: Activity }
 ];
 
@@ -100,7 +82,6 @@ function App() {
     aiStatus,
     blocks,
     createPage,
-    createSection,
     error,
     initialize,
     loading,
@@ -109,7 +90,6 @@ function App() {
     pages,
     quickAddTask,
     setNotification,
-    sections,
     selectedTaskId,
     setActivePage,
     setTheme,
@@ -228,26 +208,34 @@ function App() {
 
           <div className="mb-3 flex items-center justify-between">
             <p className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-slate-400">
-              Sections
+              Pages
             </p>
-            <button
-              aria-label="Create section"
-              className="icon-button"
-              onClick={() => void createSection()}
-              title="Create section"
-              type="button"
-            >
-              <Plus size={16} />
-            </button>
           </div>
 
-          <div className="grid gap-4">
-            {sections.map((section) => (
-              <SidebarSection
-                key={section.id}
-                section={section}
-                pages={pages.filter((page) => page.sectionId === section.id)}
-              />
+          <div className="grid gap-1">
+            {pages.map((page) => (
+              <div key={page.id} className="group relative flex items-center">
+                <button
+                  className={clsx(
+                    "w-full rounded-md px-3 py-2 text-left text-sm transition pr-8",
+                    activePageId === page.id && view === "workspace"
+                      ? "bg-stone-100 font-semibold text-stone-950 dark:bg-slate-800 dark:text-white"
+                      : "text-stone-600 hover:bg-stone-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                  )}
+                  onClick={() => setActivePage(page.id)}
+                  type="button"
+                >
+                  {page.title}
+                </button>
+                <button
+                  className="absolute right-2 text-stone-400 hover:text-red-500 opacity-0 group-hover:opacity-100"
+                  onClick={() => void deletePage(page.id)}
+                  title="Delete page"
+                  type="button"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
             ))}
           </div>
 
@@ -348,9 +336,7 @@ function App() {
             <WorkspaceView pageId={activePage.id} searchQuery={searchQuery} />
           ) : null}
           {view === "tasks" ? <TaskListView searchQuery={searchQuery} /> : null}
-          {view === "planner" ? <PlannerView searchQuery={searchQuery} /> : null}
           {view === "calendar" ? <CalendarView searchQuery={searchQuery} /> : null}
-          {view === "graph" ? <GraphView searchQuery={searchQuery} /> : null}
           {view === "insights" ? <InsightsView /> : null}
         </section>
       </div>
@@ -361,108 +347,14 @@ function App() {
   );
 }
 
-function SidebarSection({ section, pages }) {
-  const { activePageId, createPage, renameSection, setActivePage, deletePage, deleteSection, view } = useAppStore();
-  return (
-    <section>
-      <div className="group mb-1 flex items-center gap-2">
-        <input
-          className="min-w-0 flex-1 bg-transparent text-xs font-semibold uppercase tracking-wide text-stone-500 outline-none dark:text-slate-400"
-          onChange={(event) => void renameSection(section.id, event.target.value)}
-          value={section.title}
-        />
-        <button className="icon-button h-7 w-7 opacity-0 text-stone-400 hover:text-red-500 group-hover:opacity-100" onClick={() => void deleteSection(section.id)} title="Delete section" type="button">
-          <Trash2 size={14} />
-        </button>
-        <button className="icon-button h-7 w-7" onClick={() => void createPage(section.id)} title="Add page" type="button">
-          <Plus size={14} />
-        </button>
-      </div>
-      <div className="grid gap-1">
-        {pages.map((page) => (
-          <div key={page.id} className="group relative flex items-center">
-            <button
-              className={clsx(
-                "w-full rounded-md px-3 py-2 text-left text-sm transition pr-8",
-                activePageId === page.id && view === "workspace"
-                  ? "bg-stone-100 font-semibold text-stone-950 dark:bg-slate-800 dark:text-white"
-                  : "text-stone-600 hover:bg-stone-50 dark:text-slate-300 dark:hover:bg-slate-800"
-              )}
-              onClick={() => setActivePage(page.id)}
-              type="button"
-            >
-              {page.title}
-            </button>
-            <button
-              className="absolute right-2 text-stone-400 hover:text-red-500 opacity-0 group-hover:opacity-100"
-              onClick={() => void deletePage(page.id)}
-              title="Delete page"
-              type="button"
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function SortableWorkspaceBlock({ block }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: block.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    zIndex: isDragging ? 50 : 1,
-    position: "relative"
-  };
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={clsx(isDragging && "opacity-50")}
-      {...attributes}
-      {...listeners}
-    >
-      <BlockCard block={block} />
-    </div>
-  );
-}
 
 function WorkspaceView({ pageId, searchQuery }) {
-  const { blocks, movePageToSection, pages, renamePage, reorderBlock, sections } = useAppStore();
+  const { blocks, pages, renamePage } = useAppStore();
   const page = pages.find((item) => item.id === pageId);
   const pageBlocks = blocks
     .filter((block) => block.pageId === pageId)
     .filter((block) => blockMatchesSearch(block, searchQuery))
     .sort((a, b) => a.order - b.order);
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
-
-  const handleDragEnd = (event) => {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      void reorderBlock(active.id, over.id);
-    }
-  };
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -472,32 +364,12 @@ function WorkspaceView({ pageId, searchQuery }) {
           onChange={(event) => page && void renamePage(page.id, event.target.value)}
           value={page?.title ?? ""}
         />
-        <select
-          className="h-11 rounded-md border border-stone-200 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-          onChange={(event) => page && void movePageToSection(page.id, event.target.value)}
-          value={page?.sectionId ?? ""}
-        >
-          {sections.map((section) => (
-            <option key={section.id} value={section.id}>{section.title}</option>
-          ))}
-        </select>
       </div>
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
-      >
-        <div className="grid gap-3">
-          <SortableContext
-            items={pageBlocks.map((b) => b.id)}
-            strategy={verticalListSortingStrategy}
-          >
-            {pageBlocks.map((block) => (
-              <SortableWorkspaceBlock key={block.id} block={block} />
-            ))}
-          </SortableContext>
-        </div>
-      </DndContext>
+      <div className="grid gap-3">
+        {pageBlocks.map((block) => (
+          <BlockCard key={block.id} block={block} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -618,7 +490,7 @@ function NoteBlock({ block }) {
 }
 
 function TaskBlock({ block }) {
-  const { deleteBlock, setSelectedTask, toggleTask, updateTask } = useAppStore();
+  const { deleteBlock, setSelectedTask, toggleTask, updateTask, moveBlock } = useAppStore();
   const blocked = useIsBlocked(block);
   return (
     <article className={clsx("rounded-lg border border-l-4 bg-white p-4 shadow-sm transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900/50", priorityRail[block.metadata.priority ?? "medium"])}>
@@ -633,6 +505,8 @@ function TaskBlock({ block }) {
             placeholder="Task title"
             value={block.content.title}
           />
+          <IconButton icon={ArrowUp} title="Move up" onClick={() => void moveBlock(block.id, "up")} />
+          <IconButton icon={ArrowDown} title="Move down" onClick={() => void moveBlock(block.id, "down")} />
           <IconButton icon={PanelRight} title="Open details" onClick={() => setSelectedTask(block.id)} />
           <IconButton danger icon={Trash2} title="Delete task" onClick={() => void deleteBlock(block.id)} />
         </div>
@@ -866,153 +740,6 @@ function TaskListCard({ task }) {
   );
 }
 
-function PlannerView({ searchQuery }) {
-  const { blocks, updateTask } = useAppStore();
-  const [selectedDate, setSelectedDate] = useState(todayIso());
-  const tasks = blocks
-    .filter((block) => block.type === "task")
-    .filter((task) => blockMatchesSearch(task, searchQuery));
-  const openTasks = tasks.filter((task) => !task.metadata.completed);
-  const slots = createPlannerSlots(6, 22);
-  const scheduledTasks = openTasks.filter((task) => task.metadata.scheduledDate === selectedDate);
-  const unscheduledTasks = openTasks
-    .filter((task) => !task.metadata.scheduledDate)
-    .sort(compareTasksByDate);
-  const dueTodayTasks = openTasks
-    .filter((task) => toDateInput(task.metadata.deadline) === selectedDate && task.metadata.scheduledDate !== selectedDate)
-    .sort(compareTasksByDate);
-
-  const handleDragEnd = (event) => {
-    const { active, over } = event;
-    if (!active?.id || !over?.id?.startsWith("slot-")) return;
-    const start = over.id.replace("slot-", "");
-    const task = openTasks.find((item) => item.id === active.id);
-    void updateTask(active.id, {
-      scheduledDate: selectedDate,
-      scheduledStart: start,
-      scheduledEnd: addMinutesToTime(start, 60),
-      deadline: task?.metadata.deadline || selectedDate
-    });
-  };
-
-  return (
-    <DndContext onDragEnd={handleDragEnd}>
-      <div className="mx-auto grid max-w-7xl grid-cols-[1fr_360px] gap-4 max-xl:grid-cols-1">
-        <section className="app-card p-4">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium text-stone-500 dark:text-slate-400">Drag tasks into a time slot</p>
-              <h3 className="text-xl font-semibold">Daily time block</h3>
-            </div>
-            <input
-              className="h-10 rounded-md border border-stone-200 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950"
-              onChange={(event) => setSelectedDate(event.target.value)}
-              type="date"
-              value={selectedDate}
-            />
-          </div>
-
-          <div className="grid gap-2">
-            {slots.map((slot) => (
-              <TimeSlot
-                key={slot}
-                slot={slot}
-                tasks={scheduledTasks.filter((task) => task.metadata.scheduledStart === slot)}
-              />
-            ))}
-          </div>
-        </section>
-
-        <aside className="grid content-start gap-4">
-          <PlannerBucket title="Due this day" tasks={dueTodayTasks} />
-          <PlannerBucket title="Unscheduled" tasks={unscheduledTasks} />
-          <PlannerBucket title="Overdue" tasks={openTasks.filter((task) => isOverdue(task.metadata.deadline))} />
-        </aside>
-      </div>
-    </DndContext>
-  );
-}
-
-function TimeSlot({ slot, tasks }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `slot-${slot}` });
-  return (
-    <div
-      className={clsx(
-        "grid min-h-20 grid-cols-[76px_1fr] gap-3 rounded-lg border p-3 transition max-sm:grid-cols-1",
-        isOver
-          ? "border-[#6fbe44] bg-lime-50 shadow-[0_10px_30px_rgba(111,190,68,0.18)] dark:border-[#8bdc65] dark:bg-emerald-950/30"
-          : "border-stone-200 bg-white/70 dark:border-slate-800 dark:bg-slate-950/40"
-      )}
-      ref={setNodeRef}
-    >
-      <div className="text-sm font-semibold text-stone-500 dark:text-slate-400">{slot}</div>
-      <div className="grid gap-2">
-        {tasks.length ? (
-          tasks.map((task) => <PlannerTaskCard key={task.id} task={task} />)
-        ) : (
-          <p className="rounded-md border border-dashed border-stone-200 px-3 py-3 text-sm text-stone-500 dark:border-slate-700">
-            Drop task here
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function PlannerBucket({ title, tasks }) {
-  return (
-    <section className="app-card p-4">
-      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-stone-500 dark:text-slate-400">{title}</h3>
-      <div className="grid gap-2">
-        {tasks.length ? tasks.map((task) => <PlannerTaskCard key={task.id} task={task} />) : <p className="rounded-md border border-dashed border-stone-200 px-3 py-8 text-center text-sm text-stone-500 dark:border-slate-700">Nothing here</p>}
-      </div>
-    </section>
-  );
-}
-
-function PlannerTaskCard({ task }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: task.id });
-  const { setSelectedTask, toggleTask, updateTask } = useAppStore();
-  const style = {
-    transform: CSS.Translate.toString(transform),
-    opacity: isDragging ? 0.6 : 1
-  };
-
-  return (
-    <article
-      className={clsx(
-        "grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-md border border-l-4 bg-white px-3 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900",
-        priorityRail[task.metadata.priority ?? "medium"]
-      )}
-      ref={setNodeRef}
-      style={style}
-      {...listeners}
-      {...attributes}
-    >
-      <button onClick={() => void toggleTask(task.id)} type="button">
-        {task.metadata.completed ? <Check size={18} /> : <Circle size={18} />}
-      </button>
-      <button className="min-w-0 text-left" onClick={() => setSelectedTask(task.id)} type="button">
-        <span className="block truncate text-sm font-semibold">{task.content.title || "Untitled task"}</span>
-        <span className="text-xs text-stone-500 dark:text-slate-400">
-          {task.metadata.scheduledStart ? `${task.metadata.scheduledStart} - ${task.metadata.scheduledEnd}` : formatShortDate(task.metadata.deadline)}
-        </span>
-      </button>
-      {task.metadata.scheduledDate ? (
-        <button
-          className="grid h-8 w-8 place-items-center rounded-md text-stone-400 hover:bg-stone-100 hover:text-stone-900 dark:hover:bg-slate-800 dark:hover:text-white"
-          onClick={() => void updateTask(task.id, { scheduledDate: "", scheduledStart: "", scheduledEnd: "" })}
-          title="Remove schedule"
-          type="button"
-        >
-          <X size={15} />
-        </button>
-      ) : (
-        <Clock3 className="text-stone-400" size={16} />
-      )}
-    </article>
-  );
-}
 
 function CalendarView({ searchQuery }) {
   const { blocks, quickAddTask, setSelectedTask } = useAppStore();
@@ -1081,85 +808,6 @@ function TaskRow({ task }) {
   );
 }
 
-function GraphView({ searchQuery }) {
-  const { blocks, pages, setActivePage, setSelectedTask } = useAppStore();
-  const normalized = searchQuery.trim().toLowerCase();
-  const notes = blocks.filter((block) => block.type === "note");
-  const tasks = blocks.filter((block) => block.type === "task");
-  const visiblePages = pages.filter((page) => !normalized || page.title.toLowerCase().includes(normalized));
-  const links = notes.flatMap((note) => {
-    const page = pages.find((item) => item.id === note.pageId);
-    return extractInternalLinks(note.content.text ?? "")
-      .map((title) => pages.find((candidate) => candidate.title.toLowerCase() === title.toLowerCase()))
-      .filter(Boolean)
-      .map((target) => ({ from: page, to: target, note }));
-  });
-  const linkedTasks = tasks.filter((task) => task.sourceBlockId);
-
-  return (
-    <div className="mx-auto grid max-w-6xl gap-4">
-      <section className="app-card p-4">
-        <div className="mb-4 flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-md bg-[#202020] text-white dark:bg-[#8bdc65] dark:text-slate-950">
-            <Network size={18} />
-          </div>
-          <div>
-            <h3 className="text-xl font-semibold">Workspace graph</h3>
-            <p className="text-sm text-stone-500 dark:text-slate-400">Internal links use [[Page title]]. Note-derived tasks are shown as backlinks.</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-3 gap-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
-          {visiblePages.map((page) => {
-            const pageBlocks = blocks.filter((block) => block.pageId === page.id);
-            const pageTasks = pageBlocks.filter((block) => block.type === "task");
-            const backlinks = links.filter((link) => link.to?.id === page.id);
-            return (
-              <button className="rounded-lg border border-l-4 border-l-teal-500 border-stone-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/50 dark:border-l-teal-400" key={page.id} onClick={() => setActivePage(page.id)} type="button">
-                <span className="mb-3 flex items-center gap-2 text-base font-semibold"><Workflow size={16} />{page.title}</span>
-                <span className="grid grid-cols-3 gap-2 text-center text-xs text-stone-500 dark:text-slate-400">
-                  <span className="rounded-md bg-stone-100 px-2 py-2 dark:bg-slate-800">{pageBlocks.length}<br />blocks</span>
-                  <span className="rounded-md bg-stone-100 px-2 py-2 dark:bg-slate-800">{pageTasks.length}<br />tasks</span>
-                  <span className="rounded-md bg-stone-100 px-2 py-2 dark:bg-slate-800">{backlinks.length}<br />backs</span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      <div className="grid grid-cols-2 gap-4 max-lg:grid-cols-1">
-        <section className="app-card p-4">
-          <h3 className="mb-3 text-base font-semibold">Page Links</h3>
-          <div className="grid gap-2">
-            {links.length ? links.map((link, index) => (
-              <div className="flex items-center gap-2 rounded-md border border-stone-200 px-3 py-2 text-sm dark:border-slate-700" key={`${link.from?.id}-${link.to?.id}-${index}`}>
-                <button className="font-medium text-sky-700 dark:text-sky-300" onClick={() => setActivePage(link.from.id)} type="button">{link.from?.title}</button>
-                <span className="text-stone-400">{"->"}</span>
-                <button className="font-medium text-sky-700 dark:text-sky-300" onClick={() => setActivePage(link.to.id)} type="button">{link.to?.title}</button>
-              </div>
-            )) : <p className="rounded-md border border-dashed border-stone-200 px-3 py-8 text-center text-sm text-stone-500 dark:border-slate-700">No [[page links]] yet.</p>}
-          </div>
-        </section>
-        <section className="app-card p-4">
-          <h3 className="mb-3 text-base font-semibold">Task Backlinks</h3>
-          <div className="grid gap-2">
-            {linkedTasks.length ? linkedTasks.map((task) => {
-              const source = blocks.find((block) => block.id === task.sourceBlockId);
-              const page = pages.find((item) => item.id === task.pageId);
-              return (
-                <div className="grid gap-1 rounded-md border border-stone-200 px-3 py-2 text-sm dark:border-slate-700" key={task.id}>
-                  <button className="text-left font-semibold" onClick={() => setSelectedTask(task.id)} type="button">{task.content.title}</button>
-                  <button className="inline-flex items-center gap-1 text-left text-xs text-sky-700 dark:text-sky-300" onClick={() => setActivePage(page.id)} type="button"><ExternalLink size={12} />{page?.title ?? "Page"} source note</button>
-                  {source?.content?.text ? <p className="line-clamp-2 text-xs text-stone-500 dark:text-slate-400">{source.content.text}</p> : null}
-                </div>
-              );
-            }) : <p className="rounded-md border border-dashed border-stone-200 px-3 py-8 text-center text-sm text-stone-500 dark:border-slate-700">Convert note text into tasks to create backlinks.</p>}
-          </div>
-        </section>
-      </div>
-    </div>
-  );
-}
 
 function InsightsView() {
   const {
@@ -1237,7 +885,7 @@ function InsightsView() {
             </div>
           )) : (
             <p className="rounded-md border border-dashed border-stone-200 px-3 py-8 text-center text-sm text-stone-500 dark:border-slate-700">
-              Deleted pages, sections, and blocks will appear here.
+              Deleted pages and blocks will appear here.
             </p>
           )}
         </div>
@@ -1360,9 +1008,7 @@ function CommandPalette({ onClose }) {
       }]
     ] : []),
     ["/today", "Open today page", CalendarPlus, () => void openTodayPage()],
-    ["/planner", "Go to planner", Clock3, () => setView("planner")],
-    ["/calendar", "Go to calendar", CalendarDays, () => setView("calendar")],
-    ["/graph", "Go to graph", Network, () => setView("graph")]
+    ["/calendar", "Go to calendar", CalendarDays, () => setView("calendar")]
   ].filter(([shortcut, label]) => {
     if (!normalized) return true;
     return shortcut.includes(normalized) || label.toLowerCase().includes(normalized);
@@ -1549,16 +1195,9 @@ function extractInternalLinks(text) {
   return [...text.matchAll(/\[\[([^\]]+)\]\]/g)].map((match) => match[1].trim()).filter(Boolean);
 }
 
-function createPlannerSlots(startHour, endHour) {
-  return Array.from({ length: endHour - startHour }, (_, index) => `${String(startHour + index).padStart(2, "0")}:00`);
-}
 
-function addMinutesToTime(value, minutes) {
-  const [hours, mins] = value.split(":").map(Number);
-  const date = new Date();
-  date.setHours(hours, mins + minutes, 0, 0);
-  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-}
+
+
 
 function getCalendarDays(cursor) {
   const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
@@ -1673,9 +1312,7 @@ function escapeHtml(value) {
 
 function viewTitle(view) {
   if (view === "tasks") return "Task list";
-  if (view === "planner") return "Daily planner";
   if (view === "calendar") return "Calendar";
-  if (view === "graph") return "Workspace graph";
   if (view === "insights") return "Insights";
   return "Workspace";
 }

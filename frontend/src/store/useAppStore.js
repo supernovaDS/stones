@@ -571,36 +571,6 @@ export const useAppStore = create((set, get) => ({
     }));
   },
 
-  reorderBlock: async (blockId, targetId) => {
-    if (blockId === targetId) return;
-    const state = get();
-    const block = state.blocks.find((item) => item.id === blockId);
-    const target = state.blocks.find((item) => item.id === targetId);
-    if (!block || !target || block.pageId !== target.pageId) return;
-
-    const pageBlocks = sortBlocks(
-      state.blocks.filter((item) => item.pageId === block.pageId)
-    ).filter((item) => item.id !== blockId);
-    const targetIndex = pageBlocks.findIndex((item) => item.id === targetId);
-    pageBlocks.splice(targetIndex, 0, block);
-
-    pushUndoSnapshot(get, set, "reorder block");
-    const updatedBlocks = pageBlocks.map((item, index) => ({
-      ...item,
-      order: index + 1
-    }));
-    await db.transaction("rw", db.blocks, async () => {
-      await db.blocks.bulkPut(updatedBlocks);
-    });
-
-    const updatedById = new Map(updatedBlocks.map((item) => [item.id, item]));
-    set((current) => ({
-      blocks: sortBlocks(
-        current.blocks.map((item) => updatedById.get(item.id) ?? item)
-      )
-    }));
-  },
-
   deleteSection: async (sectionId) => {
     if (!window.confirm("Are you sure you want to delete this section and all its pages?")) return;
     const section = get().sections.find((item) => item.id === sectionId);
