@@ -8,7 +8,7 @@
   "theme_color": "#f4f6f2",
   "icons": [
     {
-      "src": "/logo.png",
+      "src": "/stones_logo.png",
       "sizes": "1024x1024",
       "type": "image/png",
       "purpose": "any maskable"

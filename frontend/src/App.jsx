@@ -1,4 +1,4 @@
-﻿import {
+import {
   Activity,
   ArrowDown,
   ArrowUp,
@@ -76,6 +76,14 @@ const priorityRail = {
   high: "border-l-red-500 dark:border-l-red-400",
   medium: "border-l-orange-500 dark:border-l-orange-400",
   low: "border-l-green-500 dark:border-l-green-400"
+};
+
+const blockTypeRail = {
+  note: "border-l-sky-500 dark:border-l-sky-400",
+  checklist: "border-l-purple-500 dark:border-l-purple-400",
+  code: "border-l-amber-500 dark:border-l-amber-400",
+  link: "border-l-indigo-500 dark:border-l-indigo-400",
+  image: "border-l-pink-500 dark:border-l-pink-400",
 };
 
 function App() {
@@ -180,7 +188,7 @@ function App() {
         <aside className="border-r border-stone-200 bg-white/90 px-4 py-5 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 max-lg:border-b max-lg:border-r-0">
           <div className="mb-6 flex items-center gap-3">
             <div className="grid h-12 w-12 place-items-center overflow-hidden rounded-lg border border-stone-200 bg-stone-100 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-              <img alt="Stones logo" className="h-full w-full object-cover" src="/logo.png" />
+              <img alt="Stones logo" className="h-full w-full object-cover" src="/stones_logo.png" />
             </div>
             <div>
               <h1 className="text-lg font-semibold leading-tight">Stones</h1>
@@ -253,8 +261,8 @@ function App() {
           </button>
 
           <div className="mt-6 grid grid-cols-2 gap-2">
-            <Metric label="Today" value={dueToday.length.toString()} />
-            <Metric label="Overdue" value={overdue.length.toString()} />
+            <Metric label="Today" value={dueToday.length.toString()} color="blue" />
+            <Metric label="Overdue" value={overdue.length.toString()} color="red" />
           </div>
         </aside>
 
@@ -506,7 +514,7 @@ function BlockCard({ block }) {
 function BlockShell({ block, label, children, actions }) {
   const { deleteBlock, moveBlock } = useAppStore();
   return (
-    <article className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
+    <article className={clsx("rounded-lg border border-l-4 border-stone-200 bg-white p-4 shadow-sm transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900/50", blockTypeRail[block.type] ?? "border-l-stone-400 dark:border-l-slate-500")}>
       <div className="mb-3 flex items-center justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-slate-400">{label}</p>
         <div className="flex flex-wrap gap-2">
@@ -540,6 +548,7 @@ function NoteBlock({ block }) {
     const selected = draft.slice(start, end) || "text";
     const next = `${draft.slice(0, start)}${wrapper}${selected}${suffix}${draft.slice(end)}`;
     setDraft(next);
+    void updateNote(block.id, next);
     window.requestAnimationFrame(() => {
       textarea.focus();
       textarea.setSelectionRange(start + wrapper.length, start + wrapper.length + selected.length);
@@ -566,11 +575,11 @@ function NoteBlock({ block }) {
       }
     >
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <button className="rich-button" onClick={() => formatSelection("**")} type="button">B</button>
-        <button className="rich-button italic" onClick={() => formatSelection("_")} type="button">I</button>
-        <button className="rich-button font-mono" onClick={() => formatSelection("`")} type="button">`</button>
-        <button className="rich-button" onClick={() => formatSelection("- ", "")} type="button">List</button>
-        <button className="rich-button" onClick={() => formatSelection("[", "](https://)")} type="button">Link</button>
+        <button className="rich-button" onMouseDown={(e) => e.preventDefault()} onClick={() => formatSelection("**")} type="button">B</button>
+        <button className="rich-button italic" onMouseDown={(e) => e.preventDefault()} onClick={() => formatSelection("_")} type="button">I</button>
+        <button className="rich-button font-mono" onMouseDown={(e) => e.preventDefault()} onClick={() => formatSelection("`")} type="button">`</button>
+        <button className="rich-button" onMouseDown={(e) => e.preventDefault()} onClick={() => formatSelection("- ", "")} type="button">List</button>
+        <button className="rich-button" onMouseDown={(e) => e.preventDefault()} onClick={() => formatSelection("[", "](https://)")} type="button">Link</button>
         <button className="rich-button ml-auto" onClick={() => setPreview((value) => !value)} type="button">
           {preview ? "Edit" : "Preview"}
         </button>
@@ -1105,7 +1114,7 @@ function GraphView({ searchQuery }) {
             const pageTasks = pageBlocks.filter((block) => block.type === "task");
             const backlinks = links.filter((link) => link.to?.id === page.id);
             return (
-              <button className="rounded-lg border border-stone-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-900" key={page.id} onClick={() => setActivePage(page.id)} type="button">
+              <button className="rounded-lg border border-l-4 border-l-teal-500 border-stone-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/50 dark:border-l-teal-400" key={page.id} onClick={() => setActivePage(page.id)} type="button">
                 <span className="mb-3 flex items-center gap-2 text-base font-semibold"><Workflow size={16} />{page.title}</span>
                 <span className="grid grid-cols-3 gap-2 text-center text-xs text-stone-500 dark:text-slate-400">
                   <span className="rounded-md bg-stone-100 px-2 py-2 dark:bg-slate-800">{pageBlocks.length}<br />blocks</span>
@@ -1198,10 +1207,10 @@ function InsightsView() {
   return (
     <div className="mx-auto grid max-w-5xl gap-4">
       <div className="grid grid-cols-4 gap-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
-        <Metric label="Tasks" value={tasks.length.toString()} />
-        <Metric label="Completed" value={completed.length.toString()} />
-        <Metric label="Rate" value={`${completionRate}%`} />
-        <Metric label="Streak" value={`${streak}d`} />
+        <Metric label="Tasks" value={tasks.length.toString()} color="blue" />
+        <Metric label="Completed" value={completed.length.toString()} color="green" />
+        <Metric label="Rate" value={`${completionRate}%`} color="purple" />
+        <Metric label="Streak" value={`${streak}d`} color="orange" />
       </div>
       <section className="rounded-lg border border-stone-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <h3 className="mb-3 text-base font-semibold">Backup</h3>
@@ -1403,8 +1412,22 @@ function IconButton({ danger, icon: Icon, onClick, title }) {
   return <button className={clsx("icon-button", danger && "danger")} onClick={onClick} title={title} type="button"><Icon size={16} /></button>;
 }
 
-function Metric({ label, value }) {
-  return <div className="rounded-lg border border-stone-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"><p className="text-xs font-medium text-stone-500 dark:text-slate-400">{label}</p><p className="mt-1 text-2xl font-semibold">{value}</p></div>;
+function Metric({ label, value, color }) {
+  const borderColors = {
+    green: "border-l-green-500 dark:border-l-green-400",
+    orange: "border-l-orange-500 dark:border-l-orange-400",
+    red: "border-l-red-500 dark:border-l-red-400",
+    blue: "border-l-sky-500 dark:border-l-sky-400",
+    purple: "border-l-purple-500 dark:border-l-purple-400",
+    pink: "border-l-pink-500 dark:border-l-pink-400",
+    teal: "border-l-teal-500 dark:border-l-teal-400"
+  };
+  return (
+    <div className={clsx("rounded-lg border border-l-4 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/50", color ? borderColors[color] : "border-l-stone-300 dark:border-l-slate-600")}>
+      <p className="text-xs font-medium text-stone-500 dark:text-slate-400">{label}</p>
+      <p className="mt-1 text-2xl font-semibold text-stone-800 dark:text-white">{value}</p>
+    </div>
+  );
 }
 
 function Notice({ children, tone }) {
@@ -1610,7 +1633,7 @@ function notifyDueReminders(tasks, setNotification) {
     if ("Notification" in window && Notification.permission === "granted") {
       new Notification("Stones reminder", {
         body: title,
-        icon: "/logo.png"
+        icon: "/stones_logo.png"
       });
     } else {
       setNotification(`Reminder: ${title}`);

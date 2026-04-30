@@ -95,13 +95,3 @@ Task data is stored as specialized blocks with metadata for completion, priority
 - `GET /api/health`: service health check
 - `POST /api/ai/extract-tasks`: extracts tasks from note text using Gemini when configured, otherwise local fallback
 
-## Repository Hygiene
-
-The repository intentionally excludes:
-
-- `node_modules`
-- build output
-- `.env` files
-- local planning markdown files other than `README.md`
-
-Use `.env.example` as the committed environment template.
