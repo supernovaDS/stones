@@ -78,28 +78,28 @@ function App() {
     addLinkBlock,
     addNoteBlock,
     addTaskBlock,
-    aiReview,
-    aiStatus,
     blocks,
     createPage,
+    deletePage,
     error,
     initialize,
     loading,
     notification,
     openTodayPage,
     pages,
-    quickAddTask,
     setNotification,
     selectedTaskId,
     setActivePage,
     setTheme,
     setView,
     theme,
+    taskModalParams,
+    openTaskModal,
+    closeTaskModal,
     undoLastChange,
     undoStack,
     view
   } = store;
-  const [quickText, setQuickText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [commandOpen, setCommandOpen] = useState(false);
   const imageInputRef = useRef(null);
@@ -139,12 +139,6 @@ function App() {
     const interval = window.setInterval(checkReminders, 60 * 1000);
     return () => window.clearInterval(interval);
   }, [openTasks, setNotification]);
-
-  const submitQuickAdd = async (event) => {
-    event.preventDefault();
-    await quickAddTask(quickText);
-    setQuickText("");
-  };
 
   const addImage = async (file) => {
     await addImageBlock(file);
@@ -285,8 +279,8 @@ function App() {
                   <HeaderButton icon={Code2} label="Code" onClick={() => void addCodeBlock()} />
                   <HeaderButton icon={Image} label="Image" onClick={() => imageInputRef.current?.click()} />
                   <button
-                    className="inline-flex h-10 items-center gap-2 rounded-md bg-[#202020] px-3 text-sm font-medium text-white hover:bg-black dark:bg-[#8bdc65] dark:text-slate-950 dark:hover:bg-[#9bea76]"
-                    onClick={() => void addTaskBlock()}
+                    className="inline-flex h-10 items-center gap-2 rounded-none border-2 border-black bg-[#202020] px-3 text-sm font-medium text-white shadow-[4px_4px_0_0_#000] hover:-translate-y-1 hover:bg-black dark:border-white dark:bg-[#8bdc65] dark:text-slate-950 dark:shadow-[4px_4px_0_0_#fff] dark:hover:bg-[#9bea76]"
+                    onClick={() => openTaskModal()}
                     type="button"
                   >
                     <Check size={16} />
@@ -304,20 +298,8 @@ function App() {
             </div>
           </header>
 
-          <div className="mb-4 grid grid-cols-[minmax(220px,1fr)_minmax(220px,1fr)] gap-3 max-lg:grid-cols-1">
-            <form className="flex rounded-md border border-stone-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900" onSubmit={submitQuickAdd}>
-              <input
-                className="min-w-0 flex-1 rounded-l-md bg-transparent px-3 text-sm outline-none"
-                onChange={(event) => setQuickText(event.target.value)}
-                placeholder="Quick add: Finish assignment tomorrow high weekly"
-                value={quickText}
-              />
-              <button className="inline-flex h-11 items-center gap-2 rounded-r-md bg-[#202020] px-3 text-sm font-medium text-white dark:bg-[#8bdc65] dark:text-slate-950" type="submit">
-                <Plus size={16} />
-                Add
-              </button>
-            </form>
-            <label className="flex h-11 items-center gap-2 rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-500 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+          <div className="mb-4 grid gap-3">
+            <label className="flex h-11 items-center gap-2 rounded-none border-2 border-black bg-white px-3 text-sm text-stone-500 shadow-[4px_4px_0_0_#000] dark:border-white dark:bg-slate-900 dark:text-slate-400 dark:shadow-[4px_4px_0_0_#fff]">
               <Search size={16} />
               <input
                 className="min-w-0 flex-1 bg-transparent text-stone-900 outline-none dark:text-white"
@@ -329,8 +311,13 @@ function App() {
           </div>
 
           {error ? <Notice tone="red">{error}</Notice> : null}
-          {aiStatus ? <Notice tone="sky">{aiStatus}</Notice> : null}
-          {notification ? <Notice tone="green">{notification}</Notice> : null}
+          {notification ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-300">
+              <div className="animate-in fade-in zoom-in duration-300 ease-out rounded-none border-4 border-black bg-[#8bdc65] px-8 py-5 text-lg font-black text-black shadow-[8px_8px_0_0_#000]">
+                {notification}
+              </div>
+            </div>
+          ) : null}
 
           {view === "workspace" && activePage ? (
             <WorkspaceView pageId={activePage.id} searchQuery={searchQuery} />
@@ -341,7 +328,15 @@ function App() {
         </section>
       </div>
       {selectedTaskId ? <TaskDetailPanel /> : null}
-      {aiReview ? <AiReviewModal /> : null}
+      {taskModalParams ? (
+        <TaskModal
+          initialParams={taskModalParams}
+          onClose={closeTaskModal}
+          onSubmit={async (taskData) => {
+            await addTaskBlock(taskData);
+          }}
+        />
+      ) : null}
       {commandOpen ? <CommandPalette onClose={() => setCommandOpen(false)} /> : null}
     </main>
   );
@@ -349,21 +344,44 @@ function App() {
 
 
 function WorkspaceView({ pageId, searchQuery }) {
-  const { blocks, pages, renamePage } = useAppStore();
+  const { blocks, pages, renamePage, exportPageMarkdown, exportBackup, importBackup } = useAppStore();
+  const fileInputRef = useRef(null);
   const page = pages.find((item) => item.id === pageId);
   const pageBlocks = blocks
     .filter((block) => block.pageId === pageId)
     .filter((block) => blockMatchesSearch(block, searchQuery))
     .sort((a, b) => a.order - b.order);
 
+  const onMarkdownExport = () => {
+    downloadText(`${slugify(page?.title ?? "page")}.md`, exportPageMarkdown(pageId), "text/markdown");
+  };
+
+  const onPdfExport = () => {
+    printPagePdf(page?.title ?? "Stones page", exportPageMarkdown(pageId));
+  };
+
+  const onExport = () => downloadText(`stones-backup-${todayIso()}.json`, JSON.stringify(exportBackup(), null, 2), "application/json");
+
+  const onImport = async (file) => {
+    if (!file) return;
+    await importBackup(JSON.parse(await file.text()));
+  };
+
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="mb-4 grid grid-cols-[1fr_190px] gap-3 max-sm:grid-cols-1">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 max-sm:flex-col max-sm:items-stretch">
         <input
-          className="w-full bg-transparent text-4xl font-semibold outline-none max-sm:text-3xl"
+          className="w-full max-w-xl bg-transparent text-4xl font-semibold outline-none truncate max-sm:text-3xl"
           onChange={(event) => page && void renamePage(page.id, event.target.value)}
           value={page?.title ?? ""}
         />
+        <div className="flex gap-2 flex-wrap">
+          <HeaderButton icon={FileDown} label="MD" onClick={onMarkdownExport} />
+          <HeaderButton icon={Printer} label="PDF" onClick={onPdfExport} />
+          <HeaderButton icon={Download} label="Backup" onClick={onExport} />
+          <HeaderButton icon={Upload} label="Restore" onClick={() => fileInputRef.current?.click()} />
+          <input accept="application/json" className="hidden" onChange={(event) => void onImport(event.target.files?.[0])} ref={fileInputRef} type="file" />
+        </div>
       </div>
       <div className="grid gap-3">
         {pageBlocks.map((block) => (
@@ -402,7 +420,7 @@ function BlockShell({ block, label, children, actions }) {
 }
 
 function NoteBlock({ block }) {
-  const { blocks, convertTextToTask, extractTasksWithAi, setSelectedTask, updateNote } = useAppStore();
+  const { blocks, convertTextToTask, setSelectedTask, updateNote } = useAppStore();
   const [draft, setDraft] = useState(block.content.text ?? "");
   const [preview, setPreview] = useState(false);
   const textareaRef = useRef(null);
@@ -441,7 +459,6 @@ function NoteBlock({ block }) {
       label="Note"
       actions={
         <>
-          <IconButton icon={Brain} title="Extract tasks" onClick={() => void extractTasksWithAi(block.id)} />
           <IconButton icon={Sparkles} title="Convert selection to task" onClick={convertSelection} />
         </>
       }
@@ -599,10 +616,58 @@ function LinkBlock({ block }) {
 
 function ImageBlock({ block }) {
   const { updateBlockContent } = useAppStore();
+  const [scale, setScale] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const startPos = useRef({ x: 0, y: 0 });
+
+  const handleWheel = (e) => {
+    if (!e.shiftKey && !e.ctrlKey && !e.altKey) return;
+    e.preventDefault();
+    setScale((s) => Math.min(Math.max(0.5, s - e.deltaY * 0.005), 5));
+  };
+
+  const startDrag = (e) => {
+    setIsDragging(true);
+    startPos.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+  };
+
+  const doDrag = (e) => {
+    if (!isDragging) return;
+    setPan({ x: e.clientX - startPos.current.x, y: e.clientY - startPos.current.y });
+  };
+
+  const endDrag = () => setIsDragging(false);
+
   return (
     <BlockShell block={block} label="Image">
-      {block.content.dataUrl ? <img alt={block.content.caption ?? block.content.name ?? "Workspace image"} className="mb-3 max-h-[420px] w-full rounded-md object-contain" src={block.content.dataUrl} /> : null}
-      <input className="w-full bg-transparent text-sm outline-none" onChange={(event) => void updateBlockContent(block.id, { caption: event.target.value })} placeholder="Caption" value={block.content.caption ?? ""} />
+      <div className="mb-2 flex flex-wrap gap-2">
+        <button type="button" className="rich-button !h-8 !px-2 !text-xs" onClick={() => setScale((s) => Math.min(s + 0.2, 5))}>Zoom In</button>
+        <button type="button" className="rich-button !h-8 !px-2 !text-xs" onClick={() => setScale((s) => Math.max(s - 0.2, 0.5))}>Zoom Out</button>
+        <button type="button" className="rich-button !h-8 !px-2 !text-xs" onClick={() => { setScale(1); setPan({ x: 0, y: 0 }); }}>Reset</button>
+        <span className="text-xs text-stone-500 self-center ml-2">Hold Shift/Ctrl + Scroll to zoom, Drag to pan</span>
+      </div>
+      {block.content.dataUrl ? (
+        <div
+          className="overflow-hidden bg-stone-50 dark:bg-slate-950 rounded-none border-2 border-black dark:border-white cursor-move h-[420px] relative mb-3"
+          onWheelCapture={handleWheel}
+          onMouseDown={startDrag}
+          onMouseMove={doDrag}
+          onMouseUp={endDrag}
+          onMouseLeave={endDrag}
+          onTouchStart={(e) => startDrag({ clientX: e.touches[0].clientX, clientY: e.touches[0].clientY })}
+          onTouchMove={(e) => doDrag({ clientX: e.touches[0].clientX, clientY: e.touches[0].clientY })}
+          onTouchEnd={endDrag}
+        >
+          <img
+            alt={block.content.caption ?? block.content.name ?? "Workspace image"}
+            style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`, transformOrigin: 'center', transition: isDragging ? 'none' : 'transform 0.1s' }}
+            className="w-full h-full object-contain pointer-events-none"
+            src={block.content.dataUrl}
+          />
+        </div>
+      ) : null}
+      <input className="w-full bg-transparent text-sm outline-none mt-1" onChange={(event) => void updateBlockContent(block.id, { caption: event.target.value })} placeholder="Caption" value={block.content.caption ?? ""} />
     </BlockShell>
   );
 }
@@ -742,7 +807,7 @@ function TaskListCard({ task }) {
 
 
 function CalendarView({ searchQuery }) {
-  const { blocks, quickAddTask, setSelectedTask } = useAppStore();
+  const { blocks, openTaskModal, setSelectedTask } = useAppStore();
   const [cursor, setCursor] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(todayIso());
   const tasks = blocks.filter((block) => block.type === "task").filter((task) => blockMatchesSearch(task, searchQuery));
@@ -778,7 +843,7 @@ function CalendarView({ searchQuery }) {
         <aside className="rounded-lg border border-stone-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
           <h3 className="mb-3 font-semibold">{formatShortDate(selectedDay)}</h3>
           {selectedDay >= todayIso() && (
-            <button className="mb-3 inline-flex h-9 items-center gap-2 rounded-md bg-stone-950 px-3 text-sm font-medium text-white dark:bg-emerald-500 dark:text-slate-950" onClick={() => void quickAddTask(`New task ${selectedDay}`, useAppStore.getState().activePageId)} type="button">
+            <button className="mb-3 inline-flex h-9 items-center gap-2 rounded-md bg-stone-950 px-3 text-sm font-medium text-white dark:bg-emerald-500 dark:text-slate-950" onClick={() => void openTaskModal({ deadline: selectedDay, pageId: useAppStore.getState().activePageId })} type="button">
               <Plus size={16} /> Add task for day
             </button>
           )}
@@ -811,38 +876,19 @@ function TaskRow({ task }) {
 
 function InsightsView() {
   const {
-    activePageId,
     blocks,
     dismissDeletedItem,
-    exportBackup,
-    exportPageMarkdown,
-    importBackup,
-    pages,
     recentlyDeleted,
     restoreDeletedItem,
     setNotification,
     undoLastChange,
     undoStack
   } = useAppStore();
-  const fileInputRef = useRef(null);
   const tasks = blocks.filter((block) => block.type === "task");
   const completed = tasks.filter((task) => task.metadata.completed);
   const streak = useMemo(() => calculateStreak(tasks), [tasks]);
   const completionRate = tasks.length ? Math.round((completed.length / tasks.length) * 100) : 0;
 
-  const onExport = () => downloadText(`stones-backup-${todayIso()}.json`, JSON.stringify(exportBackup(), null, 2), "application/json");
-  const onMarkdownExport = () => {
-    const page = pages.find((item) => item.id === activePageId);
-    downloadText(`${slugify(page?.title ?? "page")}.md`, exportPageMarkdown(activePageId), "text/markdown");
-  };
-  const onPdfExport = () => {
-    const page = pages.find((item) => item.id === activePageId);
-    printPagePdf(page?.title ?? "Stones page", exportPageMarkdown(activePageId));
-  };
-  const onImport = async (file) => {
-    if (!file) return;
-    await importBackup(JSON.parse(await file.text()));
-  };
   const enableReminders = async () => {
     if (!("Notification" in window)) {
       setNotification("Browser notifications are not supported here.");
@@ -860,19 +906,14 @@ function InsightsView() {
         <Metric label="Rate" value={`${completionRate}%`} color="purple" />
         <Metric label="Streak" value={`${streak}d`} color="orange" />
       </div>
-      <section className="rounded-lg border border-stone-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-        <h3 className="mb-3 text-base font-semibold">Backup</h3>
+      <section className="rounded-none border-2 border-black bg-white p-4 shadow-[4px_4px_0_0_#000] dark:border-white dark:bg-slate-900 dark:shadow-[4px_4px_0_0_#fff]">
+        <h3 className="mb-3 text-base font-semibold">Workspace Settings</h3>
         <div className="flex flex-wrap gap-2">
-          <HeaderButton icon={Download} label="Export JSON" onClick={onExport} />
-          <HeaderButton icon={FileDown} label="Export Markdown" onClick={onMarkdownExport} />
-          <HeaderButton icon={Printer} label="Export PDF" onClick={onPdfExport} />
-          <HeaderButton icon={Upload} label="Import JSON" onClick={() => fileInputRef.current?.click()} />
           <HeaderButton icon={Bell} label="Enable Reminders" onClick={enableReminders} />
           <HeaderButton disabled={!undoStack.length} icon={RotateCcw} label="Undo Last Change" onClick={() => void undoLastChange()} />
-          <input accept="application/json" className="hidden" onChange={(event) => void onImport(event.target.files?.[0])} ref={fileInputRef} type="file" />
         </div>
       </section>
-      <section className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <section className="rounded-none border-2 border-black bg-white p-4 shadow-[4px_4px_0_0_#000] dark:border-white dark:bg-slate-900 dark:shadow-[4px_4px_0_0_#fff]">
         <h3 className="mb-3 text-base font-semibold">Recovery</h3>
         <div className="grid gap-2">
           {recentlyDeleted.length ? recentlyDeleted.map((item) => (
@@ -976,16 +1017,65 @@ function TaskDetailPanel() {
   );
 }
 
-function AiReviewModal() {
-  const { acceptAiReview, aiReview, dismissAiReview, updateAiDraft } = useAppStore();
-  if (!aiReview) return null;
+function TaskModal({ initialParams, onClose, onSubmit }) {
+  const [title, setTitle] = useState(initialParams?.title ?? "");
+  const [notes, setNotes] = useState(initialParams?.notes ?? "");
+  const [priority, setPriority] = useState(initialParams?.priority ?? "medium");
+  const [deadline, setDeadline] = useState(initialParams?.deadline ?? "");
+  const [time, setTime] = useState(initialParams?.time ?? "");
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (title.trim()) {
+      onSubmit({
+        title: title.trim(),
+        notes: notes.trim(),
+        priority,
+        deadline: deadline ? (time ? `${deadline}T${time}` : deadline) : undefined,
+        pageId: initialParams?.pageId,
+        sourceBlockId: initialParams?.sourceBlockId
+      });
+      onClose();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-40 grid place-items-center bg-stone-950/40 p-4">
-      <section className="max-h-[85vh] w-full max-w-2xl overflow-auto rounded-lg bg-white p-5 shadow-2xl dark:bg-slate-900">
-        <div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-stone-500">AI review</p><h3 className="text-lg font-semibold">Review extracted tasks from {aiReview.provider}</h3></div><IconButton icon={X} title="Close review" onClick={dismissAiReview} /></div>
-        <div className="grid gap-3">{aiReview.tasks.map((task, index) => <div className="grid gap-2 rounded-md border border-stone-200 p-3 dark:border-slate-700" key={`${task.title}-${index}`}><label className="flex items-center gap-2 text-sm font-medium"><input checked={task.selected} onChange={(event) => updateAiDraft(index, { selected: event.target.checked })} type="checkbox" />Add this task</label><input className="rounded-md border border-stone-200 bg-white px-3 py-2 text-sm outline-none dark:border-slate-700 dark:bg-slate-950" onChange={(event) => updateAiDraft(index, { title: event.target.value })} value={task.title} /><div className="grid grid-cols-2 gap-2 max-sm:grid-cols-1"><select className="rounded-md border border-stone-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950" onChange={(event) => updateAiDraft(index, { priority: event.target.value })} value={task.priority ?? "medium"}><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select><input className="rounded-md border border-stone-200 bg-white px-3 py-2 text-sm outline-none dark:border-slate-700 dark:bg-slate-950" onChange={(event) => updateAiDraft(index, { deadline: event.target.value })} type="datetime-local" value={toInputDate(task.deadline) ?? ""} /></div></div>)}</div>
-        <div className="mt-4 flex justify-end gap-2"><HeaderButton label="Cancel" onClick={dismissAiReview} /><button className="h-10 rounded-md bg-stone-950 px-3 text-sm font-medium text-white dark:bg-emerald-500 dark:text-slate-950" onClick={() => void acceptAiReview()} type="button">Add Selected</button></div>
-      </section>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 transition-opacity">
+      <div className="w-full max-w-md app-card p-6 animate-in fade-in zoom-in duration-200">
+        <h3 className="mb-4 text-xl font-bold">New Task</h3>
+        <form onSubmit={handleSubmit} className="grid gap-4">
+          <label className="grid gap-1 font-semibold text-sm">
+            Title
+            <input autoFocus className="rounded-none border-2 border-black px-3 py-2 outline-none dark:border-white dark:bg-slate-900" value={title} onChange={(e) => setTitle(e.target.value)} required />
+          </label>
+          <label className="grid gap-1 font-semibold text-sm">
+            Description (optional)
+            <textarea className="rounded-none border-2 border-black px-3 py-2 outline-none dark:border-white dark:bg-slate-900 min-h-[80px]" value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </label>
+          <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
+            <label className="grid gap-1 font-semibold text-sm">
+              Priority
+              <select className="rounded-none border-2 border-black px-3 py-2 outline-none dark:border-white dark:bg-slate-900" value={priority} onChange={(e) => setPriority(e.target.value)}>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </label>
+            <label className="grid gap-1 font-semibold text-sm">
+              Deadline
+              <input type="date" className="rounded-none border-2 border-black px-3 py-2 outline-none dark:border-white dark:bg-slate-900" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+            </label>
+            <label className="grid gap-1 font-semibold text-sm col-span-2 max-sm:col-span-1">
+              Time (optional)
+              <input type="time" className="rounded-none border-2 border-black px-3 py-2 outline-none dark:border-white dark:bg-slate-900" value={time} onChange={(e) => setTime(e.target.value)} />
+            </label>
+          </div>
+          <div className="mt-4 flex justify-end gap-2">
+            <button type="button" className="rich-button" onClick={onClose}>Cancel</button>
+            <button type="submit" className="rich-button bg-[#8bdc65] text-black">Create Task</button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
@@ -997,7 +1087,7 @@ function CommandPalette({ onClose }) {
   const normalized = query.trim().toLowerCase();
   const actions = [
     ...(isWorkspace ? [
-      ["/task", "Create task", Check, () => void addTaskBlock()],
+      ["/task", "Create task", Check, () => void openTaskModal()],
       ["/note", "Create note", Plus, () => void addNoteBlock()],
       ["/checklist", "Create checklist", ListChecks, () => void addChecklistBlock()],
       ["/link", "Create link", Link, () => void addLinkBlock()],

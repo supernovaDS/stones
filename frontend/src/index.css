@@ -17,6 +17,7 @@
 
   * {
     box-sizing: border-box;
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
   }
 
   body {
@@ -42,60 +43,53 @@
     height: 2rem;
     width: 2rem;
     place-items: center;
-    border-radius: 0.375rem;
-    border: 1px solid #e7e5e4;
+    border-radius: 0;
+    border: 2px solid #1c1917;
     background: #ffffff;
-    color: #57534e;
-    box-shadow: 0 1px 2px rgba(28, 25, 23, 0.06);
-    transition:
-      background 150ms ease,
-      color 150ms ease,
-      box-shadow 150ms ease;
+    color: #1c1917;
+    box-shadow: 3px 3px 0px #1c1917;
   }
 
   .icon-button:hover {
-    background: #f5f5f4;
-    color: #1c1917;
-    box-shadow: 0 8px 24px rgba(28, 25, 23, 0.1);
+    background: #f4f6f2;
+    transform: translate(-2px, -2px);
+    box-shadow: 5px 5px 0px #1c1917;
   }
 
   .icon-button.danger:hover {
-    background: #fef2f2;
-    color: #b91c1c;
+    background: #ef4444;
+    color: #ffffff;
   }
 
   .dark .icon-button {
     background: #0f172a;
-    border-color: #334155;
-    color: #cbd5e1;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    border-color: #f8fafc;
+    color: #f8fafc;
+    box-shadow: 3px 3px 0px #f8fafc;
   }
 
   .dark .icon-button:hover {
     background: #1e293b;
-    color: #f8fafc;
+    transform: translate(-2px, -2px);
+    box-shadow: 5px 5px 0px #f8fafc;
   }
 
   .dark .icon-button.danger:hover {
-    background: rgba(127, 29, 29, 0.45);
-    color: #fecaca;
+    background: #ef4444;
+    color: #ffffff;
   }
 
   .app-card {
-    border-radius: 0.75rem;
-    border: 1px solid #e7e5e4;
-    background: rgba(255, 255, 255, 0.92);
-    box-shadow:
-      0 1px 2px rgba(28, 25, 23, 0.05),
-      0 16px 40px rgba(87, 83, 78, 0.08);
+    border-radius: 0;
+    border: 3px solid #1c1917;
+    background: #ffffff;
+    box-shadow: 5px 5px 0px #1c1917;
   }
 
   .dark .app-card {
-    border-color: #1e293b;
-    background: rgba(15, 23, 42, 0.86);
-    box-shadow:
-      0 1px 2px rgba(0, 0, 0, 0.3),
-      0 18px 46px rgba(0, 0, 0, 0.22);
+    border-color: #f8fafc;
+    background: #0f172a;
+    box-shadow: 5px 5px 0px #f8fafc;
   }
 
   .rich-button {
@@ -103,27 +97,73 @@
     height: 2rem;
     align-items: center;
     justify-content: center;
-    border-radius: 0.375rem;
-    border: 1px solid #e7e5e4;
+    border-radius: 0;
+    border: 2px solid #1c1917;
     background: #ffffff;
     padding: 0 0.65rem;
     font-size: 0.8rem;
     font-weight: 700;
-    color: #44403c;
-    box-shadow: 0 1px 2px rgba(28, 25, 23, 0.06);
+    color: #1c1917;
+    box-shadow: 3px 3px 0px #1c1917;
   }
 
   .rich-button:hover {
-    background: #f5f5f4;
+    background: #f4f6f2;
+    transform: translate(-2px, -2px);
+    box-shadow: 5px 5px 0px #1c1917;
   }
 
   .dark .rich-button {
-    border-color: #334155;
+    border-color: #f8fafc;
     background: #0f172a;
-    color: #e2e8f0;
+    color: #f8fafc;
+    box-shadow: 3px 3px 0px #f8fafc;
   }
 
   .dark .rich-button:hover {
     background: #1e293b;
+    transform: translate(-2px, -2px);
+    box-shadow: 5px 5px 0px #f8fafc;
+  }
+}
+
+@layer utilities {
+
+  .rounded-md,
+  .rounded-lg,
+  .rounded-xl,
+  .rounded-full,
+  .rounded-sm,
+  .rounded {
+    border-radius: 0 !important;
+  }
+
+  .shadow-sm,
+  .shadow-md,
+  .shadow-lg,
+  .shadow-xl,
+  .shadow-2xl {
+    box-shadow: 4px 4px 0px #1c1917 !important;
+  }
+
+  .dark .shadow-sm,
+  .dark .shadow-md,
+  .dark .shadow-lg,
+  .dark .shadow-xl,
+  .dark .shadow-2xl {
+    box-shadow: 4px 4px 0px #f8fafc !important;
+  }
+
+  .border,
+  .border-l-4,
+  .border-b,
+  .border-t,
+  .border-r {
+    border-style: solid !important;
+    border-width: 2px !important;
+  }
+
+  .border-l-4 {
+    border-left-width: 6px !important;
   }
 }

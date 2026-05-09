@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import { db } from "../db/schema";
-import { extractTasksFromText } from "../services/ai";
 import {
   nextRecurringDate,
   normalizeDateText,
@@ -83,10 +82,9 @@ export const useAppStore = create((set, get) => ({
   view: "workspace",
   loading: true,
   error: undefined,
-  aiStatus: undefined,
   selectedTaskId: undefined,
-  aiReview: undefined,
   notification: undefined,
+  taskModalParams: null,
   undoStack: [],
   recentlyDeleted: [],
   theme: defaultTheme(),
@@ -154,6 +152,8 @@ export const useAppStore = create((set, get) => ({
   setView: (view) => set({ view }),
   setActivePage: (pageId) => set({ activePageId: pageId, view: "workspace" }),
   setSelectedTask: (taskId) => set({ selectedTaskId: taskId }),
+  openTaskModal: (params = {}) => set({ taskModalParams: params }),
+  closeTaskModal: () => set({ taskModalParams: null }),
   setTheme: (theme) => {
     localStorage.setItem("stones-theme", theme);
     set({ theme });
@@ -177,8 +177,7 @@ export const useAppStore = create((set, get) => ({
       blocks: sortBlocks((snapshot.data.blocks ?? []).map(normalizeBlock)),
       sections: sortSections(snapshot.data.sections ?? []),
       undoStack: rest,
-      selectedTaskId: undefined,
-      aiReview: undefined
+      selectedTaskId: undefined
     });
     get().setNotification(`Undid ${snapshot.label}`);
   },
@@ -350,15 +349,19 @@ export const useAppStore = create((set, get) => ({
   addNoteBlock: async (pageId = get().activePageId) =>
     addBlock(get, set, pageId, "note", { text: "" }),
 
-  addTaskBlock: async (pageId = get().activePageId, title = "") =>
-    addBlock(
+  addTaskBlock: async (taskData) => {
+    const pageId = taskData.pageId || get().activePageId;
+    if (!pageId) return;
+    return addBlock(
       get,
       set,
       pageId,
       "task",
-      { title, notes: "", subtasks: [], dependencyIds: [] },
-      { completed: false, priority: "medium", recurrence: "none" }
-    ),
+      { title: taskData.title, notes: taskData.notes || "", subtasks: [], dependencyIds: [] },
+      { completed: false, priority: taskData.priority || "medium", recurrence: "none", deadline: taskData.deadline },
+      { sourceBlockId: taskData.sourceBlockId }
+    );
+  },
 
   addChecklistBlock: async (pageId = get().activePageId) =>
     addBlock(get, set, pageId, "checklist", {
@@ -639,43 +642,16 @@ export const useAppStore = create((set, get) => ({
     }));
   },
 
-  quickAddTask: async (input, pageId = get().activePageId) => {
-    const title = input.trim();
-    if (!title) return;
-
-    const parsed = parseQuickTask(title);
-    await createTaskFromExtraction(
-      {
-        title: parsed.title,
-        priority: parsed.priority,
-        dueText: parsed.dueText
-      },
-      pageId,
-      get,
-      set,
-      {
-        deadline: parsed.deadline,
-        recurrence: parsed.recurrence,
-        customRecurrenceInterval: parsed.customRecurrenceInterval
-      }
-    );
-  },
-
   convertNoteToTask: async (blockId) => {
     const note = get().blocks.find((block) => block.id === blockId);
     if (!note || note.type !== "note" || !note.content.text.trim()) return;
 
-    await createTaskFromExtraction(
-      {
-        title: note.content.text.trim().split("\n")[0],
-        priority: "medium",
-        sourceBlockId: note.id,
-        pageId: note.pageId
-      },
-      note.pageId,
-      get,
-      set
-    );
+    get().openTaskModal({
+      title: note.content.text.trim().split("\n")[0],
+      priority: "medium",
+      sourceBlockId: note.id,
+      pageId: note.pageId
+    });
   },
 
   convertTextToTask: async (blockId, text) => {
@@ -683,88 +659,13 @@ export const useAppStore = create((set, get) => ({
     const title = text?.trim();
     if (!note || note.type !== "note" || !title) return;
 
-    await createTaskFromExtraction(
-      {
-        title: title.split("\n")[0],
-        priority: "medium",
-        sourceBlockId: note.id,
-        pageId: note.pageId
-      },
-      note.pageId,
-      get,
-      set
-    );
-  },
-
-  extractTasksWithAi: async (blockId) => {
-    const note = get().blocks.find((block) => block.id === blockId);
-    if (!note || note.type !== "note" || !note.content.text.trim()) return;
-
-    set({ aiStatus: "Extracting tasks...", error: undefined });
-    try {
-      const result = await extractTasksFromText(
-        note.content.text,
-        note.id,
-        note.pageId
-      );
-      set({
-        aiReview: {
-          sourceBlockId: note.id,
-          pageId: note.pageId,
-          provider: result.provider,
-          tasks: result.tasks.map((task) => ({
-            ...task,
-            deadline: normalizeDateText(task.dueText),
-            priority: task.priority ?? "medium",
-            selected: true
-          }))
-        },
-        aiStatus: `Review ${result.tasks.length} extracted task${result.tasks.length === 1 ? "" : "s"} from ${result.provider}.`
-      });
-    } catch {
-      set({
-        error:
-          "AI extraction is unavailable. Start the backend or create tasks manually.",
-        aiStatus: undefined
-      });
-    }
-  },
-
-  updateAiDraft: (index, patch) => {
-    set((state) => {
-      if (!state.aiReview) return {};
-      return {
-        aiReview: {
-          ...state.aiReview,
-          tasks: state.aiReview.tasks.map((task, taskIndex) =>
-            taskIndex === index ? { ...task, ...patch } : task
-          )
-        }
-      };
+    get().openTaskModal({
+      title: title.split("\n")[0],
+      priority: "medium",
+      sourceBlockId: note.id,
+      pageId: note.pageId
     });
   },
-
-  acceptAiReview: async () => {
-    const review = get().aiReview;
-    if (!review) return;
-    const selectedTasks = review.tasks.filter(
-      (task) => task.selected && task.title.trim()
-    );
-    for (const task of selectedTasks) {
-      await createTaskFromExtraction(
-        { ...task, sourceBlockId: review.sourceBlockId, pageId: review.pageId },
-        review.pageId,
-        get,
-        set
-      );
-    }
-    set({
-      aiReview: undefined,
-      aiStatus: `Added ${selectedTasks.length} reviewed task${selectedTasks.length === 1 ? "" : "s"}.`
-    });
-  },
-
-  dismissAiReview: () => set({ aiReview: undefined, aiStatus: undefined }),
 
   exportBackup: () => ({
     version: 2,
@@ -863,7 +764,7 @@ export const useAppStore = create((set, get) => ({
   }
 }));
 
-const addBlock = async (get, set, pageId, type, content, metadata = {}) => {
+const addBlock = async (get, set, pageId, type, content, metadata = {}, extra = {}) => {
   if (!pageId) return;
   pushUndoSnapshot(get, set, `create ${type}`);
   const state = get();
@@ -881,7 +782,8 @@ const addBlock = async (get, set, pageId, type, content, metadata = {}) => {
     type,
     order,
     content,
-    metadata: { createdAt, updatedAt: createdAt, ...metadata }
+    metadata: { createdAt, updatedAt: createdAt, ...metadata },
+    ...extra
   };
   await db.blocks.add(block);
   set((current) => ({ blocks: sortBlocks([...current.blocks, block]) }));
