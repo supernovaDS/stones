@@ -1,0 +1,102 @@
+import {
+  CalendarPlus,
+  Check,
+  Code2,
+  Command,
+  Image,
+  Link,
+  ListChecks,
+  Plus,
+  RotateCcw,
+  Search
+} from "lucide-react";
+import { useRef } from "react";
+import { useAppStore } from "../../store/useAppStore";
+import { viewTitle } from "../../utils/helpers";
+import { HeaderButton } from "../ui";
+
+export function Topbar({ searchQuery, onSearchChange, onCommandOpen, activePage, view }) {
+  const {
+    addChecklistBlock,
+    addCodeBlock,
+    addImageBlock,
+    addLinkBlock,
+    addNoteBlock,
+    openTaskModal,
+    openTodayPage,
+    undoLastChange,
+    undoStack
+  } = useAppStore();
+  const imageInputRef = useRef(null);
+
+  const addImage = async (file) => {
+    await addImageBlock(file);
+    if (imageInputRef.current) imageInputRef.current.value = "";
+  };
+
+  return (
+    <header className="topbar">
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-black uppercase tracking-wide text-stone-600 dark:text-slate-300">
+          {new Date().toLocaleDateString(undefined, {
+            weekday: "long",
+            month: "long",
+            day: "numeric"
+          })}
+        </p>
+        <h2 className="max-w-full truncate text-3xl font-black tracking-normal max-sm:text-2xl">
+          {view === "workspace" ? activePage?.title : viewTitle(view)}
+        </h2>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <HeaderButton icon={Command} label="Menu" onClick={onCommandOpen} />
+        <HeaderButton
+          disabled={!undoStack.length}
+          icon={RotateCcw}
+          label="Undo"
+          onClick={() => void undoLastChange()}
+        />
+        {view === "workspace" && activePage && (
+          <>
+            <HeaderButton icon={Plus} label="Note" onClick={() => void addNoteBlock()} />
+            <HeaderButton icon={ListChecks} label="Checklist" onClick={() => void addChecklistBlock()} />
+            <HeaderButton icon={Link} label="Link" onClick={() => void addLinkBlock()} />
+            <HeaderButton icon={Code2} label="Code" onClick={() => void addCodeBlock()} />
+            <HeaderButton icon={Image} label="Image" onClick={() => imageInputRef.current?.click()} />
+            <button
+              className="nb-button action"
+              onClick={() => openTaskModal()}
+              type="button"
+            >
+              <Check size={16} />
+              Task
+            </button>
+          </>
+        )}
+        <input
+          accept="image/*"
+          className="hidden"
+          onChange={(event) => void addImage(event.target.files?.[0])}
+          ref={imageInputRef}
+          type="file"
+        />
+      </div>
+    </header>
+  );
+}
+
+export function SearchBar({ searchQuery, onSearchChange }) {
+  return (
+    <div className="mb-5 grid gap-3">
+      <label className="nb-input flex min-h-12 items-center gap-2 px-3 text-sm text-stone-600 dark:text-slate-300">
+        <Search size={16} />
+        <input
+          className="min-w-0 flex-1 bg-transparent text-stone-900 outline-none dark:text-white"
+          onChange={(event) => onSearchChange(event.target.value)}
+          placeholder="Search notes, tasks, pages..."
+          value={searchQuery}
+        />
+      </label>
+    </div>
+  );
+}

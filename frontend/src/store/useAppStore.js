@@ -82,12 +82,15 @@ export const useAppStore = create((set, get) => ({
   view: "workspace",
   loading: true,
   error: undefined,
+  settingsOpen: false,
   selectedTaskId: undefined,
   notification: undefined,
   taskModalParams: null,
   undoStack: [],
   recentlyDeleted: [],
   theme: defaultTheme(),
+
+  setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
 
   initialize: async () => {
     set({ loading: true, error: undefined });
@@ -260,7 +263,7 @@ export const useAppStore = create((set, get) => ({
     }));
   },
 
-  createPage: async (sectionId = get().sections[0]?.id) => {
+  createPage: async (sectionId = get().sections[0]?.id, title = "Untitled page") => {
     const workspaceId = get().workspaces[0]?.id;
     if (!workspaceId) return;
 
@@ -270,7 +273,7 @@ export const useAppStore = create((set, get) => ({
       id: createId("page"),
       workspaceId,
       sectionId,
-      title: "Untitled page",
+      title,
       createdAt,
       updatedAt: createdAt
     };
@@ -459,8 +462,10 @@ export const useAppStore = create((set, get) => ({
 
     await db.blocks.put(updatedBlock);
     set((state) => ({
-      blocks: state.blocks.map((item) =>
-        item.id === blockId ? updatedBlock : item
+      blocks: sortBlocks(
+        state.blocks.map((item) =>
+          item.id === blockId ? updatedBlock : item
+        )
       )
     }));
   },
