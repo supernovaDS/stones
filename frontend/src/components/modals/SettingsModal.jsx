@@ -19,8 +19,8 @@ export function SettingsModal() {
           </button>
         </div>
         
-        <div className="min-h-48 rounded-lg border-2 border-dashed border-stone-300 p-8 text-center dark:border-stone-700">
-          <p className="text-sm font-bold text-stone-500 dark:text-slate-400">
+        <div className="min-h-48 rounded-lg border-2 border-dashed border-stone-300 p-8 text-center dark:border-[#1e232a]">
+          <p className="text-sm font-bold text-stone-500 dark:text-[#5a5650]">
             Settings will be added here in the future.
           </p>
         </div>

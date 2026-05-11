@@ -90,11 +90,11 @@ export function priorityDot(priority) {
 // ── Insights helpers ────────────────────────────────────────────
 
 export function heatColor(count) {
-  if (count === 0) return "bg-[#eef2ea] dark:bg-slate-800";
-  if (count === 1) return "bg-[#dff8d4]";
-  if (count === 2) return "bg-[#8bdc65]";
-  if (count === 3) return "bg-[#ffb45c]";
-  return "bg-[#8f75ff]";
+  if (count === 0) return "bg-[#eef2ea] dark:bg-[#12151a]";
+  if (count === 1) return "bg-[#dff8d4] dark:bg-[#0a2818]";
+  if (count === 2) return "bg-[#8bdc65] dark:bg-[#0a3d28]";
+  if (count === 3) return "bg-[#ffb45c] dark:bg-[#3d2800]";
+  return "bg-[#8f75ff] dark:bg-[#1a1040]";
 }
 
 export function calculateStreak(tasks) {
@@ -197,14 +197,7 @@ export function notifyDueReminders(tasks, setNotification) {
     if (Number.isNaN(due) || due > now) continue;
 
     const title = task.content.title || "Task reminder";
-    if ("Notification" in window && Notification.permission === "granted") {
-      new Notification("Stones reminder", {
-        body: title,
-        icon: "/stones_logo.png"
-      });
-    } else {
-      setNotification(`Reminder: ${title}`);
-    }
+    setNotification(`Reminder: ${title}`);
     fired.add(task.id);
     changed = true;
   }

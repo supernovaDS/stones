@@ -32,8 +32,8 @@ export function WorkspaceView({ pageId, searchQuery }) {
 
   return (
     <div className="bento-grid">
-      <section className="bento-card span-8 bg-[#ffdc4a] p-5 dark:bg-[#2a2200]">
-        <p className="mb-2 text-xs font-black uppercase tracking-wide text-black/70 dark:text-white/60">Active page</p>
+      <section className="bento-card span-8 bg-[#ffdc4a] p-5 dark:bg-[#1a1500]">
+        <p className="mb-2 text-xs font-black uppercase tracking-wide text-black/70 dark:text-[#7a7670]">Active page</p>
         <input
           className="hero-title w-full bg-transparent outline-none"
           onChange={(event) => page && void renamePage(page.id, event.target.value)}
@@ -43,8 +43,8 @@ export function WorkspaceView({ pageId, searchQuery }) {
 
         </p>
       </section>
-      <section className="bento-card span-4 bg-[#21caff] p-5 dark:bg-[#002b3a]">
-        <p className="mb-3 text-xs font-black uppercase tracking-wide text-black/70 dark:text-white/60">Export and backup</p>
+      <section className="bento-card span-4 bg-[#21caff] p-5 dark:bg-[#001a25]">
+        <p className="mb-3 text-xs font-black uppercase tracking-wide text-black/70 dark:text-[#7a7670]">Export and backup</p>
         <div className="flex gap-2 flex-wrap">
           <HeaderButton icon={FileDown} label="MD" onClick={onMarkdownExport} />
           <HeaderButton icon={Printer} label="PDF" onClick={onPdfExport} />
@@ -61,7 +61,7 @@ export function WorkspaceView({ pageId, searchQuery }) {
             </div>
           ))
         ) : (
-          <div className="bento-card bg-[#2ef2a6] p-8 text-center">
+          <div className="bento-card bg-[#2ef2a6] p-8 text-center dark:bg-[#0a3d28]">
             <p className="text-2xl font-black">No blocks match this search.</p>
           </div>
         )}

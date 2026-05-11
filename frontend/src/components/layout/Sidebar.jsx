@@ -20,14 +20,14 @@ export function Sidebar({ dueToday, overdue }) {
 
   return (
     <aside className="sidebar-shell">
-      <div className="border-b-4 border-black bg-[#ffdc4a] p-4 dark:border-white dark:bg-[#1e1e1e]">
+      <div className="border-b-4 border-black bg-[#ffdc4a] p-4 dark:border-[#1e232a] dark:bg-[#0c0e11]">
         <div className="flex items-center gap-3">
-          <div className="grid h-14 w-14 place-items-center overflow-hidden rounded-lg border-[3px] border-black bg-white shadow-[4px_4px_0_#111] dark:border-white dark:bg-[#202020] dark:shadow-[4px_4px_0_#fff]">
+          <div className="grid h-14 w-14 place-items-center overflow-hidden rounded-lg border-[3px] border-black bg-white shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[3px_3px_0_#000]">
             <img alt="Stones logo" className="h-full w-full object-cover" src="/stones_logo.png" />
           </div>
           <div className="min-w-0">
             <h1 className="brand-word leading-tight">Stones</h1>
-            <p className="text-xs font-black uppercase tracking-wide text-black/70">Task + workspace</p>
+            <p className="text-xs font-black uppercase tracking-wide text-black/70 dark:text-[#7a7670]">Task + workspace</p>
           </div>
           <button
             className="icon-button ml-auto"
@@ -57,8 +57,8 @@ export function Sidebar({ dueToday, overdue }) {
         })}
       </nav>
 
-      <div className="mx-4 mb-3 flex items-center justify-between border-t-4 border-black pt-4 dark:border-white">
-        <p className="text-xs font-black uppercase tracking-wide text-stone-700 dark:text-slate-200">
+      <div className="mx-4 mb-3 flex items-center justify-between border-t-4 border-black pt-4 dark:border-[#1e232a]">
+        <p className="text-xs font-black uppercase tracking-wide text-stone-700 dark:text-[#7a7670]">
           Pages
         </p>
       </div>
@@ -74,7 +74,7 @@ export function Sidebar({ dueToday, overdue }) {
               <span className="truncate min-w-0 flex-1">{page.title}</span>
             </button>
             <button
-              className="absolute right-4 grid h-7 w-7 place-items-center rounded-md text-stone-500 opacity-0 transition hover:bg-[#ff5a5f] hover:text-black group-hover:opacity-100 dark:text-slate-300"
+              className="absolute right-4 grid h-7 w-7 place-items-center rounded-md text-stone-500 opacity-0 transition hover:bg-[#ff5a5f] hover:text-black group-hover:opacity-100 dark:text-[#7a7670] dark:hover:bg-[#3d1215] dark:hover:text-[#e8a0a2]"
               onClick={() => void deletePage(page.id)}
               title="Delete page"
               type="button"
@@ -105,7 +105,7 @@ export function Sidebar({ dueToday, overdue }) {
       </button>
 
       <div className="mx-4 mt-6">
-        <p className="text-xs font-black uppercase tracking-wide text-stone-700 dark:text-slate-200">
+        <p className="text-xs font-black uppercase tracking-wide text-stone-700 dark:text-[#7a7670]">
           Tasks:
         </p>
       </div>

@@ -284,6 +284,7 @@ export const useAppStore = create((set, get) => ({
       activePageId: page.id,
       view: "workspace"
     }));
+    get().setNotification(`Page "${title}" created`);
   },
 
   movePageToSection: async (pageId, sectionId) => {
@@ -625,6 +626,7 @@ export const useAppStore = create((set, get) => ({
       activePageId: state.activePageId === pageId ? state.pages.find((item) => item.id !== pageId)?.id : state.activePageId,
       recentlyDeleted: [deletedItem, ...state.recentlyDeleted].slice(0, 12)
     }));
+    get().setNotification(`Page "${page.title}" deleted`);
   },
 
   deleteBlock: async (blockId) => {
@@ -645,6 +647,7 @@ export const useAppStore = create((set, get) => ({
         state.selectedTaskId === blockId ? undefined : state.selectedTaskId,
       recentlyDeleted: [deletedItem, ...state.recentlyDeleted].slice(0, 12)
     }));
+    get().setNotification("Block deleted");
   },
 
   convertNoteToTask: async (blockId) => {
@@ -792,7 +795,7 @@ const addBlock = async (get, set, pageId, type, content, metadata = {}, extra = 
   };
   await db.blocks.add(block);
   set((current) => ({ blocks: sortBlocks([...current.blocks, block]) }));
-  get().setNotification("Block created successfully");
+  get().setNotification(`${type.charAt(0).toUpperCase() + type.slice(1)} added`);
 };
 
 const createTaskFromExtraction = async (

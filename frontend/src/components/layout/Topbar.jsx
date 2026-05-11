@@ -37,7 +37,7 @@ export function Topbar({ searchQuery, onSearchChange, onCommandOpen, activePage,
   return (
     <header className="topbar">
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-black uppercase tracking-wide text-stone-600 dark:text-slate-300">
+        <p className="text-sm font-black uppercase tracking-wide text-stone-600 dark:text-[#7a7670]">
           {new Date().toLocaleDateString(undefined, {
             weekday: "long",
             month: "long",
@@ -88,10 +88,10 @@ export function Topbar({ searchQuery, onSearchChange, onCommandOpen, activePage,
 export function SearchBar({ searchQuery, onSearchChange }) {
   return (
     <div className="mb-5 grid gap-3">
-      <label className="nb-input flex min-h-12 items-center gap-2 px-3 text-sm text-stone-600 dark:text-slate-300">
+      <label className="nb-input flex min-h-12 items-center gap-2 px-3 text-sm text-stone-600 dark:text-[#7a7670]">
         <Search size={16} />
         <input
-          className="min-w-0 flex-1 bg-transparent text-stone-900 outline-none dark:text-white"
+          className="min-w-0 flex-1 bg-transparent text-stone-900 outline-none dark:text-[#c8c3ba]"
           onChange={(event) => onSearchChange(event.target.value)}
           placeholder="Search notes, tasks, pages..."
           value={searchQuery}

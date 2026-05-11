@@ -44,7 +44,7 @@ function BlockShell({ block, label, children, actions }) {
   return (
     <article className={clsx("bento-card h-full border-l-[10px] p-4", blockTypeRail[block.type] ?? "border-l-stone-400")}>
       <div className="mb-4 flex items-center justify-between gap-3">
-        <p className="text-xs font-black uppercase tracking-wide text-stone-700 dark:text-slate-200">{label}</p>
+        <p className="text-xs font-black uppercase tracking-wide text-stone-700 dark:text-[#7a7670]">{label}</p>
         <div className="flex flex-wrap gap-2">
           <IconButton icon={ArrowUp} title="Move up" onClick={() => void moveBlock(block.id, "up")} />
           <IconButton icon={ArrowDown} title="Move down" onClick={() => void moveBlock(block.id, "down")} />
@@ -126,17 +126,17 @@ function NoteBlock({ block }) {
         />
       )}
       {linkedTasks.length ? (
-        <div className="mt-4 rounded-lg border-[3px] border-black bg-[#f1f5ff] p-3 shadow-[4px_4px_0_#111] dark:border-white dark:bg-[#202020] dark:shadow-[4px_4px_0_#fff]">
-          <p className="mb-2 text-xs font-black uppercase tracking-wide text-stone-700 dark:text-slate-200">Linked tasks</p>
+        <div className="mt-4 rounded-lg border-[3px] border-black bg-[#f1f5ff] p-3 shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[3px_3px_0_#000]">
+          <p className="mb-2 text-xs font-black uppercase tracking-wide text-stone-700 dark:text-[#7a7670]">Linked tasks</p>
           <div className="grid gap-2">
             {linkedTasks.map((task) => (
               <button
-                className="nb-button justify-between bg-white text-left"
+                className="nb-button justify-between bg-white text-left dark:bg-[#12151a]"
                 key={task.id}
                 onClick={() => setSelectedTask(task.id)}
                 type="button"
               >
-                <span className={clsx("truncate", task.metadata.completed && "text-stone-400 line-through")}>{task.content.title}</span>
+                <span className={clsx("truncate", task.metadata.completed && "text-stone-400 line-through dark:text-[#5a5650]")}>{task.content.title}</span>
               </button>
             ))}
           </div>
@@ -157,7 +157,7 @@ function TaskBlock({ block }) {
         <div className="flex items-start gap-3">
           <Checkbox checked={block.metadata.completed} onChange={() => void toggleTask(block.id)} className="mt-1" />
           <input
-            className={clsx("min-w-0 flex-1 bg-transparent text-xl font-black outline-none", block.metadata.completed && "text-stone-400 line-through")}
+            className={clsx("min-w-0 flex-1 bg-transparent text-xl font-black outline-none", block.metadata.completed && "text-stone-400 line-through dark:text-[#5a5650]")}
             onChange={(event) => void updateTask(block.id, { title: event.target.value })}
             placeholder="Task title"
             value={block.content.title}
@@ -215,7 +215,7 @@ function ChecklistBlock({ block }) {
     <BlockShell block={block} label="Checklist">
       <div className="grid gap-2">
         {items.map((item) => (
-          <div className="flex items-center gap-3 rounded-lg border-[3px] border-black bg-[#f7f2e8] p-2 dark:border-white dark:bg-[#202020]" key={item.id}>
+          <div className="flex items-center gap-3 rounded-lg border-[3px] border-black bg-[#f7f2e8] p-2 dark:border-[#1e232a] dark:bg-[#12151a]" key={item.id}>
             <Checkbox checked={item.completed} onChange={(event) => updateItems(items.map((entry) => entry.id === item.id ? { ...entry, completed: event.target.checked } : entry))} />
             <input className="min-w-0 flex-1 bg-transparent font-bold outline-none" onChange={(event) => updateItems(items.map((entry) => entry.id === item.id ? { ...entry, text: event.target.value } : entry))} value={item.text} />
             <IconButton danger icon={X} title="Remove item" onClick={() => updateItems(items.filter((entry) => entry.id !== item.id))} />
@@ -237,7 +237,7 @@ function CodeBlock({ block }) {
     <BlockShell block={block} label="Code">
       <div className="grid gap-2">
         <input className="nb-input h-11 px-3 text-sm font-black" onChange={(event) => void updateBlockContent(block.id, { language: event.target.value })} value={block.content.language ?? ""} />
-        <textarea className="min-h-44 rounded-lg border-[3px] border-black bg-[#111] p-4 font-mono text-sm leading-6 text-[#2ef2a6] outline-none shadow-[5px_5px_0_#111] dark:border-white dark:shadow-[5px_5px_0_#fff]" onChange={(event) => void updateBlockContent(block.id, { code: event.target.value })} value={block.content.code ?? ""} />
+        <textarea className="min-h-44 rounded-lg border-[3px] border-black bg-[#111] p-4 font-mono text-sm leading-6 text-[#2ef2a6] outline-none shadow-[5px_5px_0_#111] dark:border-[#1e232a] dark:bg-[#0a0c0f] dark:text-[#4dd89a] dark:shadow-[3px_3px_0_#000]" onChange={(event) => void updateBlockContent(block.id, { code: event.target.value })} value={block.content.code ?? ""} />
       </div>
     </BlockShell>
   );
@@ -259,7 +259,7 @@ function LinkBlock({ block }) {
         </a>
         {embedUrl ? (
           <iframe
-            className="mt-2 w-full max-w-[560px] aspect-video h-auto rounded-lg border-[3px] border-black shadow-[4px_4px_0_#111] dark:border-white dark:shadow-[4px_4px_0_#fff]"
+            className="mt-2 w-full max-w-[560px] aspect-video h-auto rounded-lg border-[3px] border-black shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:shadow-[3px_3px_0_#000]"
             src={embedUrl}
             allow="autoplay; encrypted-media; picture-in-picture"
             allowFullScreen
@@ -304,8 +304,8 @@ function ImageBlock({ block }) {
         <button type="button" className="rich-button" onClick={() => setScale((s) => Math.min(s + 0.2, 5))}><ZoomIn size={14} /> Zoom</button>
         <button type="button" className="rich-button" onClick={() => setScale((s) => Math.max(s - 0.2, 0.5))}><ZoomOut size={14} /> Zoom</button>
         <button type="button" className="rich-button" onClick={() => { setScale(1); setPan({ x: 0, y: 0 }); }}><Move size={14} /> Reset</button>
-        <button type="button" className="rich-button bg-[#21caff]" onClick={() => setFullscreen(true)}><Maximize2 size={14} /> Fullscreen</button>
-        <span className="self-center text-xs font-bold text-stone-600 dark:text-slate-300">Scroll with Shift/Ctrl to zoom. Drag to pan.</span>
+        <button type="button" className="rich-button bg-[#21caff] dark:bg-[#002535]" onClick={() => setFullscreen(true)}><Maximize2 size={14} /> Fullscreen</button>
+        <span className="self-center text-xs font-bold text-stone-600 dark:text-[#7a7670]">Scroll with Shift/Ctrl to zoom. Drag to pan.</span>
       </div>
       {block.content.dataUrl ? (
         <ImageCanvas
@@ -353,7 +353,7 @@ function ImageCanvas({ alt, dataUrl, doDrag, endDrag, fullscreen, handleWheel, i
   return (
     <div
       className={clsx(
-        "relative mb-3 cursor-grab overflow-hidden rounded-lg border-[4px] border-black bg-[#fff1b8] shadow-[6px_6px_0_#111] active:cursor-grabbing dark:border-white dark:bg-[#202020] dark:shadow-[6px_6px_0_#fff]",
+        "relative mb-3 cursor-grab overflow-hidden rounded-lg border-[4px] border-black bg-[#fff1b8] shadow-[6px_6px_0_#111] active:cursor-grabbing dark:border-[#1e232a] dark:bg-[#0a0c0f] dark:shadow-[4px_4px_0_#000]",
         fullscreen ? "h-[72vh]" : "h-[420px] max-sm:h-[300px]"
       )}
       onMouseDown={startDrag}
@@ -375,7 +375,7 @@ function ImageCanvas({ alt, dataUrl, doDrag, endDrag, fullscreen, handleWheel, i
           transition: isDragging ? "none" : "transform 110ms ease"
         }}
       />
-      <div className="absolute bottom-3 left-3 rounded-md border-[3px] border-black bg-white px-2 py-1 text-xs font-black shadow-[3px_3px_0_#111] dark:border-white dark:bg-[#151515] dark:shadow-[3px_3px_0_#fff]">
+      <div className="absolute bottom-3 left-3 rounded-md border-[3px] border-black bg-white px-2 py-1 text-xs font-black shadow-[3px_3px_0_#111] dark:border-[#1e232a] dark:bg-[#0c0e11] dark:text-[#7a7670] dark:shadow-[2px_2px_0_#000]">
         {Math.round(scale * 100)}%
       </div>
     </div>
@@ -412,13 +412,13 @@ function renderInlineMarkdown(text) {
     } else if (token.startsWith("_")) {
       parts.push(<em key={`${token}-${match.index}`}>{token.slice(1, -1)}</em>);
     } else if (token.startsWith("`")) {
-      parts.push(<code className="rounded border-2 border-black bg-[#ffdc4a] px-1 py-0.5 text-xs text-black" key={`${token}-${match.index}`}>{token.slice(1, -1)}</code>);
+      parts.push(<code className="rounded border-2 border-black bg-[#ffdc4a] px-1 py-0.5 text-xs text-black dark:border-[#1e232a] dark:bg-[#3d2800] dark:text-[#c8c3ba]" key={`${token}-${match.index}`}>{token.slice(1, -1)}</code>);
     } else if (token.startsWith("[[")) {
-      parts.push(<span className="rounded border-2 border-black bg-[#2ef2a6] px-1 font-black text-black" key={`${token}-${match.index}`}>{token}</span>);
+      parts.push(<span className="rounded border-2 border-black bg-[#2ef2a6] px-1 font-black text-black dark:border-[#1e232a] dark:bg-[#0a3d28] dark:text-[#6fd09a]" key={`${token}-${match.index}`}>{token}</span>);
     } else {
       const label = token.match(/^\[([^\]]+)\]/)?.[1] ?? token;
       const href = token.match(/\(([^)]+)\)$/)?.[1] ?? "#";
-      parts.push(<a className="font-black underline decoration-[3px]" href={href} key={`${token}-${match.index}`} rel="noreferrer" target="_blank">{label}</a>);
+      parts.push(<a className="font-black underline decoration-[3px] dark:text-[#6fa8d0]" href={href} key={`${token}-${match.index}`} rel="noreferrer" target="_blank">{label}</a>);
     }
     lastIndex = match.index + token.length;
   }

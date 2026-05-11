@@ -6,6 +6,18 @@
   :root {
     color: #15120f;
     background: #fff7e8;
+    --dark-text: #c8c3ba;
+    --dark-text-muted: #7a7670;
+    --dark-surface: #0c0e11;
+    --dark-surface-raised: #12151a;
+    --dark-surface-overlay: #181c22;
+    --dark-border: #1e232a;
+    --dark-shadow: #000000;
+    --dark-highlight: #1a1f26;
+    --dark-accent-yellow: #7a6200;
+    --dark-accent-green: #0a6b42;
+    --dark-accent-blue: #003345;
+    --dark-accent-red: #5c1a1d;
     font-family:
       "Space Grotesk", Inter, ui-sans-serif, system-ui, -apple-system,
       BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -48,6 +60,11 @@
     background: #ffdc4a;
     color: #111111;
   }
+
+  .dark ::selection {
+    background: #7a6200;
+    color: #e8e4dc;
+  }
 }
 
 @layer components {
@@ -62,11 +79,11 @@
   }
 
   .dark .app-shell {
-    color: #fff8e8;
+    color: var(--dark-text);
     background:
-      radial-gradient(circle at 12% 8%, rgba(255, 220, 74, 0.16), transparent 28rem),
-      radial-gradient(circle at 90% 16%, rgba(33, 202, 255, 0.12), transparent 24rem),
-      linear-gradient(135deg, #111111 0%, #1a1720 55%, #0d1821 100%);
+      radial-gradient(circle at 12% 8%, rgba(255, 220, 74, 0.03), transparent 26rem),
+      radial-gradient(circle at 90% 16%, rgba(33, 202, 255, 0.02), transparent 22rem),
+      linear-gradient(135deg, #08090b 0%, #0a0c0f 52%, #08090b 100%);
   }
 
   .layout-grid {
@@ -90,9 +107,9 @@
   }
 
   .dark .sidebar-shell {
-    border-color: #f8fafc;
-    background: #151515;
-    box-shadow: 9px 9px 0 #f8fafc;
+    border-color: var(--dark-border);
+    background: var(--dark-surface);
+    box-shadow: 6px 6px 0 var(--dark-shadow);
   }
 
   .content-shell {
@@ -117,9 +134,9 @@
   }
 
   .dark .topbar {
-    border-color: #f8fafc;
-    background: #151515;
-    box-shadow: 7px 7px 0 #f8fafc;
+    border-color: var(--dark-border);
+    background: var(--dark-surface);
+    box-shadow: 4px 4px 0 var(--dark-shadow);
   }
 
   .brutal-card,
@@ -143,14 +160,14 @@
 
   .dark .brutal-card,
   .dark .app-card {
-    border-color: #f8fafc;
-    background: #151515;
-    box-shadow: 7px 7px 0 #f8fafc;
+    border-color: var(--dark-border);
+    background: var(--dark-surface);
+    box-shadow: 4px 4px 0 var(--dark-shadow);
   }
 
   .dark .brutal-card:hover,
   .dark .app-card:hover {
-    box-shadow: 10px 10px 0 #f8fafc;
+    box-shadow: 6px 6px 0 var(--dark-shadow);
   }
 
   .bento-grid {
@@ -178,13 +195,13 @@
   }
 
   .dark .bento-card {
-    border-color: #f8fafc;
-    background: #151515;
-    box-shadow: 7px 7px 0 #f8fafc;
+    border-color: var(--dark-border);
+    background: var(--dark-surface);
+    box-shadow: 4px 4px 0 var(--dark-shadow);
   }
 
   .dark .bento-card:hover {
-    box-shadow: 10px 10px 0 #f8fafc;
+    box-shadow: 6px 6px 0 var(--dark-shadow);
   }
 
   .nb-button,
@@ -219,22 +236,23 @@
   .dark .nb-button,
   .dark .rich-button,
   .dark .icon-button {
-    border-color: #f8fafc;
-    background: #202020;
-    color: #fff8e8;
-    box-shadow: 4px 4px 0 #f8fafc;
+    border-color: var(--dark-border);
+    background: var(--dark-surface-raised);
+    color: var(--dark-text);
+    box-shadow: 3px 3px 0 var(--dark-shadow);
   }
 
   .dark .nb-button:hover,
   .dark .rich-button:hover,
   .dark .icon-button:hover {
-    box-shadow: 6px 6px 0 #f8fafc;
+    box-shadow: 5px 5px 0 var(--dark-shadow);
+    background: var(--dark-surface-overlay);
   }
 
   .dark .nb-button:active,
   .dark .rich-button:active,
   .dark .icon-button:active {
-    box-shadow: 1px 1px 0 #f8fafc;
+    box-shadow: 1px 1px 0 var(--dark-shadow);
   }
 
   .nb-button {
@@ -254,9 +272,9 @@
   }
 
   .dark .nb-button.primary {
-    background: #a37f00;
-    color: #fff8e8;
-    border-color: #f8fafc;
+    background: var(--dark-accent-yellow);
+    color: var(--dark-text);
+    border-color: var(--dark-border);
   }
 
   .nb-button.action {
@@ -265,15 +283,22 @@
   }
 
   .dark .nb-button.action {
-    background: #0b8a5b;
-    color: #fff8e8;
-    border-color: #f8fafc;
+    background: var(--dark-accent-green);
+    color: var(--dark-text);
+    border-color: var(--dark-border);
   }
 
   .nb-button.danger,
   .icon-button.danger:hover {
     background: #ff5a5f;
     color: #111111;
+  }
+
+  .dark .nb-button.danger,
+  .dark .icon-button.danger:hover {
+    background: var(--dark-accent-red);
+    color: #e8a0a2;
+    border-color: var(--dark-border);
   }
 
   .nb-button:disabled {
@@ -325,17 +350,17 @@
   .dark .nb-input,
   .dark .nb-select,
   .dark .nb-textarea {
-    border-color: #f8fafc;
-    background: #202020;
-    color: #fff8e8;
-    box-shadow: 4px 4px 0 #f8fafc;
+    border-color: var(--dark-border);
+    background: var(--dark-surface-raised);
+    color: var(--dark-text);
+    box-shadow: 3px 3px 0 var(--dark-shadow);
   }
 
   .dark .nb-input:focus,
   .dark .nb-select:focus,
   .dark .nb-textarea:focus {
-    box-shadow: 7px 7px 0 #f8fafc;
-    background: #2b2b2b;
+    box-shadow: 5px 5px 0 var(--dark-shadow);
+    background: var(--dark-highlight);
   }
 
   .nav-button {
@@ -371,16 +396,16 @@
   }
 
   .dark .nav-button:hover {
-    border-color: #f8fafc;
-    background: transparent;
-    box-shadow: 2px 2px 0 #f8fafc;
+    border-color: var(--dark-border);
+    background: var(--dark-surface-raised);
+    box-shadow: 2px 2px 0 var(--dark-shadow);
   }
 
   .dark .nav-button.active {
-    border-color: #f8fafc;
-    background: #2a2a2a;
-    color: #2ef2a6;
-    box-shadow: 4px 4px 0 #f8fafc;
+    border-color: var(--dark-border);
+    background: var(--dark-highlight);
+    color: #6fd09a;
+    box-shadow: 3px 3px 0 var(--dark-shadow);
   }
 
   .page-chip {
@@ -409,18 +434,18 @@
   }
 
   .dark .page-chip {
-    border-color: #f8fafc;
-    background: #202020;
-    color: #fff8e8;
-    box-shadow: 4px 4px 0 #f8fafc;
+    border-color: var(--dark-border);
+    background: var(--dark-surface-raised);
+    color: var(--dark-text);
+    box-shadow: 3px 3px 0 var(--dark-shadow);
   }
 
   .dark .page-chip:hover,
   .dark .page-chip.active {
-    border-color: #f8fafc;
-    background: #2ef2a6;
-    color: #111111;
-    box-shadow: 4px 4px 0 #f8fafc;
+    border-color: var(--dark-border);
+    background: var(--dark-highlight);
+    color: #6fd09a;
+    box-shadow: 3px 3px 0 var(--dark-shadow);
   }
 
   .priority-high {
@@ -429,16 +454,34 @@
     color: #111111;
   }
 
+  .dark .priority-high {
+    border-color: var(--dark-border) !important;
+    background: var(--dark-accent-red) !important;
+    color: #e8a0a2 !important;
+  }
+
   .priority-medium {
     border-color: #111111;
     background: #ffb84d !important;
     color: #111111;
   }
 
+  .dark .priority-medium {
+    border-color: var(--dark-border) !important;
+    background: #5c4000 !important;
+    color: #d4a560 !important;
+  }
+
   .priority-low {
     border-color: #111111;
     background: #2ef2a6 !important;
     color: #111111;
+  }
+
+  .dark .priority-low {
+    border-color: var(--dark-border) !important;
+    background: var(--dark-accent-green) !important;
+    color: #6fd09a !important;
   }
 
   .modal-backdrop {
@@ -450,6 +493,10 @@
     background: rgba(17, 17, 17, 0.5);
     padding: 1rem;
     animation: fade-in 140ms ease-out;
+  }
+
+  .dark .modal-backdrop {
+    background: rgba(0, 0, 0, 0.7);
   }
 
   .modal-card {
@@ -464,9 +511,9 @@
   }
 
   .dark .modal-card {
-    border-color: #f8fafc;
-    background: #151515;
-    box-shadow: 13px 13px 0 #f8fafc;
+    border-color: var(--dark-border);
+    background: var(--dark-surface);
+    box-shadow: 8px 8px 0 var(--dark-shadow);
   }
 
   .toast-shell {
@@ -498,8 +545,15 @@
   }
 
   .dark .toast-popup {
-    border-color: #f8fafc;
-    box-shadow: 9px 9px 0 #f8fafc;
+    border-color: var(--dark-border);
+    background: var(--dark-accent-green);
+    color: var(--dark-text);
+    box-shadow: 6px 6px 0 var(--dark-shadow);
+  }
+
+  .dark .toast-popup.error {
+    background: var(--dark-accent-red);
+    color: #e8a0a2;
   }
 
   .brand-word {
@@ -529,9 +583,10 @@
   }
 
   .dark .kbd {
-    border-color: #f8fafc;
-    background: #202020;
-    box-shadow: 2px 2px 0 #f8fafc;
+    border-color: var(--dark-border);
+    background: var(--dark-surface-raised);
+    color: var(--dark-text-muted);
+    box-shadow: 2px 2px 0 var(--dark-shadow);
   }
 }
 
@@ -612,7 +667,7 @@
     }
 
     .dark .topbar {
-      box-shadow: 5px 5px 0 #f8fafc;
+      box-shadow: 3px 3px 0 var(--dark-shadow);
     }
 
     .brutal-card,
@@ -625,7 +680,7 @@
     .dark .brutal-card,
     .dark .app-card,
     .dark .bento-card {
-      box-shadow: 5px 5px 0 #f8fafc;
+      box-shadow: 3px 3px 0 var(--dark-shadow);
     }
   }
 }

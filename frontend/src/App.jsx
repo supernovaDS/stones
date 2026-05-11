@@ -3,9 +3,9 @@ import { useAppStore } from "./store/useAppStore";
 import { isOverdue, isToday } from "./utils/date";
 import { notifyDueReminders } from "./utils/helpers";
 
+import { Toaster, toast } from "sonner";
 import { Sidebar } from "./components/layout/Sidebar";
 import { Topbar, SearchBar } from "./components/layout/Topbar";
-import { Notice } from "./components/ui";
 import { WorkspaceView, TaskListView, CalendarView, InsightsView } from "./components/views";
 import { TaskDetailPanel, TaskModal, CommandPalette, SettingsModal } from "./components/modals";
 
@@ -73,6 +73,18 @@ function App() {
   }, [openTasks, setNotification]);
 
   // ── Loading state ───────────────────────────────────────────
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+    }
+  }, [error]);
+
+  useEffect(() => {
+    if (notification) {
+      toast.success(notification);
+    }
+  }, [notification]);
+
   if (loading) {
     return (
       <main className="app-shell grid min-h-screen place-items-center p-6">
@@ -100,9 +112,6 @@ function App() {
 
           <SearchBar searchQuery={searchQuery} onSearchChange={setSearchQuery} />
 
-          {error ? <Notice tone="red">{error}</Notice> : null}
-          {notification ? <Notice tone="green">{notification}</Notice> : null}
-
           {view === "workspace" && activePage ? (
             <WorkspaceView pageId={activePage.id} searchQuery={searchQuery} />
           ) : null}
@@ -124,6 +133,15 @@ function App() {
       ) : null}
       {commandOpen ? <CommandPalette onClose={() => setCommandOpen(false)} /> : null}
       {settingsOpen ? <SettingsModal /> : null}
+      <Toaster 
+        position="top-center" 
+        toastOptions={{
+          className: "border-4 border-black !bg-[#2ef2a6] !text-[#111111] !font-black !text-base shadow-[9px_9px_0_#111] rounded-[10px] dark:border-[#1e232a] dark:!bg-[#0a6b42] dark:!text-[#c8c3ba] dark:shadow-[6px_6px_0_#000] !p-4 !rounded-xl !border-4 !opacity-100",
+          error: {
+            className: "!bg-[#ff5a5f] border-4 border-black !text-[#111111] !font-black !text-base shadow-[9px_9px_0_#111] rounded-[10px] dark:border-[#1e232a] dark:!bg-[#3d1215] dark:!text-[#e8a0a2] dark:shadow-[6px_6px_0_#000]"
+          }
+        }} 
+      />
     </main>
   );
 }
