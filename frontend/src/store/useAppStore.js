@@ -16,6 +16,7 @@ const sortSections = (sections) =>
   [...sections].sort((a, b) => a.order - b.order);
 
 const defaultTheme = () => localStorage.getItem("stones-theme") ?? "light";
+const defaultColorProfile = () => localStorage.getItem("stones-color-profile") ?? "neo";
 
 const seedData = () => {
   const createdAt = nowIso();
@@ -89,6 +90,7 @@ export const useAppStore = create((set, get) => ({
   undoStack: [],
   recentlyDeleted: [],
   theme: defaultTheme(),
+  colorProfile: defaultColorProfile(),
 
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
 
@@ -160,6 +162,10 @@ export const useAppStore = create((set, get) => ({
   setTheme: (theme) => {
     localStorage.setItem("stones-theme", theme);
     set({ theme });
+  },
+  setColorProfile: (colorProfile) => {
+    localStorage.setItem("stones-color-profile", colorProfile);
+    set({ colorProfile });
   },
   setNotification: (msg) => {
     set({ notification: msg });

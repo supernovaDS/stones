@@ -15,6 +15,7 @@ function App() {
     addTaskBlock,
     blocks,
     closeTaskModal,
+    colorProfile,
     error,
     initialize,
     loading,
@@ -45,8 +46,17 @@ function App() {
 
   // ── Theme sync ──────────────────────────────────────────────
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark");
-  }, [theme]);
+    // Glow profile is always dark-only
+    const isDark = theme === "dark" || colorProfile === "glow";
+    document.documentElement.classList.toggle("dark", isDark);
+  }, [theme, colorProfile]);
+
+  // ── Color profile sync ─────────────────────────────────────
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.remove("profile-neo", "profile-minimal", "profile-glow");
+    root.classList.add(`profile-${colorProfile}`);
+  }, [colorProfile]);
 
   // ── Global keyboard shortcuts ───────────────────────────────
   useEffect(() => {

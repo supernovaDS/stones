@@ -23,7 +23,7 @@ export function Sidebar({ dueToday, overdue }) {
       <div className="border-b-4 border-black bg-[#ffdc4a] p-4 dark:border-[#1e232a] dark:bg-[#0c0e11]">
         <div className="flex items-center gap-3">
           <div className="grid h-14 w-14 place-items-center overflow-hidden rounded-lg border-[3px] border-black bg-white shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[3px_3px_0_#000]">
-            <img alt="Stones logo" className="h-full w-full object-cover" src="/stones_logo.png" />
+            <img alt="Stones logo" className="h-full w-full object-cover" src="/stones_logo_2.png" />
           </div>
           <div className="min-w-0">
             <h1 className="brand-word leading-tight">Stones</h1>

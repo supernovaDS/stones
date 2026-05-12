@@ -59,38 +59,171 @@ function BlockShell({ block, label, children, actions }) {
 
 // ── Note block ──────────────────────────────────────────────────
 
-function NoteBlock({ block }) {
-  const { blocks, convertTextToTask, setSelectedTask, updateNote } = useAppStore();
-  const [draft, setDraft] = useState(block.content.text ?? "");
-  const [preview, setPreview] = useState(false);
-  const textareaRef = useRef(null);
-  const linkedTasks = blocks.filter((task) => task.type === "task" && task.sourceBlockId === block.id);
+const FONT_COLORS = ["#111111", "#ff5a5f", "#ff8c42", "#ffdc4a", "#2ef2a6", "#21caff", "#a78bfa", "#f472b6", "#ffffff"];
+
+function RichToolbar({ editorRef }) {
+  const [activeFormats, setActiveFormats] = useState({
+    bold: false,
+    italic: false,
+    underline: false,
+    justifyLeft: false,
+    justifyCenter: false,
+    justifyRight: false,
+    insertOrderedList: false,
+    insertUnorderedList: false,
+  });
+  const [showFontColor, setShowFontColor] = useState(false);
 
   useEffect(() => {
-    setDraft(block.content.text ?? "");
-  }, [block.id, block.content.text]);
+    const updateFormatState = () => {
+      const selection = window.getSelection();
+      if (!editorRef.current || !selection.anchorNode || !editorRef.current.contains(selection.anchorNode)) {
+        setActiveFormats({
+          bold: false,
+          italic: false,
+          underline: false,
+          justifyLeft: false,
+          justifyCenter: false,
+          justifyRight: false,
+          insertOrderedList: false,
+          insertUnorderedList: false,
+        });
+        return;
+      }
 
-  const formatSelection = (wrapper, suffix = wrapper) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selected = draft.slice(start, end) || "text";
-    const next = `${draft.slice(0, start)}${wrapper}${selected}${suffix}${draft.slice(end)}`;
-    setDraft(next);
-    void updateNote(block.id, next);
-    window.requestAnimationFrame(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + wrapper.length, start + wrapper.length + selected.length);
-    });
+      setActiveFormats({
+        bold: document.queryCommandState("bold"),
+        italic: document.queryCommandState("italic"),
+        underline: document.queryCommandState("underline"),
+        justifyLeft: document.queryCommandState("justifyLeft"),
+        justifyCenter: document.queryCommandState("justifyCenter"),
+        justifyRight: document.queryCommandState("justifyRight"),
+        insertOrderedList: document.queryCommandState("insertOrderedList"),
+        insertUnorderedList: document.queryCommandState("insertUnorderedList"),
+      });
+    };
+
+    document.addEventListener("selectionchange", updateFormatState);
+    return () => document.removeEventListener("selectionchange", updateFormatState);
+  }, []);
+
+  const exec = (command, value = null) => {
+    editorRef.current?.focus();
+    document.execCommand(command, false, value);
+    // Manually trigger update after command execution
+    setActiveFormats(prev => ({
+      ...prev,
+      [command]: document.queryCommandState(command)
+    }));
+  };
+
+  return (
+    <div className="rte-toolbar mb-3 flex flex-wrap items-center gap-1.5">
+      {/* Bold */}
+      <button className={clsx("rich-button", activeFormats.bold && "rich-button--active")} onMouseDown={(e) => e.preventDefault()} onClick={() => exec("bold")} type="button" title="Bold">
+        <strong>B</strong>
+      </button>
+      {/* Italic */}
+      <button className={clsx("rich-button italic", activeFormats.italic && "rich-button--active")} onMouseDown={(e) => e.preventDefault()} onClick={() => exec("italic")} type="button" title="Italic">
+        I
+      </button>
+      {/* Underline */}
+      <button className={clsx("rich-button", activeFormats.underline && "rich-button--active")} onMouseDown={(e) => e.preventDefault()} onClick={() => exec("underline")} type="button" title="Underline" style={{ textDecoration: "underline" }}>
+        U
+      </button>
+
+      <span className="rte-sep" />
+
+      {/* Align */}
+      <button className={clsx("rich-button", activeFormats.justifyLeft && "rich-button--active")} onMouseDown={(e) => e.preventDefault()} onClick={() => exec("justifyLeft")} type="button" title="Align left">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>
+      </button>
+      <button className={clsx("rich-button", activeFormats.justifyCenter && "rich-button--active")} onMouseDown={(e) => e.preventDefault()} onClick={() => exec("justifyCenter")} type="button" title="Align center">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+      </button>
+      <button className={clsx("rich-button", activeFormats.justifyRight && "rich-button--active")} onMouseDown={(e) => e.preventDefault()} onClick={() => exec("justifyRight")} type="button" title="Align right">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="9" y1="12" x2="21" y2="12"/><line x1="6" y1="18" x2="21" y2="18"/></svg>
+      </button>
+
+      <span className="rte-sep" />
+
+      {/* Numbered list */}
+      <button className={clsx("rich-button", activeFormats.insertOrderedList && "rich-button--active")} onMouseDown={(e) => e.preventDefault()} onClick={() => exec("insertOrderedList")} type="button" title="Numbered list">
+        1.
+      </button>
+      {/* Bullet list */}
+      <button className={clsx("rich-button", activeFormats.insertUnorderedList && "rich-button--active")} onMouseDown={(e) => e.preventDefault()} onClick={() => exec("insertUnorderedList")} type="button" title="Bullet list">
+        •
+      </button>
+
+      <span className="rte-sep" />
+
+      {/* Font Color */}
+      <div className="relative">
+        <button className="rich-button" onMouseDown={(e) => e.preventDefault()} onClick={() => {
+          setShowFontColor((v) => !v);
+        }} type="button" title="Font color">
+          A<span className="ml-0.5 inline-block h-[3px] w-3 rounded" style={{ background: "#ff5a5f" }} />
+        </button>
+        {showFontColor ? (
+          <div className="rte-dropdown" onMouseDown={(e) => e.preventDefault()}>
+            {FONT_COLORS.map((color) => (
+              <button
+                className="rte-swatch"
+                key={color}
+                onClick={() => { exec("foreColor", color); setShowFontColor(false); }}
+                style={{ background: color }}
+                title={color}
+                type="button"
+              />
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function NoteBlock({ block }) {
+  const { blocks, convertTextToTask, setSelectedTask, updateBlockContent } = useAppStore();
+  const editorRef = useRef(null);
+  const linkedTasks = blocks.filter((task) => task.type === "task" && task.sourceBlockId === block.id);
+  const isInitializing = useRef(false);
+
+  // Initialize editor content from stored HTML or plain text
+  useEffect(() => {
+    if (!editorRef.current) return;
+    isInitializing.current = true;
+    const html = block.content.html ?? "";
+    const text = block.content.text ?? "";
+    // Prefer stored HTML; fall back to plain text (wrap lines in <p> tags)
+    if (html) {
+      editorRef.current.innerHTML = html;
+    } else if (text) {
+      editorRef.current.innerHTML = text
+        .split("\n")
+        .map((line) => `<p>${line || "<br>"}</p>`)
+        .join("");
+    } else {
+      editorRef.current.innerHTML = "";
+    }
+    isInitializing.current = false;
+  }, [block.id]); // only re-init when block changes
+
+  const handleInput = () => {
+    if (isInitializing.current) return;
+    const editor = editorRef.current;
+    if (!editor) return;
+    const html = editor.innerHTML;
+    const text = editor.innerText;
+    void updateBlockContent(block.id, { html, text });
   };
 
   const convertSelection = () => {
-    const textarea = textareaRef.current;
-    const selected = textarea
-      ? draft.slice(textarea.selectionStart, textarea.selectionEnd)
-      : "";
-    void convertTextToTask(block.id, selected || draft.split("\n")[0]);
+    const sel = window.getSelection();
+    const text = sel ? sel.toString() : "";
+    const fallback = editorRef.current?.innerText?.split("\n")[0] ?? "";
+    void convertTextToTask(block.id, text || fallback);
   };
 
   return (
@@ -103,28 +236,15 @@ function NoteBlock({ block }) {
         </>
       }
     >
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <button className="rich-button" onMouseDown={(e) => e.preventDefault()} onClick={() => formatSelection("**")} type="button">B</button>
-        <button className="rich-button italic" onMouseDown={(e) => e.preventDefault()} onClick={() => formatSelection("_")} type="button">I</button>
-        <button className="rich-button font-mono" onMouseDown={(e) => e.preventDefault()} onClick={() => formatSelection("`")} type="button">`</button>
-        <button className="rich-button" onMouseDown={(e) => e.preventDefault()} onClick={() => formatSelection("- ", "")} type="button">List</button>
-        <button className="rich-button" onMouseDown={(e) => e.preventDefault()} onClick={() => formatSelection("[", "](https://)")} type="button">Link</button>
-        <button className="rich-button ml-auto" onClick={() => setPreview((value) => !value)} type="button">
-          {preview ? "Edit" : "Preview"}
-        </button>
-      </div>
-      {preview ? (
-        <MarkdownPreview text={draft} />
-      ) : (
-        <textarea
-          className="nb-textarea min-h-36 w-full resize-y px-4 py-3 text-base leading-7"
-          onBlur={() => void updateNote(block.id, draft)}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder="Write a note, meeting thought, or rough plan..."
-          ref={textareaRef}
-          value={draft}
-        />
-      )}
+      <RichToolbar editorRef={editorRef} />
+      <div
+        className="nb-textarea rte-editor min-h-36 w-full px-4 py-3 text-base leading-7"
+        contentEditable
+        onInput={handleInput}
+        ref={editorRef}
+        suppressContentEditableWarning
+        data-placeholder="Write a note, meeting thought, or rough plan..."
+      />
       {linkedTasks.length ? (
         <div className="mt-4 rounded-lg border-[3px] border-black bg-[#f1f5ff] p-3 shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[3px_3px_0_#000]">
           <p className="mb-2 text-xs font-black uppercase tracking-wide text-stone-700 dark:text-[#7a7670]">Linked tasks</p>
@@ -211,8 +331,18 @@ function ChecklistBlock({ block }) {
   const { updateBlockContent } = useAppStore();
   const items = block.content.items ?? [];
   const updateItems = (nextItems) => void updateBlockContent(block.id, { items: nextItems });
+  
+  const completedCount = items.filter((item) => item.completed).length;
+  const progress = items.length === 0 ? 0 : Math.round((completedCount / items.length) * 100);
+
   return (
     <BlockShell block={block} label="Checklist">
+      <div className="mb-4 flex items-center gap-3">
+        <div className="h-3 flex-1 overflow-hidden rounded-full border-2 border-black bg-white shadow-[2px_2px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[1px_1px_0_#000]">
+          <div className="h-full bg-[#2ef2a6] dark:bg-[#0a3d28]" style={{ width: `${progress}%`, transition: "width 0.3s ease" }} />
+        </div>
+        <span className="text-xs font-black text-stone-500 dark:text-[#5a5650]">{progress}%</span>
+      </div>
       <div className="grid gap-2">
         {items.map((item) => (
           <div className="flex items-center gap-3 rounded-lg border-[3px] border-black bg-[#f7f2e8] p-2 dark:border-[#1e232a] dark:bg-[#12151a]" key={item.id}>
