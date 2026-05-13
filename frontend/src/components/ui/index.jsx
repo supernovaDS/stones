@@ -18,13 +18,13 @@ export function IconButton({ danger, icon: Icon, onClick, title }) {
 
 export function Metric({ label, value, color }) {
   const colors = {
-    green: "bg-[#2ef2a6] dark:bg-[#0a3d28]",
-    orange: "bg-[#ffb84d] dark:bg-[#3d2800]",
-    red: "bg-[#ff5a5f] dark:bg-[#3d1215]",
-    blue: "bg-[#21caff] dark:bg-[#002535]",
-    purple: "bg-[#c4a8ff] dark:bg-[#1a1040]",
-    pink: "bg-[#ff5ec4] dark:bg-[#3d0030]",
-    teal: "bg-[#00e0c6] dark:bg-[#002e28]"
+    green: "bg-white border-l-[10px] border-l-[#2ef2a6] dark:bg-[#12151a] dark:border-l-[#0a3d28]",
+    orange: "bg-white border-l-[10px] border-l-[#ffb84d] dark:bg-[#12151a] dark:border-l-[#3d2800]",
+    red: "bg-white border-l-[10px] border-l-[#ff5a5f] dark:bg-[#12151a] dark:border-l-[#3d1215]",
+    blue: "bg-white border-l-[10px] border-l-[#21caff] dark:bg-[#12151a] dark:border-l-[#002535]",
+    purple: "bg-white border-l-[10px] border-l-[#c4a8ff] dark:bg-[#12151a] dark:border-l-[#1a1040]",
+    pink: "bg-white border-l-[10px] border-l-[#ff5ec4] dark:bg-[#12151a] dark:border-l-[#3d0030]",
+    teal: "bg-white border-l-[10px] border-l-[#00e0c6] dark:bg-[#12151a] dark:border-l-[#002e28]"
   };
   return (
     <div className={clsx("bento-card p-3 text-black dark:text-[#c8c3ba]", colors[color] ?? "bg-white dark:bg-[#12151a]")}>
@@ -36,12 +36,12 @@ export function Metric({ label, value, color }) {
 
 export function InsightCard({ color, label, value }) {
   const colorClasses = {
-    green: "bg-[#2ef2a6] dark:bg-[#0a3d28]",
-    orange: "bg-[#ffb84d] dark:bg-[#3d2800]",
-    purple: "bg-[#c4a8ff] dark:bg-[#1a1040]",
-    blue: "bg-[#21caff] dark:bg-[#002535]",
-    red: "bg-[#ff5a5f] dark:bg-[#3d1215]",
-    pink: "bg-[#ff5ec4] dark:bg-[#3d0030]"
+    green: "bg-white border-l-[10px] border-l-[#2ef2a6] dark:bg-[#12151a] dark:border-l-[#0a3d28]",
+    orange: "bg-white border-l-[10px] border-l-[#ffb84d] dark:bg-[#12151a] dark:border-l-[#3d2800]",
+    purple: "bg-white border-l-[10px] border-l-[#c4a8ff] dark:bg-[#12151a] dark:border-l-[#1a1040]",
+    blue: "bg-white border-l-[10px] border-l-[#21caff] dark:bg-[#12151a] dark:border-l-[#002535]",
+    red: "bg-white border-l-[10px] border-l-[#ff5a5f] dark:bg-[#12151a] dark:border-l-[#3d1215]",
+    pink: "bg-white border-l-[10px] border-l-[#ff5ec4] dark:bg-[#12151a] dark:border-l-[#3d0030]"
   };
   return (
     <div className={clsx("bento-card p-4 text-black dark:text-[#c8c3ba]", colorClasses[color] ?? "bg-white dark:bg-[#12151a]")}>

@@ -1,13 +1,8 @@
-/* ═══════════════════════════════════════════════════════════════
-   PROFILE: GLOW — Dark Minimal + Accent Glow
-   Dark-only immersive workspace. Purple/cyan accents with glow.
-   ═══════════════════════════════════════════════════════════════ */
-
 /* ── Root ─────────────────────────────────────────────────────── */
 .profile-glow {
   color: #F8FAFC;
   background: #0B1120;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 .profile-glow ::selection { background: rgba(139,92,246,0.4); color: #F8FAFC; }
@@ -281,8 +276,14 @@
 }
 
 /* ── Misc typography ─────────────────────────────────────────── */
-.profile-glow .brand-word { font-weight: 700; }
-.profile-glow .hero-title { font-weight: 700; }
+.profile-glow .brand-word,
+.profile-glow .hero-title,
+.profile-glow h1, .profile-glow h2, .profile-glow h3,
+.profile-glow .nb-button,
+.profile-glow .nav-button { 
+  font-family: "Satoshi", sans-serif;
+  font-weight: 700; 
+}
 
 .profile-glow .kbd {
   border: 1px solid rgba(255,255,255,0.08);

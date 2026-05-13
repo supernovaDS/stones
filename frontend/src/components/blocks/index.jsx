@@ -11,7 +11,6 @@ import {
   Move,
   PanelRight,
   Plus,
-  Sparkles,
   Trash2,
   X,
   ZoomIn,
@@ -71,6 +70,7 @@ function RichToolbar({ editorRef }) {
     justifyRight: false,
     insertOrderedList: false,
     insertUnorderedList: false,
+    foreColor: "#111111",
   });
   const [showFontColor, setShowFontColor] = useState(false);
 
@@ -87,9 +87,14 @@ function RichToolbar({ editorRef }) {
           justifyRight: false,
           insertOrderedList: false,
           insertUnorderedList: false,
+          foreColor: "#111111",
         });
         return;
       }
+
+      // queryCommandValue("foreColor") typically returns an rgb() string.
+      // If it fails or returns nothing, we default to #111111.
+      const currentForeColor = document.queryCommandValue("foreColor") || "#111111";
 
       setActiveFormats({
         bold: document.queryCommandState("bold"),
@@ -100,6 +105,7 @@ function RichToolbar({ editorRef }) {
         justifyRight: document.queryCommandState("justifyRight"),
         insertOrderedList: document.queryCommandState("insertOrderedList"),
         insertUnorderedList: document.queryCommandState("insertUnorderedList"),
+        foreColor: currentForeColor,
       });
     };
 
@@ -113,7 +119,8 @@ function RichToolbar({ editorRef }) {
     // Manually trigger update after command execution
     setActiveFormats(prev => ({
       ...prev,
-      [command]: document.queryCommandState(command)
+      [command]: command === "foreColor" ? value : document.queryCommandState(command),
+      ...(command === "foreColor" ? { foreColor: value } : {})
     }));
   };
 
@@ -136,13 +143,13 @@ function RichToolbar({ editorRef }) {
 
       {/* Align */}
       <button className={clsx("rich-button", activeFormats.justifyLeft && "rich-button--active")} onMouseDown={(e) => e.preventDefault()} onClick={() => exec("justifyLeft")} type="button" title="Align left">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="15" y2="12" /><line x1="3" y1="18" x2="18" y2="18" /></svg>
       </button>
       <button className={clsx("rich-button", activeFormats.justifyCenter && "rich-button--active")} onMouseDown={(e) => e.preventDefault()} onClick={() => exec("justifyCenter")} type="button" title="Align center">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6" /><line x1="6" y1="12" x2="18" y2="12" /><line x1="4" y1="18" x2="20" y2="18" /></svg>
       </button>
       <button className={clsx("rich-button", activeFormats.justifyRight && "rich-button--active")} onMouseDown={(e) => e.preventDefault()} onClick={() => exec("justifyRight")} type="button" title="Align right">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="9" y1="12" x2="21" y2="12"/><line x1="6" y1="18" x2="21" y2="18"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6" /><line x1="9" y1="12" x2="21" y2="12" /><line x1="6" y1="18" x2="21" y2="18" /></svg>
       </button>
 
       <span className="rte-sep" />
@@ -163,7 +170,7 @@ function RichToolbar({ editorRef }) {
         <button className="rich-button" onMouseDown={(e) => e.preventDefault()} onClick={() => {
           setShowFontColor((v) => !v);
         }} type="button" title="Font color">
-          A<span className="ml-0.5 inline-block h-[3px] w-3 rounded" style={{ background: "#ff5a5f" }} />
+          A<span className="ml-0.5 inline-block h-[3px] w-3 rounded" style={{ background: activeFormats.foreColor }} />
         </button>
         {showFontColor ? (
           <div className="rte-dropdown" onMouseDown={(e) => e.preventDefault()}>
@@ -185,7 +192,7 @@ function RichToolbar({ editorRef }) {
 }
 
 function NoteBlock({ block }) {
-  const { blocks, convertTextToTask, setSelectedTask, updateBlockContent } = useAppStore();
+  const { blocks, setSelectedTask, updateBlockContent } = useAppStore();
   const editorRef = useRef(null);
   const linkedTasks = blocks.filter((task) => task.type === "task" && task.sourceBlockId === block.id);
   const isInitializing = useRef(false);
@@ -219,22 +226,10 @@ function NoteBlock({ block }) {
     void updateBlockContent(block.id, { html, text });
   };
 
-  const convertSelection = () => {
-    const sel = window.getSelection();
-    const text = sel ? sel.toString() : "";
-    const fallback = editorRef.current?.innerText?.split("\n")[0] ?? "";
-    void convertTextToTask(block.id, text || fallback);
-  };
-
   return (
     <BlockShell
       block={block}
       label="Note"
-      actions={
-        <>
-          <IconButton icon={Sparkles} title="Convert selection to task" onClick={convertSelection} />
-        </>
-      }
     >
       <RichToolbar editorRef={editorRef} />
       <div
@@ -331,7 +326,7 @@ function ChecklistBlock({ block }) {
   const { updateBlockContent } = useAppStore();
   const items = block.content.items ?? [];
   const updateItems = (nextItems) => void updateBlockContent(block.id, { items: nextItems });
-  
+
   const completedCount = items.filter((item) => item.completed).length;
   const progress = items.length === 0 ? 0 : Math.round((completedCount / items.length) * 100);
 
@@ -378,7 +373,7 @@ function CodeBlock({ block }) {
 function LinkBlock({ block }) {
   const { updateBlockContent } = useAppStore();
   const embedUrl = getEmbedUrl(block.content.url);
-  
+
   return (
     <BlockShell block={block} label="External link">
       <div className="grid gap-2">

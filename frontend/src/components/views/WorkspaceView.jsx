@@ -1,34 +1,81 @@
-import { Download, FileDown, Printer, Upload } from "lucide-react";
-import { useRef } from "react";
+import { useEffect, useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
-import { todayIso } from "../../utils/date";
-import { blockMatchesSearch, slugify, downloadText, printPagePdf } from "../../utils/helpers";
+import { blockMatchesSearch } from "../../utils/helpers";
 import { BlockCard } from "../blocks";
-import { HeaderButton } from "../ui";
+
+function WeatherWidget() {
+  const [time, setTime] = useState(new Date());
+  const [weather, setWeather] = useState({ temp: null, desc: "Locating...", icon: "" });
+
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const { latitude, longitude } = position.coords;
+            const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code`);
+            if (!res.ok) throw new Error("Network response was not ok");
+            const data = await res.json();
+            const temp = Math.round(data.current.temperature_2m);
+            const code = data.current.weather_code;
+            let desc = "Clear";
+            let icon = "☀️";
+            if (code >= 1 && code <= 3) { desc = "Cloudy"; icon = "☁️"; }
+            else if (code >= 45 && code <= 48) { desc = "Fog"; icon = "🌫️"; }
+            else if (code >= 51 && code <= 67) { desc = "Rain"; icon = "🌧️"; }
+            else if (code >= 71 && code <= 77) { desc = "Snow"; icon = "❄️"; }
+            else if (code >= 80 && code <= 82) { desc = "Showers"; icon = "🚿"; }
+            else if (code >= 95 && code <= 99) { desc = "Storm"; icon = "⛈️"; }
+            
+            setWeather({ temp, desc, icon });
+          } catch (e) {
+            setWeather({ temp: null, desc: "Unavailable", icon: "⚠️" });
+          }
+        },
+        () => {
+          setWeather({ temp: null, desc: "No location", icon: "📍" });
+        }
+      );
+    } else {
+      setWeather({ temp: null, desc: "No geolocation", icon: "🚫" });
+    }
+  }, []);
+
+  return (
+    <section className="bento-card span-4 bg-[#21caff] p-5 dark:bg-[#001a25] flex flex-col justify-center">
+      <div className="flex justify-between items-center h-full">
+        <div>
+          <h2 className="text-5xl font-black tracking-tight">{time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</h2>
+          <p className="text-sm font-black text-black/70 dark:text-[#7a7670] mt-1 uppercase tracking-wide">
+            {time.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-4xl leading-none">{weather.icon}</span>
+          <div className="text-right">
+            <p className="text-4xl font-black">{weather.temp !== null ? `${weather.temp}°C` : "--"}</p>
+            <p className="text-sm font-black text-black/70 dark:text-[#7a7670] uppercase tracking-wide">
+              {weather.desc}
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export function WorkspaceView({ pageId, searchQuery }) {
-  const { blocks, pages, renamePage, exportPageMarkdown, exportBackup, importBackup } = useAppStore();
-  const fileInputRef = useRef(null);
+  const { blocks, pages, renamePage } = useAppStore();
   const page = pages.find((item) => item.id === pageId);
   const pageBlocks = blocks
     .filter((block) => block.pageId === pageId)
     .filter((block) => blockMatchesSearch(block, searchQuery))
     .sort((a, b) => a.order - b.order);
-
-  const onMarkdownExport = () => {
-    downloadText(`${slugify(page?.title ?? "page")}.md`, exportPageMarkdown(pageId), "text/markdown");
-  };
-
-  const onPdfExport = () => {
-    printPagePdf(page?.title ?? "Stones page", exportPageMarkdown(pageId));
-  };
-
-  const onExport = () => downloadText(`stones-backup-${todayIso()}.json`, JSON.stringify(exportBackup(), null, 2), "application/json");
-
-  const onImport = async (file) => {
-    if (!file) return;
-    await importBackup(JSON.parse(await file.text()));
-  };
 
   return (
     <div className="bento-grid">
@@ -43,16 +90,7 @@ export function WorkspaceView({ pageId, searchQuery }) {
 
         </p>
       </section>
-      <section className="bento-card span-4 bg-[#21caff] p-5 dark:bg-[#001a25]">
-        <p className="mb-3 text-xs font-black uppercase tracking-wide text-black/70 dark:text-[#7a7670]">Export and backup</p>
-        <div className="flex gap-2 flex-wrap">
-          <HeaderButton icon={FileDown} label="MD" onClick={onMarkdownExport} />
-          <HeaderButton icon={Printer} label="PDF" onClick={onPdfExport} />
-          <HeaderButton icon={Download} label="Backup" onClick={onExport} />
-          <HeaderButton icon={Upload} label="Restore" onClick={() => fileInputRef.current?.click()} />
-          <input accept="application/json" className="hidden" onChange={(event) => void onImport(event.target.files?.[0])} ref={fileInputRef} type="file" />
-        </div>
-      </section>
+      <WeatherWidget />
       <section className="span-12 flex flex-col gap-8">
         {pageBlocks.length ? (
           pageBlocks.map((block) => (

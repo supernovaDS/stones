@@ -33,14 +33,14 @@ export function InsightsView() {
         <Metric label="Rate" value={`${completionRate}%`} color="purple" />
         <Metric label="Streak" value={`${streak}d`} color="orange" />
       </div>
-      <section className="bento-card span-5 bg-[#ffdc4a] p-4 text-black dark:bg-[#1a1500] dark:text-[#c8c3ba]">
+      <section className="bento-card span-5 bg-white border-l-[10px] border-l-[#ffdc4a] p-4 text-black dark:bg-[#12151a] dark:border-l-[#1a1500] dark:text-[#c8c3ba]">
         <h3 className="mb-3 text-xl font-black">Workspace Settings</h3>
         <div className="flex flex-wrap gap-2">
           <HeaderButton icon={Bell} label="Enable Reminders" onClick={enableReminders} />
           <HeaderButton disabled={!undoStack.length} icon={RotateCcw} label="Undo Last Change" onClick={() => void undoLastChange()} />
         </div>
       </section>
-      <section className="bento-card span-7 p-4">
+      <section className="bento-card span-7 bg-white border-l-[10px] border-l-[#c4a8ff] p-4 text-black dark:bg-[#12151a] dark:border-l-[#1a1040] dark:text-[#c8c3ba]">
         <h3 className="mb-3 text-xl font-black">Recovery</h3>
         <div className="grid gap-2">
           {recentlyDeleted.length ? recentlyDeleted.map((item) => (
@@ -58,7 +58,7 @@ export function InsightsView() {
           )}
         </div>
       </section>
-      <section className="bento-card span-12 p-4">
+      <section className="bento-card span-12 bg-white border-l-[10px] border-l-[#ff5ec4] p-4 text-black dark:bg-[#12151a] dark:border-l-[#3d0030] dark:text-[#c8c3ba]">
         <h3 className="mb-3 text-xl font-black">Recent Completion</h3>
         <div className="grid grid-cols-14 gap-1">
           {Array.from({ length: 42 }).map((_, index) => {

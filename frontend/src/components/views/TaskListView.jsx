@@ -28,7 +28,7 @@ export function TaskListView({ searchQuery }) {
         <InsightCard color="orange" label="High Priority" value={highCount.toString()} />
         <InsightCard color="purple" label="Overdue" value={overdueCount.toString()} />
       </section>
-      <section className="bento-card span-12 p-4">
+      <section className="bento-card span-12 bg-white border-l-[10px] border-l-[#21caff] p-4 text-black dark:bg-[#12151a] dark:border-l-[#002535] dark:text-[#c8c3ba]">
         <div className="mb-4 flex flex-wrap items-center gap-2">
           {["open","today","overdue","upcoming","no-date","high","done","all"].map((item) => (
             <button className={clsx("nb-button min-h-0 px-3 py-2 text-sm capitalize", filter === item ? "primary" : "bg-white dark:bg-[#12151a]")} key={item} onClick={() => setFilter(item)} type="button">{item}</button>

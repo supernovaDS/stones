@@ -15,7 +15,8 @@ export function Sidebar({ dueToday, overdue }) {
     setView,
     setSettingsOpen,
     theme,
-    view
+    view,
+    colorProfile
   } = useAppStore();
 
   return (
@@ -29,14 +30,16 @@ export function Sidebar({ dueToday, overdue }) {
             <h1 className="brand-word leading-tight">Stones</h1>
             <p className="text-xs font-black uppercase tracking-wide text-black/70 dark:text-[#7a7670]">Task + workspace</p>
           </div>
-          <button
-            className="icon-button ml-auto"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            title="Toggle dark mode"
-            type="button"
-          >
-            {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-          </button>
+          {colorProfile !== "glow" && (
+            <button
+              className="icon-button ml-auto"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              title="Toggle dark mode"
+              type="button"
+            >
+              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+          )}
         </div>
       </div>
 
@@ -114,7 +117,7 @@ export function Sidebar({ dueToday, overdue }) {
         <Metric label="Today" value={dueToday.toString()} color="blue" />
         <Metric label="Overdue" value={overdue.toString()} color="red" />
       </div>
-      
+
       <button
         className="nav-button mx-4 mb-4"
         onClick={() => setSettingsOpen(true)}

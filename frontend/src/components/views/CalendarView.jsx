@@ -16,7 +16,7 @@ export function CalendarView({ searchQuery }) {
 
   return (
     <div className="bento-grid">
-      <div className="bento-card span-12 flex items-center justify-between bg-[#21caff] p-4 text-black dark:bg-[#001a25] dark:text-[#c8c3ba]">
+      <div className="bento-card span-12 flex items-center justify-between bg-white border-l-[10px] border-l-[#21caff] p-4 text-black dark:bg-[#12151a] dark:border-l-[#001a25] dark:text-[#c8c3ba]">
         <button className="icon-button" onClick={() => setCursor(shiftMonth(cursor, -1))} type="button"><ChevronLeft size={16} /></button>
         <h3 className="text-3xl font-black max-sm:text-xl">{monthLabel}</h3>
         <button className="icon-button" onClick={() => setCursor(shiftMonth(cursor, 1))} type="button"><ChevronRight size={16} /></button>
@@ -27,8 +27,20 @@ export function CalendarView({ searchQuery }) {
           const key = day.toISOString().slice(0, 10);
           const dayTasks = tasks.filter((task) => toDateInput(task.metadata.deadline) === key);
           const inMonth = day.getMonth() === cursor.getMonth();
+          const isToday = key === todayIso();
+          const isPast = key < todayIso();
           return (
-            <button className={clsx("min-h-24 rounded-lg border-[3px] border-black p-2 text-left font-black shadow-[3px_3px_0_#111] transition hover:-translate-y-1 hover:shadow-[5px_5px_0_#111] dark:border-[#1e232a] dark:shadow-[2px_2px_0_#000] dark:hover:shadow-[3px_3px_0_#000] max-sm:min-h-16", selectedDay === key ? "bg-[#ffdc4a] text-black dark:bg-[#3d2800] dark:text-[#c8c3ba]" : "bg-white hover:bg-[#fff1b8] dark:bg-[#12151a] dark:hover:bg-[#1a1f26]", !inMonth && "opacity-45")} key={key} onClick={() => setSelectedDay(key)} type="button">
+            <button className={clsx(
+              "min-h-24 rounded-lg border-[3px] border-black p-2 text-left font-black shadow-[3px_3px_0_#111] transition hover:-translate-y-1 hover:shadow-[5px_5px_0_#111] dark:border-[#1e232a] dark:shadow-[2px_2px_0_#000] dark:hover:shadow-[3px_3px_0_#000] max-sm:min-h-16",
+              selectedDay === key 
+                ? "bg-white border-l-[8px] border-l-[#ffdc4a] text-black dark:bg-[#12151a] dark:border-l-[#3d2800] dark:text-[#c8c3ba]" 
+                : isToday
+                  ? "bg-white border-l-[8px] border-l-[#21caff] text-black dark:bg-[#12151a] dark:border-l-[#003d52] dark:text-[#c8c3ba]"
+                  : isPast
+                    ? "bg-stone-100 hover:bg-stone-200 text-stone-400 dark:bg-[#0a0c0f] dark:hover:bg-[#12151a] dark:text-[#5a5650]"
+                    : "bg-white hover:bg-[#fff1b8] dark:bg-[#12151a] dark:hover:bg-[#1a1f26]",
+              !inMonth && "opacity-45"
+            )} key={key} onClick={() => setSelectedDay(key)} type="button">
               <span className="text-sm">{day.getDate()}</span>
               <div className="mt-2 flex flex-wrap gap-1">
                 {dayTasks.slice(0, 4).map((task) => <span className={clsx("h-3 w-3 rounded-sm border border-black dark:border-[#1e232a]", priorityDot(task.metadata.priority))} key={task.id} />)}
@@ -38,7 +50,7 @@ export function CalendarView({ searchQuery }) {
           );
         })}
       </section>
-      <aside className="bento-card span-4 bg-[#ffdc4a] p-4 text-black dark:bg-[#1a1500] dark:text-[#c8c3ba]">
+      <aside className="bento-card span-4 bg-white border-l-[10px] border-l-[#ffdc4a] p-4 text-black dark:bg-[#12151a] dark:border-l-[#1a1500] dark:text-[#c8c3ba]">
         <h3 className="mb-3 text-2xl font-black">{formatShortDate(selectedDay)}</h3>
         {selectedDay >= todayIso() && (
           <button className="nb-button action mb-4" onClick={() => void openTaskModal({ deadline: selectedDay, pageId: useAppStore.getState().activePageId })} type="button">

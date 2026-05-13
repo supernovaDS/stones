@@ -25,17 +25,6 @@ const PROFILES = [
       text: "#161616",
     },
   },
-  {
-    id: "glow",
-    label: "Glow",
-    description: "Dark, immersive, accent glow — dark mode only",
-    preview: {
-      bg: "#0B1120",
-      border: "#1E293B",
-      accent: "#8B5CF6",
-      text: "#F8FAFC",
-    },
-  },
 ];
 
 export function SettingsModal() {
@@ -59,7 +48,7 @@ export function SettingsModal() {
         <p className="mb-4 text-sm font-black uppercase tracking-wide text-stone-700 dark:text-[#7a7670]">
           Color Profile
         </p>
-        <div className="grid grid-cols-3 gap-4 max-sm:grid-cols-1">
+        <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
           {PROFILES.map((profile) => {
             const isActive = colorProfile === profile.id;
             return (

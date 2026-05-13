@@ -45,7 +45,7 @@ export function Topbar({ searchQuery, onSearchChange, onCommandOpen, activePage,
           })}
         </p>
         <h2 className="max-w-full truncate text-3xl font-black tracking-normal max-sm:text-2xl">
-          {view === "workspace" ? activePage?.title : viewTitle(view)}
+          {view === "workspace" ? "Workspace" : viewTitle(view)}
         </h2>
       </div>
       <div className="flex flex-wrap items-center gap-2">

@@ -32,7 +32,7 @@ export const formatShortDate = (value) => {
     return "No date";
   }
 
-  const dateStr = value.includes("T") ? value : `${value}T00:00:00`;
+  const dateStr = value.includes("T") ? value : `${value}T12:00:00`;
   const date = new Date(dateStr);
   if (Number.isNaN(date.getTime())) return value;
 
