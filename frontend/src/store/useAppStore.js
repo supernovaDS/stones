@@ -20,6 +20,16 @@ const sortSections = (sections) =>
 const defaultTheme = () => localStorage.getItem("stones-theme") ?? "light";
 const defaultColorProfile = () => localStorage.getItem("stones-color-profile") ?? "neo";
 
+const getUniquePageTitle = (baseTitle, existingPages, excludeId = null) => {
+  let title = baseTitle;
+  let counter = 1;
+  while (existingPages.some((p) => p.title === title && p.id !== excludeId)) {
+    title = `${baseTitle} (${counter})`;
+    counter++;
+  }
+  return title;
+};
+
 const seedData = () => {
   const createdAt = nowIso();
   const workspace = {
@@ -74,7 +84,7 @@ const seedData = () => {
     }
   };
 
-  return { workspace, section, page, blocks: [note, task] };
+  return { workspace, section, page, blocks: [] };
 };
 
 export const useAppStore = create((set, get) => ({
@@ -297,11 +307,12 @@ export const useAppStore = create((set, get) => ({
 
     pushUndoSnapshot(get, set, "create page");
     const createdAt = nowIso();
+    const uniqueTitle = getUniquePageTitle(title, get().pages);
     const page = {
       id: createId("page"),
       workspaceId,
       sectionId,
-      title,
+      title: uniqueTitle,
       createdAt,
       updatedAt: createdAt
     };
@@ -359,16 +370,14 @@ export const useAppStore = create((set, get) => ({
       metadata: { createdAt, updatedAt: createdAt }
     };
 
-    await db.transaction("rw", db.pages, db.blocks, async () => {
+    await db.transaction("rw", db.pages, async () => {
       await db.pages.add(page);
-      await db.blocks.add(note);
     });
     await enqueueMutation("page", page.id, "upsert", page);
-    await enqueueMutation("block", note.id, "upsert", note);
 
     set((current) => ({
       pages: [...current.pages, page],
-      blocks: sortBlocks([...current.blocks, note]),
+      blocks: current.blocks,
       activePageId: page.id,
       view: "workspace"
     }));
@@ -376,12 +385,13 @@ export const useAppStore = create((set, get) => ({
 
   renamePage: async (pageId, title) => {
     const updatedAt = nowIso();
-    await db.pages.update(pageId, { title, updatedAt });
+    const uniqueTitle = getUniquePageTitle(title, get().pages, pageId);
+    await db.pages.update(pageId, { title: uniqueTitle, updatedAt });
     const page = get().pages.find((p) => p.id === pageId);
-    if (page) await enqueueMutation("page", pageId, "upsert", { ...page, title, updatedAt });
+    if (page) await enqueueMutation("page", pageId, "upsert", { ...page, title: uniqueTitle, updatedAt });
     set((state) => ({
       pages: state.pages.map((page) =>
-        page.id === pageId ? { ...page, title, updatedAt } : page
+        page.id === pageId ? { ...page, title: uniqueTitle, updatedAt } : page
       )
     }));
   },

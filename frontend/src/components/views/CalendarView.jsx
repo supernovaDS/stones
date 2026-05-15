@@ -16,9 +16,9 @@ export function CalendarView({ searchQuery }) {
 
   return (
     <div className="bento-grid">
-      <div className="bento-card span-12 flex items-center justify-between bg-white border-l-[10px] border-l-[#21caff] p-4 text-black dark:bg-[#12151a] dark:border-l-[#001a25] dark:text-[#c8c3ba]">
+      <div className="calendar-header bento-card span-12 flex items-center justify-between gap-3 bg-white border-l-[10px] border-l-[#21caff] p-4 text-black dark:bg-[#12151a] dark:border-l-[#001a25] dark:text-[#c8c3ba]">
         <button className="icon-button" onClick={() => setCursor(shiftMonth(cursor, -1))} type="button"><ChevronLeft size={16} /></button>
-        <h3 className="text-3xl font-black max-sm:text-xl">{monthLabel}</h3>
+        <h3 className="min-w-0 truncate text-center text-3xl font-black max-sm:text-xl">{monthLabel}</h3>
         <button className="icon-button" onClick={() => setCursor(shiftMonth(cursor, 1))} type="button"><ChevronRight size={16} /></button>
       </div>
       <section className="bento-card span-8 grid grid-cols-7 gap-2 p-4 max-sm:gap-1">
@@ -31,7 +31,7 @@ export function CalendarView({ searchQuery }) {
           const isPast = key < todayIso();
           return (
             <button className={clsx(
-              "min-h-24 rounded-lg border-[3px] border-black p-2 text-left font-black shadow-[3px_3px_0_#111] transition hover:-translate-y-1 hover:shadow-[5px_5px_0_#111] dark:border-[#1e232a] dark:shadow-[2px_2px_0_#000] dark:hover:shadow-[3px_3px_0_#000] max-sm:min-h-16",
+              "calendar-cell min-h-24 rounded-lg border-[3px] border-black p-2 text-left font-black shadow-[3px_3px_0_#111] transition hover:-translate-y-1 hover:shadow-[5px_5px_0_#111] dark:border-[#1e232a] dark:shadow-[2px_2px_0_#000] dark:hover:shadow-[3px_3px_0_#000] max-sm:min-h-16",
               selectedDay === key 
                 ? "calendar-day-selected bg-white border-l-[8px] border-l-[#ffdc4a] text-black dark:bg-[#12151a] dark:border-l-[#3d2800] dark:text-[#c8c3ba]" 
                 : isToday
@@ -42,7 +42,7 @@ export function CalendarView({ searchQuery }) {
               !inMonth && "opacity-45"
             )} key={key} onClick={() => setSelectedDay(key)} type="button">
               <span className="text-sm">{day.getDate()}</span>
-              <div className="mt-2 flex flex-wrap gap-1">
+              <div className="calendar-dots mt-2 flex flex-wrap gap-1">
                 {dayTasks.slice(0, 4).map((task) => <span className={clsx("h-3 w-3 rounded-sm border border-black dark:border-[#1e232a]", priorityDot(task.metadata.priority))} key={task.id} />)}
               </div>
               {dayTasks.length > 4 ? <p className="mt-1 text-xs">+{dayTasks.length - 4}</p> : null}
@@ -58,7 +58,7 @@ export function CalendarView({ searchQuery }) {
           </button>
         )}
         <div className="grid gap-2">
-          {selectedTasks.length ? selectedTasks.map((task) => <button className="nb-button justify-start bg-white text-left dark:bg-[#12151a]" key={task.id} onClick={() => setSelectedTask(task.id)} type="button">{task.content.title}</button>) : <p className="rounded-lg border-[3px] border-black bg-white p-4 text-sm font-black shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[2px_2px_0_#000]">No tasks scheduled.</p>}
+          {selectedTasks.length ? selectedTasks.map((task) => <button className="nb-button min-w-0 justify-start bg-white text-left dark:bg-[#12151a]" key={task.id} onClick={() => setSelectedTask(task.id)} type="button"><span className="min-w-0 truncate">{task.content.title}</span></button>) : <p className="rounded-lg border-[3px] border-black bg-white p-4 text-sm font-black shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[2px_2px_0_#000]">No tasks scheduled.</p>}
         </div>
       </aside>
     </div>

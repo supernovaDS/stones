@@ -63,15 +63,15 @@ export function InsightsView() {
         </div>
       </section>
       <section className="bento-card span-12 bg-white border-l-[10px] border-l-[#ff5ec4] p-4 text-black dark:bg-[#12151a] dark:border-l-[#3d0030] dark:text-[#c8c3ba]">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-xl font-black">Recent Completions</h3>
-          <div className="flex items-center gap-3">
+        <div className="heatmap-header mb-4 flex items-center justify-between gap-3">
+          <h3 className="min-w-0 text-xl font-black">Recent Completions</h3>
+          <div className="flex shrink-0 items-center gap-3">
             <button className="icon-button min-h-0 min-w-0" onClick={() => setHeatmapCursor(shiftMonth(heatmapCursor, -1))} type="button"><ChevronLeft size={16} /></button>
-            <span className="text-sm font-black">{heatmapMonthLabel}</span>
-            <button className="icon-button min-h-0 min-w-0" disabled={(heatmapCursor.getFullYear() * 12 + heatmapCursor.getMonth()) >= (new Date().getFullYear() * 12 + new Date().getMonth())} onClick={() => setHeatmapCursor(shiftMonth(heatmapCursor, 1))} type="button"><ChevronRight size={16} /></button>
+            <span className="min-w-0 text-center text-sm font-black">{heatmapMonthLabel}</span>
+            <button className="icon-button min-h-0 min-w-0 disabled:opacity-50 disabled:cursor-not-allowed" disabled={(heatmapCursor.getFullYear() * 12 + heatmapCursor.getMonth()) >= (new Date().getFullYear() * 12 + new Date().getMonth())} onClick={() => setHeatmapCursor(shiftMonth(heatmapCursor, 1))} type="button"><ChevronRight size={16} /></button>
           </div>
         </div>
-        <div className="grid grid-cols-14 gap-1">
+        <div className="heatmap-grid grid grid-cols-14 gap-1">
           {heatmapDays.map((day) => {
             const key = toLocalDateString(day);
             const count = completed.filter((task) => task.metadata.completedAt?.startsWith(key)).length;

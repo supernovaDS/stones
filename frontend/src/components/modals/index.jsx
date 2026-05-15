@@ -29,7 +29,7 @@ export function TaskDetailPanel() {
   const dependencies = task.content.dependencyIds ?? [];
 
   return (
-    <aside className="fixed inset-y-0 right-0 z-30 w-[430px] max-w-full overflow-auto border-l-[5px] border-black bg-[#fff7e8] p-5 shadow-[-10px_0_0_#111] dark:border-[#1e232a] dark:bg-[#0c0e11] dark:shadow-[-6px_0_0_#000]">
+    <aside className="task-detail-panel fixed inset-y-0 right-0 z-30 w-[430px] max-w-full overflow-auto border-l-[5px] border-black bg-[#fff7e8] p-5 shadow-[-10px_0_0_#111] dark:border-[#1e232a] dark:bg-[#0c0e11] dark:shadow-[-6px_0_0_#000]">
       <div className="mb-5 flex items-center justify-between gap-3">
         <div className="min-w-0"><p className="text-xs font-black uppercase tracking-wide text-stone-600 dark:text-[#7a7670]">Task details</p><h3 className="truncate text-xl font-black">{page?.title ?? "Workspace"}</h3></div>
         <IconButton icon={X} title="Close details" onClick={() => setSelectedTask(undefined)} />

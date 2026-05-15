@@ -42,7 +42,7 @@ function BlockShell({ block, label, children, actions }) {
     <article className={clsx("bento-card h-full border-l-[10px] p-4", blockTypeRail[block.type] ?? "border-l-stone-400")}>
       <div className="mb-4 flex items-center justify-between gap-3">
         <p className="text-xs font-black uppercase tracking-wide text-stone-700 dark:text-[#7a7670]">{label}</p>
-        <div className="flex flex-wrap gap-2">
+        <div className="block-actions flex flex-wrap gap-2">
           <IconButton icon={ArrowUp} title="Move up" onClick={() => void moveBlock(block.id, "up")} />
           <IconButton icon={ArrowDown} title="Move down" onClick={() => void moveBlock(block.id, "down")} />
           {actions}
@@ -267,7 +267,7 @@ function TaskBlock({ block }) {
   return (
     <article className={clsx("bento-card h-full border-l-[10px] p-4", priorityRail[block.metadata.priority ?? "medium"])}>
       <div className="grid gap-3">
-        <div className="flex items-start gap-3">
+        <div className="task-block-header flex items-start gap-3">
           <Checkbox checked={block.metadata.completed} onChange={() => void toggleTask(block.id)} className="mt-1" />
           <input
             className={clsx("min-w-0 flex-1 bg-transparent text-xl font-black outline-none", block.metadata.completed && "text-stone-400 line-through dark:text-[#5a5650]")}
@@ -275,12 +275,14 @@ function TaskBlock({ block }) {
             placeholder="Task title"
             value={block.content.title}
           />
-          <IconButton icon={ArrowUp} title="Move up" onClick={() => void moveBlock(block.id, "up")} />
-          <IconButton icon={ArrowDown} title="Move down" onClick={() => void moveBlock(block.id, "down")} />
-          <IconButton icon={PanelRight} title="Open details" onClick={() => setSelectedTask(block.id)} />
-          <IconButton danger icon={Trash2} title="Delete task" onClick={() => void deleteBlock(block.id)} />
+          <div className="task-block-actions flex shrink-0 flex-wrap gap-2">
+            <IconButton icon={ArrowUp} title="Move up" onClick={() => void moveBlock(block.id, "up")} />
+            <IconButton icon={ArrowDown} title="Move down" onClick={() => void moveBlock(block.id, "down")} />
+            <IconButton icon={PanelRight} title="Open details" onClick={() => setSelectedTask(block.id)} />
+            <IconButton danger icon={Trash2} title="Delete task" onClick={() => void deleteBlock(block.id)} />
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2 pl-8">
+        <div className="task-block-controls flex flex-wrap gap-2 pl-8">
           <select className={clsx("nb-select h-10 px-2 text-sm font-black", priorityClasses[block.metadata.priority ?? "medium"])} onChange={(event) => void updateTask(block.id, { priority: event.target.value })} value={block.metadata.priority ?? "medium"}>
             <option value="high">High</option>
             <option value="medium">Medium</option>
@@ -424,10 +426,10 @@ function ImageBlock({ block }) {
   return (
     <BlockShell block={block} label="Image">
       <div className="mb-3 flex flex-wrap gap-2">
-        <button type="button" className="rich-button" onClick={() => setScale((s) => Math.min(s + 0.2, 5))}><ZoomIn size={14} /> Zoom</button>
-        <button type="button" className="rich-button" onClick={() => setScale((s) => Math.max(s - 0.2, 0.5))}><ZoomOut size={14} /> Zoom</button>
-        <button type="button" className="rich-button" onClick={() => { setScale(1); setPan({ x: 0, y: 0 }); }}><Move size={14} /> Reset</button>
-        <button type="button" className="rich-button bg-[#21caff] dark:bg-[#002535]" onClick={() => setFullscreen(true)}><Maximize2 size={14} /> Fullscreen</button>
+        <button type="button" className="nb-button px-3" onClick={() => setScale((s) => Math.min(s + 0.2, 5))}><ZoomIn size={16} /> Zoom</button>
+        <button type="button" className="nb-button px-3" onClick={() => setScale((s) => Math.max(s - 0.2, 0.5))}><ZoomOut size={16} /> Zoom</button>
+        <button type="button" className="nb-button px-3" onClick={() => { setScale(1); setPan({ x: 0, y: 0 }); }}><Move size={16} /> Reset</button>
+        <button type="button" className="nb-button px-3 bg-[#21caff] dark:bg-[#002535]" onClick={() => setFullscreen(true)}><Maximize2 size={16} /> Fullscreen</button>
         <span className="self-center text-xs font-bold text-stone-600 dark:text-[#7a7670]">Scroll with Shift/Ctrl to zoom. Drag to pan.</span>
       </div>
       {block.content.dataUrl ? (

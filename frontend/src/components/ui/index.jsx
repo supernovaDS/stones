@@ -2,8 +2,8 @@ import { clsx } from "clsx";
 
 export function HeaderButton({ disabled, icon: Icon, label, onClick }) {
   return (
-    <button className="nb-button" disabled={disabled} onClick={onClick} type="button">
-      {Icon ? <Icon size={16} /> : null}{label}
+    <button className="nb-button" disabled={disabled} onClick={onClick} title={label} type="button">
+      {Icon ? <Icon size={16} /> : null}<span className="header-btn-label">{label}</span>
     </button>
   );
 }

@@ -37,6 +37,7 @@ function App() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [commandOpen, setCommandOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const activePage = pages.find((page) => page.id === activePageId);
   const tasks = blocks.filter((block) => block.type === "task");
@@ -80,6 +81,9 @@ function App() {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
         event.preventDefault();
         void undoLastChange();
+      }
+      if (event.key === "Escape") {
+        setSidebarOpen(false);
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -140,13 +144,23 @@ function App() {
   return (
     <main className="app-shell">
       <div className="layout-grid">
-        <Sidebar dueToday={dueToday.length} overdue={overdue.length} />
+        <div
+          className={`sidebar-backdrop${sidebarOpen ? " sidebar-backdrop-visible" : ""}`}
+          onClick={() => setSidebarOpen(false)}
+        />
+        <Sidebar
+          dueToday={dueToday.length}
+          overdue={overdue.length}
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+        />
 
         <section className="content-shell">
           <Topbar
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             onCommandOpen={() => setCommandOpen(true)}
+            onMenuToggle={() => setSidebarOpen((prev) => !prev)}
             activePage={activePage}
             view={view}
             syncStatus={syncStatus}

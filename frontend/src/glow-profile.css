@@ -521,3 +521,26 @@
   background: #8B5CF6 !important;
   color: #ffffff !important;
 }
+
+.profile-glow .sidebar-backdrop {
+  background: rgba(2, 6, 23, 0.66);
+  backdrop-filter: blur(10px);
+}
+
+@media (max-width: 1100px) {
+  .profile-glow .content-shell {
+    padding: 0;
+  }
+
+  .profile-glow .sidebar-shell {
+    border-right: 1px solid rgba(255,255,255,0.08);
+    background: rgba(15,23,42,0.96);
+    backdrop-filter: blur(14px);
+  }
+}
+
+@media (max-width: 640px) {
+  .profile-glow .topbar {
+    border-radius: 14px;
+  }
+}

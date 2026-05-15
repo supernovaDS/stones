@@ -48,17 +48,17 @@ function WeatherWidget() {
 
   return (
     <section className="bento-card span-4 bg-[#21caff] p-5 dark:bg-[#001a25] flex flex-col justify-center">
-      <div className="flex justify-between items-center h-full">
-        <div>
-          <h2 className="text-5xl font-black tracking-tight">{time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</h2>
+      <div className="weather-layout flex h-full items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h2 className="weather-time text-5xl font-black tracking-tight">{time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</h2>
           <p className="text-sm font-black text-black/70 dark:text-[#7a7670] mt-1 uppercase tracking-wide">
             {time.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-4xl leading-none">{weather.icon}</span>
-          <div className="text-right">
-            <p className="text-4xl font-black">{weather.temp !== null ? `${weather.temp}°C` : "--"}</p>
+        <div className="weather-meta flex min-w-0 items-center gap-3">
+          <span className="shrink-0 text-4xl leading-none">{weather.icon}</span>
+          <div className="min-w-0 text-right">
+            <p className="weather-temp text-4xl font-black">{weather.temp !== null ? `${weather.temp}°C` : "--"}</p>
             <p className="text-sm font-black text-black/70 dark:text-[#7a7670] uppercase tracking-wide">
               {weather.desc}
             </p>

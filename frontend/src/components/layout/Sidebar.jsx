@@ -1,10 +1,10 @@
 import { clsx } from "clsx";
-import { FilePlus, Moon, Sun, Trash2, Settings } from "lucide-react";
+import { FilePlus, Moon, Sun, Trash2, Settings, X } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { navItems } from "../../utils/constants";
 import { Metric } from "../ui";
 
-export function Sidebar({ dueToday, overdue }) {
+export function Sidebar({ dueToday, overdue, isOpen, onClose }) {
   const {
     activePageId,
     createPage,
@@ -19,8 +19,15 @@ export function Sidebar({ dueToday, overdue }) {
     colorProfile
   } = useAppStore();
 
+  const handleNav = (action) => {
+    action();
+    onClose?.();
+  };
+
+  const sortedPages = [...pages].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
   return (
-    <aside className="sidebar-shell">
+    <aside aria-label="Workspace navigation" className={clsx("sidebar-shell", isOpen && "sidebar-open")}>
       <div className="border-b-4 border-black bg-[#ffdc4a] p-4 dark:border-[#1e232a] dark:bg-[#0c0e11]">
         <div className="flex items-center gap-3">
           <div className="grid h-14 w-14 place-items-center overflow-hidden rounded-lg border-[3px] border-black bg-white shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[3px_3px_0_#000]">
@@ -40,6 +47,15 @@ export function Sidebar({ dueToday, overdue }) {
               {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
             </button>
           )}
+          <button
+            className="icon-button sidebar-close-btn"
+            onClick={onClose}
+            title="Close sidebar"
+            type="button"
+            style={{ display: "none" }}
+          >
+            <X size={16} />
+          </button>
         </div>
       </div>
 
@@ -50,7 +66,7 @@ export function Sidebar({ dueToday, overdue }) {
             <button
               key={item.id}
               className={clsx("nav-button", view === item.id && "active")}
-              onClick={() => setView(item.id)}
+              onClick={() => handleNav(() => setView(item.id))}
               type="button"
             >
               <Icon size={17} />
@@ -66,12 +82,12 @@ export function Sidebar({ dueToday, overdue }) {
         </p>
       </div>
 
-      <div className="mx-4 flex min-h-0 flex-1 flex-col gap-2 overflow-auto pb-2 pr-3">
-        {pages.map((page) => (
+      <div className="mx-4 flex min-h-[8rem] flex-1 flex-col gap-2 overflow-auto pb-2 pr-3">
+        {sortedPages.map((page) => (
           <div key={page.id} className="group relative flex items-center">
             <button
               className={clsx("nav-button flex-1 min-w-0 pr-12", activePageId === page.id && view === "workspace" && "active")}
-              onClick={() => setActivePage(page.id)}
+              onClick={() => handleNav(() => setActivePage(page.id))}
               type="button"
             >
               <span className="truncate min-w-0 flex-1">{page.title}</span>
@@ -99,6 +115,7 @@ export function Sidebar({ dueToday, overdue }) {
           const title = window.prompt("Enter page name:", defaultDate);
           if (title !== null) {
             void createPage(undefined, title || defaultDate);
+            onClose?.();
           }
         }}
         type="button"
@@ -120,7 +137,7 @@ export function Sidebar({ dueToday, overdue }) {
 
       <button
         className="nav-button mx-4 mb-4"
-        onClick={() => setSettingsOpen(true)}
+        onClick={() => handleNav(() => setSettingsOpen(true))}
         type="button"
       >
         <Settings size={17} />
