@@ -2,8 +2,6 @@ import {
   ArrowDown,
   ArrowUp,
   Bell,
-  Check,
-  Circle,
   Code2,
   Link,
   Maximize2,
@@ -509,44 +507,3 @@ function ImageCanvas({ alt, dataUrl, doDrag, endDrag, fullscreen, handleWheel, i
 
 // ── Markdown preview ────────────────────────────────────────────
 
-function MarkdownPreview({ text }) {
-  const lines = text.split(/\r?\n/);
-  return (
-    <div className="nb-textarea min-h-36 p-4 text-sm font-bold leading-7">
-      {lines.map((line, index) => {
-        if (!line.trim()) return <div className="h-4" key={index} />;
-        if (line.startsWith("### ")) return <h4 className="text-base font-semibold" key={index}>{renderInlineMarkdown(line.slice(4))}</h4>;
-        if (line.startsWith("## ")) return <h3 className="text-lg font-semibold" key={index}>{renderInlineMarkdown(line.slice(3))}</h3>;
-        if (line.startsWith("# ")) return <h2 className="text-xl font-semibold" key={index}>{renderInlineMarkdown(line.slice(2))}</h2>;
-        if (line.startsWith("- ")) return <p className="pl-4" key={index}>- {renderInlineMarkdown(line.slice(2))}</p>;
-        return <p key={index}>{renderInlineMarkdown(line)}</p>;
-      })}
-    </div>
-  );
-}
-
-function renderInlineMarkdown(text) {
-  const parts = [];
-  const pattern = /(\*\*[^*]+\*\*|_[^_]+_|`[^`]+`|\[[^\]]+\]\([^)]+\)|\[\[[^\]]+\]\])/g;
-  let lastIndex = 0;
-  for (const match of text.matchAll(pattern)) {
-    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
-    const token = match[0];
-    if (token.startsWith("**")) {
-      parts.push(<strong key={`${token}-${match.index}`}>{token.slice(2, -2)}</strong>);
-    } else if (token.startsWith("_")) {
-      parts.push(<em key={`${token}-${match.index}`}>{token.slice(1, -1)}</em>);
-    } else if (token.startsWith("`")) {
-      parts.push(<code className="rounded border-2 border-black bg-[#ffdc4a] px-1 py-0.5 text-xs text-black dark:border-[#1e232a] dark:bg-[#3d2800] dark:text-[#c8c3ba]" key={`${token}-${match.index}`}>{token.slice(1, -1)}</code>);
-    } else if (token.startsWith("[[")) {
-      parts.push(<span className="rounded border-2 border-black bg-[#2ef2a6] px-1 font-black text-black dark:border-[#1e232a] dark:bg-[#0a3d28] dark:text-[#6fd09a]" key={`${token}-${match.index}`}>{token}</span>);
-    } else {
-      const label = token.match(/^\[([^\]]+)\]/)?.[1] ?? token;
-      const href = token.match(/\(([^)]+)\)$/)?.[1] ?? "#";
-      parts.push(<a className="font-black underline decoration-[3px] dark:text-[#6fa8d0]" href={href} key={`${token}-${match.index}`} rel="noreferrer" target="_blank">{label}</a>);
-    }
-    lastIndex = match.index + token.length;
-  }
-  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
-  return parts;
-}

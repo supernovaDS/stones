@@ -91,6 +91,77 @@ export function TaskDetailPanel() {
 
 // ── Task modal ──────────────────────────────────────────────────
 
+function TaskImageAttachment({ imagePath, onRemove, onUpload, user }) {
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [dragging, setDragging] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    if (!imagePath) {
+      setPreviewUrl("");
+      return undefined;
+    }
+    getTaskImageUrl(imagePath)
+      .then((url) => {
+        if (mounted) setPreviewUrl(url);
+      })
+      .catch(() => {
+        if (mounted) setPreviewUrl("");
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [imagePath]);
+
+  const handleFile = (file) => {
+    if (!file || !user?.id) return;
+    onUpload(file);
+  };
+
+  return (
+    <section className="grid gap-2">
+      <h4 className="text-sm font-black">Image</h4>
+      <label
+        className="nb-textarea grid min-h-28 cursor-pointer place-items-center overflow-hidden px-3 py-4 text-center text-sm font-bold"
+        onDragEnter={(event) => {
+          event.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={(event) => {
+          event.preventDefault();
+          setDragging(false);
+          handleFile(event.dataTransfer.files?.[0]);
+        }}
+      >
+        {previewUrl ? (
+          <img alt="Task attachment" className="max-h-48 w-full rounded-md object-contain" src={previewUrl} />
+        ) : (
+          <span className={dragging ? "text-[#21caff]" : "text-stone-600 dark:text-[#7a7670]"}>
+            <Image className="mx-auto mb-2" size={24} />
+            {user?.id ? "Drop or choose an image" : "Sign in to upload images"}
+          </span>
+        )}
+        <input
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          className="hidden"
+          disabled={!user?.id}
+          onChange={(event) => handleFile(event.target.files?.[0])}
+          type="file"
+        />
+      </label>
+      {imagePath ? (
+        <button className="nb-button danger justify-self-start" onClick={onRemove} type="button">
+          Remove image
+        </button>
+      ) : null}
+    </section>
+  );
+}
+
+// ── Task modal ──────────────────────────────────────────────────
+
 export function TaskModal({ initialParams, onClose, onSubmit }) {
   const [title, setTitle] = useState(initialParams?.title ?? "");
   const [notes, setNotes] = useState(initialParams?.notes ?? "");
@@ -105,7 +176,7 @@ export function TaskModal({ initialParams, onClose, onSubmit }) {
         title: title.trim(),
         notes: notes.trim(),
         priority,
-        deadline: deadline ? (time ? `${deadline}T${time}` : deadline) : undefined,
+        deadline: deadline ? (time ? `${deadline}T${time}` : `${deadline}T23:59`) : undefined,
         pageId: initialParams?.pageId,
         sourceBlockId: initialParams?.sourceBlockId
       });
@@ -137,7 +208,7 @@ export function TaskModal({ initialParams, onClose, onSubmit }) {
             </label>
             <label className="grid gap-1 text-sm font-black">
               Deadline
-              <input type="date" className="nb-input px-3 py-2 font-bold" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+              <input type="date" className="nb-input px-3 py-2 font-bold" value={deadline} onChange={(e) => setDeadline(e.target.value)} required />
             </label>
             <label className="col-span-2 grid gap-1 text-sm font-black max-sm:col-span-1">
               Time (optional)

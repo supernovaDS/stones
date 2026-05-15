@@ -5,7 +5,7 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, {
 
 const pad = (value) => String(value).padStart(2, "0");
 
-const toLocalDateString = (date) =>
+export const toLocalDateString = (date) =>
   `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 
 const toLocalDateTimeString = (date) =>

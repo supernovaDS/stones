@@ -1,9 +1,9 @@
-import { Bell, History, RotateCcw, X } from "lucide-react";
+import { Bell, History, RotateCcw, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { clsx } from "clsx";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
-import { formatShortDate } from "../../utils/date";
-import { calculateStreak, heatColor } from "../../utils/helpers";
+import { formatShortDate, toLocalDateString } from "../../utils/date";
+import { calculateStreak, heatColor, getCalendarDays, shiftMonth } from "../../utils/helpers";
 import { HeaderButton, IconButton, Metric } from "../ui";
 
 export function InsightsView() {
@@ -20,6 +20,10 @@ export function InsightsView() {
   const completed = tasks.filter((task) => task.metadata.completed);
   const streak = useMemo(() => calculateStreak(tasks), [tasks]);
   const completionRate = tasks.length ? Math.round((completed.length / tasks.length) * 100) : 0;
+
+  const [heatmapCursor, setHeatmapCursor] = useState(new Date());
+  const heatmapDays = useMemo(() => getCalendarDays(heatmapCursor), [heatmapCursor]);
+  const heatmapMonthLabel = heatmapCursor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
 
   const enableReminders = async () => {
     setNotification("Task reminders are active within the app.");
@@ -59,14 +63,20 @@ export function InsightsView() {
         </div>
       </section>
       <section className="bento-card span-12 bg-white border-l-[10px] border-l-[#ff5ec4] p-4 text-black dark:bg-[#12151a] dark:border-l-[#3d0030] dark:text-[#c8c3ba]">
-        <h3 className="mb-3 text-xl font-black">Recent Completion</h3>
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-xl font-black">Recent Completions</h3>
+          <div className="flex items-center gap-3">
+            <button className="icon-button min-h-0 min-w-0" onClick={() => setHeatmapCursor(shiftMonth(heatmapCursor, -1))} type="button"><ChevronLeft size={16} /></button>
+            <span className="text-sm font-black">{heatmapMonthLabel}</span>
+            <button className="icon-button min-h-0 min-w-0" disabled={(heatmapCursor.getFullYear() * 12 + heatmapCursor.getMonth()) >= (new Date().getFullYear() * 12 + new Date().getMonth())} onClick={() => setHeatmapCursor(shiftMonth(heatmapCursor, 1))} type="button"><ChevronRight size={16} /></button>
+          </div>
+        </div>
         <div className="grid grid-cols-14 gap-1">
-          {Array.from({ length: 42 }).map((_, index) => {
-            const date = new Date();
-            date.setDate(date.getDate() - (41 - index));
-            const key = date.toISOString().slice(0, 10);
+          {heatmapDays.map((day) => {
+            const key = toLocalDateString(day);
             const count = completed.filter((task) => task.metadata.completedAt?.startsWith(key)).length;
-            return <div className={clsx("h-8 rounded border-2 border-black dark:border-[#1e232a]", heatColor(count))} key={key} title={`${key}: ${count} completed`} />;
+            const inMonth = day.getMonth() === heatmapCursor.getMonth();
+            return <div className={clsx("h-8 rounded border-2 border-black dark:border-[#1e232a] transition-colors duration-200", heatColor(count), !inMonth && "opacity-30")} key={key} title={`${key}: ${count} completed`} />;
           })}
         </div>
       </section>

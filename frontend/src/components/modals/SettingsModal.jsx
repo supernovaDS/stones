@@ -1,4 +1,5 @@
-import { X, Check } from "lucide-react";
+import { X, Check, LogOut, User } from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
 import { useAppStore } from "../../store/useAppStore";
 import { clsx } from "clsx";
 
@@ -29,6 +30,7 @@ const PROFILES = [
 
 export function SettingsModal() {
   const { colorProfile, setColorProfile, setSettingsOpen } = useAppStore();
+  const { user, signOut } = useAuth();
 
   return (
     <div className="modal-backdrop" onClick={() => setSettingsOpen(false)}>
@@ -44,6 +46,32 @@ export function SettingsModal() {
             <X size={16} />
           </button>
         </div>
+
+        {user && (
+          <div className="mb-8">
+            <p className="mb-4 text-sm font-black uppercase tracking-wide text-stone-700 dark:text-[#7a7670]">
+              Account
+            </p>
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border-[3px] border-[#111111] bg-white p-4 shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[3px_3px_0_#000]">
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 place-items-center rounded-lg border-2 border-black bg-[#ffdc4a] dark:border-[#1e232a] dark:bg-[#3d2800]">
+                  <User size={18} />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-stone-500 dark:text-[#7a7670]">Signed in as</p>
+                  <p className="text-sm font-black">{user.email}</p>
+                </div>
+              </div>
+              <button
+                className="nb-button danger"
+                onClick={() => void signOut()}
+                type="button"
+              >
+                <LogOut size={16} /> Logout
+              </button>
+            </div>
+          </div>
+        )}
 
         <p className="mb-4 text-sm font-black uppercase tracking-wide text-stone-700 dark:text-[#7a7670]">
           Color Profile

@@ -2,14 +2,19 @@ import { useEffect, useState } from "react";
 import { useAppStore } from "./store/useAppStore";
 import { isOverdue, isToday } from "./utils/date";
 import { notifyDueReminders } from "./utils/helpers";
+import { useAuth } from "./contexts/AuthContext";
+import { useSync } from "./hooks/useSync";
 
 import { Toaster, toast } from "sonner";
+import { AuthPage } from "./components/auth/AuthPage";
 import { Sidebar } from "./components/layout/Sidebar";
 import { Topbar, SearchBar } from "./components/layout/Topbar";
 import { WorkspaceView, TaskListView, CalendarView, InsightsView } from "./components/views";
 import { TaskDetailPanel, TaskModal, CommandPalette, SettingsModal } from "./components/modals";
 
 function App() {
+  const auth = useAuth();
+  const syncStatus = useSync(auth.user);
   const {
     activePageId,
     addTaskBlock,
@@ -39,9 +44,16 @@ function App() {
   const dueToday = openTasks.filter((task) => isToday(task.metadata.deadline));
   const overdue = openTasks.filter((task) => isOverdue(task.metadata.deadline));
 
+  // ── Sync UI updates ─────────────────────────────────────────
+  useEffect(() => {
+    if (syncStatus.lastSyncedAt) {
+      void useAppStore.getState().syncDbUpdates?.();
+    }
+  }, [syncStatus.lastSyncedAt]);
+
   // ── Bootstrap ───────────────────────────────────────────────
   useEffect(() => {
-    void initialize();
+    void initialize({ skipSeed: Boolean(auth.user) });
   }, [initialize]);
 
   // ── Theme sync ──────────────────────────────────────────────
@@ -95,6 +107,25 @@ function App() {
     }
   }, [notification]);
 
+  if (auth.loading) {
+    return (
+      <main className="app-shell grid min-h-screen place-items-center p-6">
+        <div className="brutal-card bg-[#ffdc4a] px-6 py-4 text-lg font-black">
+          Restoring session...
+        </div>
+      </main>
+    );
+  }
+
+  if (auth.authEnabled && !auth.session) {
+    return (
+      <>
+        <AuthPage />
+        <Toaster position="top-center" />
+      </>
+    );
+  }
+
   if (loading) {
     return (
       <main className="app-shell grid min-h-screen place-items-center p-6">
@@ -118,6 +149,7 @@ function App() {
             onCommandOpen={() => setCommandOpen(true)}
             activePage={activePage}
             view={view}
+            syncStatus={syncStatus}
           />
 
           <SearchBar searchQuery={searchQuery} onSearchChange={setSearchQuery} />

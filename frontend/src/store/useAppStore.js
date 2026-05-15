@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import { db } from "../db/schema";
+import { deleteTaskImage, uploadTaskImage } from "../services/imageUploadService";
+import { enqueueMutation } from "../sync/syncQueue";
 import {
   nextRecurringDate,
   normalizeDateText,
@@ -94,7 +96,7 @@ export const useAppStore = create((set, get) => ({
 
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
 
-  initialize: async () => {
+  initialize: async ({ skipSeed = false } = {}) => {
     set({ loading: true, error: undefined });
 
     let [workspaces, sections, pages, blocks] = await Promise.all([
@@ -104,7 +106,7 @@ export const useAppStore = create((set, get) => ({
       db.blocks.toArray()
     ]);
 
-    if (workspaces.length === 0) {
+    if (workspaces.length === 0 && !skipSeed) {
       const seed = seedData();
       await db.transaction(
         "rw",
@@ -154,6 +156,22 @@ export const useAppStore = create((set, get) => ({
     });
   },
 
+  syncDbUpdates: async () => {
+    const [workspaces, sections, pages, blocks] = await Promise.all([
+      db.workspaces.toArray(),
+      db.sections.toArray(),
+      db.pages.toArray(),
+      db.blocks.toArray()
+    ]);
+    set({
+      workspaces,
+      sections: sortSections(sections),
+      pages,
+      blocks: sortBlocks(blocks.map(normalizeBlock)),
+      activePageId: get().activePageId || pages[0]?.id
+    });
+  },
+
   setView: (view) => set({ view }),
   setActivePage: (pageId) => set({ activePageId: pageId, view: "workspace" }),
   setSelectedTask: (taskId) => set({ selectedTaskId: taskId }),
@@ -198,6 +216,7 @@ export const useAppStore = create((set, get) => ({
     pushUndoSnapshot(get, set, `restore ${item.label}`);
     if (item.type === "block") {
       await db.blocks.put(item.payload.block);
+      await enqueueMutation("block", item.payload.block.id, "upsert", item.payload.block);
       set((state) => ({
         blocks: sortBlocks([...state.blocks, normalizeBlock(item.payload.block)]),
         recentlyDeleted: state.recentlyDeleted.filter((entry) => entry.id !== itemId)
@@ -256,12 +275,15 @@ export const useAppStore = create((set, get) => ({
       updatedAt: createdAt
     };
     await db.sections.add(section);
+    await enqueueMutation("section", section.id, "upsert", section);
     set((state) => ({ sections: sortSections([...state.sections, section]) }));
   },
 
   renameSection: async (sectionId, title) => {
     const updatedAt = nowIso();
     await db.sections.update(sectionId, { title, updatedAt });
+    const updated = get().sections.find((s) => s.id === sectionId);
+    if (updated) await enqueueMutation("section", sectionId, "upsert", { ...updated, title, updatedAt });
     set((state) => ({
       sections: state.sections.map((section) =>
         section.id === sectionId ? { ...section, title, updatedAt } : section
@@ -285,6 +307,7 @@ export const useAppStore = create((set, get) => ({
     };
 
     await db.pages.add(page);
+    await enqueueMutation("page", page.id, "upsert", page);
     set((state) => ({
       pages: [...state.pages, page],
       activePageId: page.id,
@@ -294,7 +317,10 @@ export const useAppStore = create((set, get) => ({
   },
 
   movePageToSection: async (pageId, sectionId) => {
-    await db.pages.update(pageId, { sectionId, updatedAt: nowIso() });
+    const updatedAt = nowIso();
+    await db.pages.update(pageId, { sectionId, updatedAt });
+    const page = get().pages.find((p) => p.id === pageId);
+    if (page) await enqueueMutation("page", pageId, "upsert", { ...page, sectionId, updatedAt });
     set((state) => ({
       pages: state.pages.map((page) =>
         page.id === pageId ? { ...page, sectionId } : page
@@ -337,6 +363,8 @@ export const useAppStore = create((set, get) => ({
       await db.pages.add(page);
       await db.blocks.add(note);
     });
+    await enqueueMutation("page", page.id, "upsert", page);
+    await enqueueMutation("block", note.id, "upsert", note);
 
     set((current) => ({
       pages: [...current.pages, page],
@@ -349,6 +377,8 @@ export const useAppStore = create((set, get) => ({
   renamePage: async (pageId, title) => {
     const updatedAt = nowIso();
     await db.pages.update(pageId, { title, updatedAt });
+    const page = get().pages.find((p) => p.id === pageId);
+    if (page) await enqueueMutation("page", pageId, "upsert", { ...page, title, updatedAt });
     set((state) => ({
       pages: state.pages.map((page) =>
         page.id === pageId ? { ...page, title, updatedAt } : page
@@ -413,6 +443,7 @@ export const useAppStore = create((set, get) => ({
       metadata: { ...block.metadata, updatedAt }
     };
     await db.blocks.put(updatedBlock);
+    await enqueueMutation("block", updatedBlock.id, "upsert", updatedBlock);
     set((state) => ({
       blocks: state.blocks.map((item) =>
         item.id === blockId ? updatedBlock : item
@@ -468,6 +499,7 @@ export const useAppStore = create((set, get) => ({
     };
 
     await db.blocks.put(updatedBlock);
+    await enqueueMutation("block", updatedBlock.id, "upsert", updatedBlock);
     set((state) => ({
       blocks: sortBlocks(
         state.blocks.map((item) =>
@@ -545,6 +577,8 @@ export const useAppStore = create((set, get) => ({
       await db.blocks.put(updatedBlock);
       if (nextTask) await db.blocks.add(nextTask);
     });
+    await enqueueMutation("block", updatedBlock.id, "upsert", updatedBlock);
+    if (nextTask) await enqueueMutation("block", nextTask.id, "upsert", nextTask);
     set((state) => ({
       error: undefined,
       blocks: sortBlocks(
@@ -574,6 +608,8 @@ export const useAppStore = create((set, get) => ({
       await db.blocks.put(updatedBlock);
       await db.blocks.put(updatedTarget);
     });
+    await enqueueMutation("block", updatedBlock.id, "upsert", updatedBlock);
+    await enqueueMutation("block", updatedTarget.id, "upsert", updatedTarget);
 
     set((current) => ({
       blocks: sortBlocks(
@@ -600,6 +636,9 @@ export const useAppStore = create((set, get) => ({
       await Promise.all(pages.map((page) => db.pages.delete(page.id)));
       await Promise.all(blocks.map((block) => db.blocks.delete(block.id)));
     });
+    await enqueueMutation("section", sectionId, "delete", section);
+    await Promise.all(pages.map((page) => enqueueMutation("page", page.id, "delete", page)));
+    await Promise.all(blocks.map((block) => enqueueMutation("block", block.id, "delete", block)));
     const deletedItem = makeDeletedItem("section", section.title, {
       section,
       pages,
@@ -625,6 +664,8 @@ export const useAppStore = create((set, get) => ({
       await db.pages.delete(pageId);
       await Promise.all(blocks.map((block) => db.blocks.delete(block.id)));
     });
+    await enqueueMutation("page", pageId, "delete", page);
+    await Promise.all(blocks.map((block) => enqueueMutation("block", block.id, "delete", block)));
     const deletedItem = makeDeletedItem("page", page.title, { page, blocks });
     set((state) => ({
       pages: state.pages.filter((item) => item.id !== pageId),
@@ -641,6 +682,10 @@ export const useAppStore = create((set, get) => ({
     if (!block) return;
 
     pushUndoSnapshot(get, set, `delete ${block.type}`);
+    await enqueueMutation("block", blockId, "delete", block);
+    if (block.type === "task" && block.content.imageUrl) {
+      await deleteTaskImage(block.content.imageUrl);
+    }
     await db.blocks.delete(blockId);
     const deletedItem = makeDeletedItem(
       "block",
@@ -775,6 +820,51 @@ export const useAppStore = create((set, get) => ({
       selectedTaskId: undefined,
       aiReview: undefined
     });
+  },
+
+  uploadTaskAttachment: async (taskId, file, userId) => {
+    const block = get().blocks.find((item) => item.id === taskId);
+    if (!block || block.type !== "task") return;
+
+    pushUndoSnapshot(get, set, "upload task image");
+    const updatedAt = nowIso();
+    const imageUrl = await uploadTaskImage({
+      file,
+      taskId,
+      userId,
+      oldPath: block.content.imageUrl
+    });
+    const updatedBlock = {
+      ...block,
+      content: { ...block.content, imageUrl },
+      metadata: { ...block.metadata, updatedAt }
+    };
+    await db.blocks.put(updatedBlock);
+    await enqueueMutation("block", updatedBlock.id, "upsert", updatedBlock);
+    set((state) => ({
+      blocks: state.blocks.map((item) => (item.id === taskId ? updatedBlock : item))
+    }));
+    get().setNotification("Image uploaded");
+  },
+
+  removeTaskAttachment: async (taskId) => {
+    const block = get().blocks.find((item) => item.id === taskId);
+    if (!block || block.type !== "task" || !block.content.imageUrl) return;
+
+    pushUndoSnapshot(get, set, "remove task image");
+    const updatedAt = nowIso();
+    await deleteTaskImage(block.content.imageUrl);
+    const updatedBlock = {
+      ...block,
+      content: { ...block.content, imageUrl: undefined },
+      metadata: { ...block.metadata, updatedAt }
+    };
+    await db.blocks.put(updatedBlock);
+    await enqueueMutation("block", updatedBlock.id, "upsert", updatedBlock);
+    set((state) => ({
+      blocks: state.blocks.map((item) => (item.id === taskId ? updatedBlock : item))
+    }));
+    get().setNotification("Image removed");
   }
 }));
 
@@ -800,6 +890,7 @@ const addBlock = async (get, set, pageId, type, content, metadata = {}, extra = 
     ...extra
   };
   await db.blocks.add(block);
+  await enqueueMutation("block", block.id, "upsert", block);
   set((current) => ({ blocks: sortBlocks([...current.blocks, block]) }));
   get().setNotification(`${type.charAt(0).toUpperCase() + type.slice(1)} added`);
 };

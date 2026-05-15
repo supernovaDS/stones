@@ -12,8 +12,10 @@
     "vite": "^8.0.10"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.105.4",
     "@tailwindcss/vite": "^4.2.4",
     "@vitejs/plugin-react": "^6.0.1",
+    "browser-image-compression": "^2.0.2",
     "clsx": "^2.1.1",
     "dexie": "^4.4.2",
     "lucide-react": "^1.12.0",

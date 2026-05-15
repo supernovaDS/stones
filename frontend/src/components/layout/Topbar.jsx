@@ -1,5 +1,4 @@
 import {
-  CalendarPlus,
   Check,
   Code2,
   Command,
@@ -14,8 +13,10 @@ import { useRef } from "react";
 import { useAppStore } from "../../store/useAppStore";
 import { viewTitle } from "../../utils/helpers";
 import { HeaderButton } from "../ui";
+import { SyncStatusIndicator } from "../sync/SyncStatusIndicator";
 
-export function Topbar({ searchQuery, onSearchChange, onCommandOpen, activePage, view }) {
+export function Topbar({ searchQuery, onSearchChange, onCommandOpen, activePage, view, syncStatus }) {
+
   const {
     addChecklistBlock,
     addCodeBlock,
@@ -49,6 +50,7 @@ export function Topbar({ searchQuery, onSearchChange, onCommandOpen, activePage,
         </h2>
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        <SyncStatusIndicator status={syncStatus} onSync={() => void syncStatus?.syncNow?.()} />
         <HeaderButton icon={Command} label="Menu" onClick={onCommandOpen} />
         <HeaderButton
           disabled={!undoStack.length}

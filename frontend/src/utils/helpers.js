@@ -1,4 +1,4 @@
-import { formatShortDate, isOverdue, todayIso } from "./date";
+import { formatShortDate, isOverdue, todayIso, toLocalDateString } from "./date";
 
 // ── Task filtering ──────────────────────────────────────────────
 
@@ -43,7 +43,7 @@ function groupLabel(deadline, mode) {
   if (mode === "week") {
     const start = new Date(date);
     start.setDate(date.getDate() - date.getDay());
-    return `Week of ${formatShortDate(start.toISOString().slice(0, 10))}`;
+    return `Week of ${formatShortDate(toLocalDateString(start))}`;
   }
   return date.toLocaleDateString(undefined, { month: "long", year: "numeric" });
 }
@@ -101,7 +101,7 @@ export function calculateStreak(tasks) {
   const completedDays = new Set(tasks.map((task) => task.metadata.completedAt?.slice(0, 10)).filter(Boolean));
   let streak = 0;
   const cursor = new Date();
-  while (completedDays.has(cursor.toISOString().slice(0, 10))) {
+  while (completedDays.has(toLocalDateString(cursor))) {
     streak += 1;
     cursor.setDate(cursor.getDate() - 1);
   }
