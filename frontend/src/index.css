@@ -1369,6 +1369,16 @@
   border-left-color: #ff5ec4 !important;
 }
 
+.profile-minimal .bento-card[class*="border-l-[#10b981]"] {
+  border-color: rgba(16, 185, 129, 0.25) !important;
+  border-left-color: #10b981 !important;
+}
+
+.profile-minimal .bento-card[class*="border-l-[#ef4444]"] {
+  border-color: rgba(239, 68, 68, 0.25) !important;
+  border-left-color: #ef4444 !important;
+}
+
 .profile-minimal.dark .bento-card[class*="border-l-[#21caff]"] {
   border-color: rgba(3, 105, 161, 0.3) !important;
   border-left-color: #0369a1 !important;
@@ -1407,6 +1417,16 @@
 .profile-minimal.dark .bento-card[class*="border-l-[#ff5ec4]"] {
   border-color: rgba(190, 24, 93, 0.3) !important;
   border-left-color: #be185d !important;
+}
+
+.profile-minimal.dark .bento-card[class*="border-l-[#10b981]"] {
+  border-color: rgba(4, 120, 87, 0.3) !important;
+  border-left-color: #047857 !important;
+}
+
+.profile-minimal.dark .bento-card[class*="border-l-[#ef4444]"] {
+  border-color: rgba(153, 27, 27, 0.3) !important;
+  border-left-color: #991b1b !important;
 }
 
 /* Default for any without rail */
@@ -2347,6 +2367,19 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
 }
 
+/* Calendar sidebar plain border override in minimal profile */
+.profile-minimal .bento-grid>aside.span-4.bento-card {
+  border-left-width: 1px !important;
+  border-left-color: rgba(0, 0, 0, 0.05) !important;
+  border-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+.profile-minimal.dark .bento-grid>aside.span-4.bento-card {
+  border-left-width: 1px !important;
+  border-left-color: #1e293b !important;
+  border-color: #1e293b !important;
+}
+
 .profile-minimal.dark .bento-grid>.bento-card[class*="bg-[#ffdc4a]"] {
   background: #0f172a !important;
   color: #e2e8f0 !important;
@@ -2550,3 +2583,12 @@
 
 /* Import glow profile */
 @import "./glow-profile.css";
+
+.profile-minimal .priority-high,
+.profile-minimal .priority-medium,
+.profile-minimal .priority-low,
+.profile-minimal.dark .priority-high,
+.profile-minimal.dark .priority-medium,
+.profile-minimal.dark .priority-low {
+  color: #111111 !important;
+}

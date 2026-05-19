@@ -4,6 +4,7 @@ import { isOverdue, isToday } from "./utils/date";
 import { notifyDueReminders } from "./utils/helpers";
 import { useAuth } from "./contexts/AuthContext";
 import { useSync } from "./hooks/useSync";
+import { ArrowDown, ArrowUp } from "lucide-react";
 
 import { Toaster, toast } from "sonner";
 import { AuthPage } from "./components/auth/AuthPage";
@@ -39,9 +40,54 @@ function App() {
   const [commandOpen, setCommandOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // ── Scroll to Top/Bottom button ──
+  const [scrollDirection, setScrollDirection] = useState("down");
+  const [isScrollVisible, setIsScrollVisible] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight;
+      const winHeight = window.innerHeight;
+
+      if (docHeight > winHeight + 150) {
+        setIsScrollVisible(true);
+      } else {
+        setIsScrollVisible(false);
+      }
+
+      if (scrollTop > (docHeight - winHeight) / 2) {
+        setScrollDirection("up");
+      } else {
+        setScrollDirection("down");
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    window.addEventListener("resize", handleScroll);
+    handleScroll();
+
+    const observer = new MutationObserver(handleScroll);
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+      observer.disconnect();
+    };
+  }, []);
+
+  const handleScrollClick = () => {
+    if (scrollDirection === "up") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
+    }
+  };
+
   const activePage = pages.find((page) => page.id === activePageId);
   const tasks = blocks.filter((block) => block.type === "task");
-  const openTasks = tasks.filter((task) => !task.metadata.completed);
+  const openTasks = tasks.filter((task) => !task.metadata.completed && !task.metadata.failed);
   const dueToday = openTasks.filter((task) => isToday(task.metadata.deadline));
   const overdue = openTasks.filter((task) => isOverdue(task.metadata.deadline));
 
@@ -198,6 +244,20 @@ function App() {
           }
         }} 
       />
+      {isScrollVisible && (
+        <button
+          className={
+            colorProfile === "minimal"
+              ? "fixed bottom-6 right-6 z-40 flex h-12 w-12 items-center justify-center rounded-full border border-stone-200 bg-white text-stone-700 shadow-md transition-all hover:bg-stone-50 hover:shadow-lg active:scale-95 dark:border-stone-800 dark:bg-[#12151a] dark:text-[#c8c3ba] dark:shadow-none animate-in fade-in zoom-in-75 duration-200"
+              : "fixed bottom-6 right-6 z-40 flex h-12 w-12 items-center justify-center rounded-full border-[3px] border-black bg-[#ffdc4a] text-black shadow-[4px_4px_0_#111] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0_#111] active:translate-y-0 active:shadow-[2px_2px_0_#111] dark:border-black dark:bg-[#21caff] dark:text-black dark:shadow-[3px_3px_0_#000] animate-in fade-in zoom-in-75 duration-200"
+          }
+          onClick={handleScrollClick}
+          title={scrollDirection === "up" ? "Scroll to top" : "Scroll to bottom"}
+          type="button"
+        >
+          {scrollDirection === "up" ? <ArrowUp size={22} /> : <ArrowDown size={22} />}
+        </button>
+      )}
     </main>
   );
 }

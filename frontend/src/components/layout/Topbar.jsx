@@ -2,6 +2,7 @@ import {
   Check,
   Code2,
   Command,
+  Heading,
   Image,
   Link,
   ListChecks,
@@ -24,6 +25,7 @@ export function Topbar({ searchQuery, onSearchChange, onCommandOpen, onMenuToggl
     addImageBlock,
     addLinkBlock,
     addNoteBlock,
+    addTitleBlock,
     openTaskModal,
     openTodayPage,
     undoLastChange,
@@ -72,6 +74,7 @@ export function Topbar({ searchQuery, onSearchChange, onCommandOpen, onMenuToggl
         />
         {view === "workspace" && activePage && (
           <>
+            <HeaderButton icon={Heading} label="Heading" onClick={() => void addTitleBlock()} />
             <HeaderButton icon={Plus} label="Note" onClick={() => void addNoteBlock()} />
             <HeaderButton icon={ListChecks} label="Checklist" onClick={() => void addChecklistBlock()} />
             <HeaderButton icon={Link} label="Link" onClick={() => void addLinkBlock()} />

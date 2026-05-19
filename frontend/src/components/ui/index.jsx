@@ -8,9 +8,9 @@ export function HeaderButton({ disabled, icon: Icon, label, onClick }) {
   );
 }
 
-export function IconButton({ danger, icon: Icon, onClick, title }) {
+export function IconButton({ danger, icon: Icon, onClick, title, className }) {
   return (
-    <button className={clsx("icon-button", danger && "danger")} onClick={onClick} title={title} type="button">
+    <button className={clsx("icon-button", danger && "danger", className)} onClick={onClick} title={title} type="button">
       <Icon size={16} />
     </button>
   );

@@ -5,11 +5,13 @@ import {
   Code2,
   Command,
   FileDown,
+  Heading,
   Link,
   ListChecks,
   Plus,
   Workflow,
-  X
+  X,
+  XCircle
 } from "lucide-react";
 import { useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
@@ -20,7 +22,7 @@ import { HeaderButton, IconButton, Checkbox } from "../ui";
 // ── Task detail panel ───────────────────────────────────────────
 
 export function TaskDetailPanel() {
-  const { addSubtask, blocks, deleteSubtask, pages, selectedTaskId, setActivePage, setSelectedTask, setTaskDependencies, toggleTask, updateSubtask, updateTask } = useAppStore();
+  const { addSubtask, blocks, deleteSubtask, pages, selectedTaskId, setActivePage, setSelectedTask, setTaskDependencies, toggleTask, toggleFailTask, updateSubtask, updateTask } = useAppStore();
   const task = blocks.find((block) => block.id === selectedTaskId);
   if (!task || task.type !== "task") return null;
   const page = pages.find((item) => item.id === task.pageId);
@@ -35,27 +37,29 @@ export function TaskDetailPanel() {
         <IconButton icon={X} title="Close details" onClick={() => setSelectedTask(undefined)} />
       </div>
       <div className="grid gap-4">
-        <label className="grid gap-1 text-sm font-black">Title<input className="nb-input px-3 py-2 font-bold" onChange={(event) => void updateTask(task.id, { title: event.target.value })} value={task.content.title} /></label>
-        <label className="grid gap-1 text-sm font-black">Notes<textarea className="nb-textarea min-h-24 px-3 py-2 font-bold" onChange={(event) => void updateTask(task.id, { notes: event.target.value })} value={task.content.notes ?? ""} /></label>
-        <div className="grid grid-cols-2 gap-3">
-          <select className="nb-select px-3 py-2 font-bold" onChange={(event) => void updateTask(task.id, { priority: event.target.value })} value={task.metadata.priority ?? "medium"}><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
-          <input className="nb-input px-3 py-2 font-bold" onChange={(event) => void updateTask(task.id, { deadline: event.target.value })} type="datetime-local" value={toInputDate(task.metadata.deadline)} />
-        </div>
-        <div className="grid grid-cols-[1fr_120px] gap-3 max-sm:grid-cols-1">
-          <select className="nb-select px-3 py-2 font-bold" onChange={(event) => void updateTask(task.id, { recurrence: event.target.value })} value={task.metadata.recurrence ?? "none"}><option value="none">No repeat</option><option value="daily">Daily</option><option value="weekdays">Weekdays</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="custom">Custom days</option></select>
-          <input className="nb-input px-3 py-2 font-bold" disabled={task.metadata.recurrence !== "custom"} min="1" onChange={(event) => void updateTask(task.id, { customRecurrenceInterval: event.target.value })} type="number" value={task.metadata.customRecurrenceInterval ?? 1} />
-        </div>
-        <section className="grid gap-2">
-          <h4 className="text-sm font-black">Schedule</h4>
-          <div className="grid grid-cols-3 gap-2 max-sm:grid-cols-1">
-            <input className="nb-input px-3 py-2 font-bold" onChange={(event) => void updateTask(task.id, { scheduledDate: event.target.value })} type="date" value={task.metadata.scheduledDate ?? ""} />
-            <input className="nb-input px-3 py-2 font-bold" onChange={(event) => void updateTask(task.id, { scheduledStart: event.target.value })} type="time" value={task.metadata.scheduledStart ?? ""} />
-            <input className="nb-input px-3 py-2 font-bold" onChange={(event) => void updateTask(task.id, { scheduledEnd: event.target.value })} type="time" value={task.metadata.scheduledEnd ?? ""} />
-          </div>
-        </section>
+        <label className="grid gap-1 text-sm font-black">Title<input className="nb-input w-full px-3 py-2 font-bold" onChange={(event) => void updateTask(task.id, { title: event.target.value })} value={task.content.title} /></label>
+        <label className="grid gap-1 text-sm font-black">Notes<textarea className="nb-textarea w-full min-h-24 px-3 py-2 font-bold" onChange={(event) => void updateTask(task.id, { notes: event.target.value })} value={task.content.notes ?? ""} /></label>
+        <label className="grid gap-1 text-sm font-black">
+          Priority
+          <select className="nb-select w-full px-3 py-2 font-bold" onChange={(event) => void updateTask(task.id, { priority: event.target.value })} value={task.metadata.priority ?? "medium"}><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+        </label>
+        <label className="grid gap-1 text-sm font-black">
+          Deadline
+          <input className="nb-input w-full px-3 py-2 font-bold" onChange={(event) => void updateTask(task.id, { deadline: event.target.value })} type="datetime-local" value={toInputDate(task.metadata.deadline)} />
+        </label>
+        <label className="grid gap-1 text-sm font-black">
+          Repeat
+          <select className="nb-select w-full px-3 py-2 font-bold" onChange={(event) => void updateTask(task.id, { recurrence: event.target.value })} value={task.metadata.recurrence ?? "none"}><option value="none">No repeat</option><option value="daily">Daily</option><option value="weekdays">Weekdays</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="custom">Custom days</option></select>
+        </label>
+        {task.metadata.recurrence === "custom" && (
+          <label className="grid gap-1 text-sm font-black animate-in fade-in slide-in-from-top-1 duration-150">
+            Interval (Days)
+            <input className="nb-input w-full px-3 py-2 font-bold" min="1" onChange={(event) => void updateTask(task.id, { customRecurrenceInterval: event.target.value })} type="number" value={task.metadata.customRecurrenceInterval ?? 1} />
+          </label>
+        )}
         <label className="grid gap-1 text-sm font-black">
           Reminder
-          <input className="nb-input px-3 py-2 font-bold" onChange={(event) => void updateTask(task.id, { reminderAt: event.target.value })} type="datetime-local" value={toInputDate(task.metadata.reminderAt)} />
+          <input className="nb-input w-full px-3 py-2 font-bold" onChange={(event) => void updateTask(task.id, { reminderAt: event.target.value })} type="datetime-local" value={toInputDate(task.metadata.reminderAt)} />
         </label>
         <section className="grid gap-2">
           <div className="flex items-center justify-between"><h4 className="text-sm font-black">Subtasks</h4><button className="nb-button min-h-0 px-3 py-1 text-xs" onClick={() => void addSubtask(task.id)} type="button">Add</button></div>
@@ -81,7 +85,10 @@ export function TaskDetailPanel() {
             ))}
           </div>
         </section>
-        <button className="nb-button action" onClick={() => void toggleTask(task.id)} type="button"><Check size={16} />{task.metadata.completed ? "Mark Open" : "Mark Complete"}</button>
+        <div className="flex gap-2">
+          <button className="nb-button action flex-1" onClick={() => void toggleTask(task.id)} type="button"><Check size={16} />{task.metadata.completed ? "Mark Open" : "Mark Complete"}</button>
+          <button className="nb-button flex-1" onClick={() => void toggleFailTask(task.id)} type="button"><XCircle size={16} />{task.metadata.failed ? "Unfail Task" : "Fail Task"}</button>
+        </div>
         {source?.type === "note" ? <div className="rounded-lg border-[3px] border-black bg-[#fff1b8] p-3 shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[3px_3px_0_#000]"><p className="mb-1 text-xs font-black uppercase tracking-wide text-stone-600 dark:text-[#7a7670]">Source note</p><p className="line-clamp-4 text-sm font-bold text-stone-700 dark:text-[#7a7670]">{source.content.text}</p></div> : null}
         <button className="nb-button" onClick={() => { setActivePage(task.pageId); setSelectedTask(undefined); }} type="button"><Workflow size={16} />Open Page</button>
       </div>
@@ -228,12 +235,13 @@ export function TaskModal({ initialParams, onClose, onSubmit }) {
 // ── Command palette ─────────────────────────────────────────────
 
 export function CommandPalette({ onClose }) {
-  const { activePageId, addChecklistBlock, addCodeBlock, addLinkBlock, addNoteBlock, blocks, exportPageMarkdown, openTaskModal, openTodayPage, pages, setActivePage, setSelectedTask, setView, view } = useAppStore();
+  const { activePageId, addTitleBlock, addChecklistBlock, addCodeBlock, addLinkBlock, addNoteBlock, blocks, exportPageMarkdown, openTaskModal, openTodayPage, pages, setActivePage, setSelectedTask, setView, view } = useAppStore();
   const [query, setQuery] = useState("");
   const isWorkspace = view === "workspace" && activePageId;
   const normalized = query.trim().toLowerCase();
   const actions = [
     ...(isWorkspace ? [
+      ["/heading", "Create section heading", Heading, () => void addTitleBlock()],
       ["/task", "Create task", Check, () => void openTaskModal()],
       ["/note", "Create note", Plus, () => void addNoteBlock()],
       ["/checklist", "Create checklist", ListChecks, () => void addChecklistBlock()],

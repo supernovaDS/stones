@@ -24,5 +24,6 @@ export const blockTypeRail = {
   checklist: "border-l-[#a78bfa]",
   code: "border-l-[#ffdc4a]",
   link: "border-l-[#7c3aed]",
-  image: "border-l-[#ff5ec4]"
+  image: "border-l-[#ff5ec4]",
+  title: "border-l-[#ffb84d]"
 };

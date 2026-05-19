@@ -2,8 +2,12 @@ import { useEffect, useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
 import { blockMatchesSearch } from "../../utils/helpers";
 import { BlockCard } from "../blocks";
+import { clsx } from "clsx";
+import { Archive, ChevronDown, ChevronUp, Plus, FileText, CheckSquare, List, Code2, Link, Image, Heading } from "lucide-react";
 
 function WeatherWidget() {
+// ... keeping weather widget ...
+
   const [time, setTime] = useState(new Date());
   const [weather, setWeather] = useState({ temp: null, desc: "Locating...", icon: "" });
 
@@ -69,13 +73,146 @@ function WeatherWidget() {
   );
 }
 
+function AddBlockMenu({ pageId }) {
+  const { addTitleBlock, addNoteBlock, openTaskModal, addChecklistBlock, addCodeBlock, addLinkBlock, addImageBlock, theme, colorProfile } = useAppStore();
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleImageClick = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = (e) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        void addImageBlock(file, pageId);
+      }
+    };
+    input.click();
+    setIsOpen(false);
+  };
+
+  const menuItems = [
+    {
+      label: "Task",
+      icon: CheckSquare,
+      color: "bg-[#21caff] dark:bg-[#002535]",
+      action: () => {
+        void openTaskModal({ pageId });
+        setIsOpen(false);
+      }
+    },
+    {
+      label: "Note",
+      icon: FileText,
+      color: "bg-[#ffdc4a] dark:bg-[#3d2800]",
+      action: () => {
+        void addNoteBlock(pageId);
+        setIsOpen(false);
+      }
+    },
+    {
+      label: "Checklist",
+      icon: List,
+      color: "bg-[#2ef2a6] dark:bg-[#0a3d28]",
+      action: () => {
+        void addChecklistBlock(pageId);
+        setIsOpen(false);
+      }
+    },
+    {
+      label: "Code",
+      icon: Code2,
+      color: "bg-[#c4a8ff] dark:bg-[#1a1040]",
+      action: () => {
+        void addCodeBlock(pageId);
+        setIsOpen(false);
+      }
+    },
+    {
+      label: "Link",
+      icon: Link,
+      color: "bg-[#ff5ec4] dark:bg-[#3d0030]",
+      action: () => {
+        void addLinkBlock(pageId);
+        setIsOpen(false);
+      }
+    },
+    {
+      label: "Image",
+      icon: Image,
+      color: "bg-[#ff5a5f] dark:bg-[#3d1215]",
+      action: handleImageClick
+    }
+  ];
+
+  return (
+    <div className="relative flex flex-col items-center py-4">
+      {isOpen && (
+        <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
+      )}
+
+      {isOpen && (
+        <div className="absolute bottom-20 z-20 grid w-64 grid-cols-2 gap-2 rounded-xl border-[3px] border-black bg-white p-3 shadow-[6px_6px_0_#111] animate-in fade-in slide-in-from-bottom-2 duration-150 dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[4px_4px_0_#000]">
+          <button
+            className="nb-button col-span-2 flex items-center gap-3 p-2.5 transition hover:-translate-y-0.5 hover:shadow-[3px_3px_0_#111]"
+            onClick={() => {
+              void addTitleBlock(pageId);
+              setIsOpen(false);
+            }}
+            type="button"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg border-2 border-black bg-[#ffb84d] dark:border-[#1e232a] dark:bg-[#b45309]">
+              <Heading size={16} />
+            </span>
+            <span className="text-sm font-black">Heading / Section Title</span>
+          </button>
+          
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.label}
+                className="nb-button flex flex-col items-center justify-center gap-1.5 p-3 text-center transition hover:-translate-y-0.5 hover:shadow-[3px_3px_0_#111]"
+                onClick={item.action}
+                type="button"
+              >
+                <span className={clsx("flex h-8 w-8 items-center justify-center rounded-lg border-2 border-black dark:border-[#1e232a]", item.color)}>
+                  <Icon size={16} />
+                </span>
+                <span className="text-xs font-black">{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <button
+        className={clsx(
+          "nb-button flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-black !p-0 shadow-[4px_4px_0_#111] transition-all hover:scale-105 active:scale-95 dark:border-[#1e232a] dark:shadow-[3px_3px_0_#000]",
+          isOpen ? "bg-[#ff5a5f] rotate-45 text-black" : (theme === "dark" && colorProfile === "neo" ? "bg-[#21caff] text-black" : "bg-[#2ef2a6] text-black")
+        )}
+        onClick={() => setIsOpen(!isOpen)}
+        title="Add block"
+        type="button"
+      >
+        <Plus size={28} />
+      </button>
+    </div>
+  );
+}
+
 export function WorkspaceView({ pageId, searchQuery }) {
   const { blocks, pages, renamePage } = useAppStore();
+  const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+
   const page = pages.find((item) => item.id === pageId);
   const pageBlocks = blocks
     .filter((block) => block.pageId === pageId)
     .filter((block) => blockMatchesSearch(block, searchQuery))
     .sort((a, b) => a.order - b.order);
+
+  const activeBlocks = pageBlocks.filter((block) => !block.metadata.archived);
+  const archivedBlocks = pageBlocks.filter((block) => block.metadata.archived);
 
   return (
     <div className="bento-grid">
@@ -92,15 +229,47 @@ export function WorkspaceView({ pageId, searchQuery }) {
       </section>
       <WeatherWidget />
       <section className="span-12 flex flex-col gap-8">
-        {pageBlocks.length ? (
-          pageBlocks.map((block) => (
+        {activeBlocks.length ? (
+          activeBlocks.map((block) => (
             <div key={block.id}>
               <BlockCard block={block} />
             </div>
           ))
         ) : (
           <div className="bento-card bg-[#2ef2a6] p-8 text-center dark:bg-[#0a3d28]">
-            <p className="text-2xl font-black">No blocks match this search.</p>
+            <p className="text-2xl font-black">No active blocks match this search.</p>
+          </div>
+        )}
+        <AddBlockMenu pageId={pageId} />
+
+        {archivedBlocks.length > 0 && (
+          <div className="mt-8">
+            <button
+              className="flex w-full items-center justify-between rounded-xl border-[3px] border-black bg-[#f1f5ff] p-4 transition-all hover:bg-white dark:border-[#1e232a] dark:bg-[#0c0e11] dark:hover:bg-[#12151a]"
+              onClick={() => setIsArchiveOpen(!isArchiveOpen)}
+              type="button"
+            >
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg border-2 border-black bg-white dark:border-[#1e232a] dark:bg-[#12151a]">
+                  <Archive size={20} />
+                </span>
+                <div className="text-left">
+                  <p className="font-black">Archived Blocks</p>
+                  <p className="text-xs font-bold text-stone-500 dark:text-[#7a7670]">{archivedBlocks.length} block{archivedBlocks.length !== 1 && 's'}</p>
+                </div>
+              </div>
+              {isArchiveOpen ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+            </button>
+            
+            {isArchiveOpen && (
+              <div className="mt-6 flex flex-col gap-6 p-4 rounded-xl border-[3px] border-dashed border-stone-300 dark:border-stone-800">
+                {archivedBlocks.map((block) => (
+                  <div key={block.id} className="opacity-80 transition-opacity hover:opacity-100">
+                    <BlockCard block={block} />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </section>

@@ -11,8 +11,11 @@ import {
   Plus,
   Trash2,
   X,
+  XCircle,
   ZoomIn,
-  ZoomOut
+  ZoomOut,
+  Archive,
+  ArchiveRestore
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useEffect, useRef, useState } from "react";
@@ -31,13 +34,14 @@ export function BlockCard({ block }) {
   if (block.type === "code") return <CodeBlock block={block} />;
   if (block.type === "link") return <LinkBlock block={block} />;
   if (block.type === "image") return <ImageBlock block={block} />;
+  if (block.type === "title") return <TitleBlock block={block} />;
   return <NoteBlock block={block} />;
 }
 
 // ── Block shell ─────────────────────────────────────────────────
 
 function BlockShell({ block, label, children, actions }) {
-  const { deleteBlock, moveBlock } = useAppStore();
+  const { deleteBlock, moveBlock, toggleArchiveBlock } = useAppStore();
   return (
     <article className={clsx("bento-card h-full border-l-[10px] p-4", blockTypeRail[block.type] ?? "border-l-stone-400")}>
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -46,6 +50,7 @@ function BlockShell({ block, label, children, actions }) {
           <IconButton icon={ArrowUp} title="Move up" onClick={() => void moveBlock(block.id, "up")} />
           <IconButton icon={ArrowDown} title="Move down" onClick={() => void moveBlock(block.id, "down")} />
           {actions}
+          <IconButton icon={block.metadata.archived ? ArchiveRestore : Archive} title={block.metadata.archived ? "Unarchive block" : "Archive block"} onClick={() => void toggleArchiveBlock(block.id)} />
           <IconButton danger icon={Trash2} title="Delete block" onClick={() => void deleteBlock(block.id)} />
         </div>
       </div>
@@ -259,10 +264,26 @@ function NoteBlock({ block }) {
   );
 }
 
+// ── Title block ─────────────────────────────────────────────────
+
+function TitleBlock({ block }) {
+  const { updateBlockContent } = useAppStore();
+  return (
+    <BlockShell block={block} label="Heading">
+      <input
+        className="w-full bg-transparent text-3xl font-black tracking-tight text-black outline-none dark:text-[#c8c3ba]"
+        onChange={(event) => void updateBlockContent(block.id, { text: event.target.value })}
+        placeholder="Header / Section Title..."
+        value={block.content.text ?? ""}
+      />
+    </BlockShell>
+  );
+}
+
 // ── Task block ──────────────────────────────────────────────────
 
 function TaskBlock({ block }) {
-  const { deleteBlock, setSelectedTask, toggleTask, updateTask, moveBlock } = useAppStore();
+  const { deleteBlock, setSelectedTask, toggleTask, toggleFailTask, updateTask, moveBlock, updateSubtask, deleteSubtask, addSubtask, toggleArchiveBlock } = useAppStore();
   const blocked = useIsBlocked(block);
   return (
     <article className={clsx("bento-card h-full border-l-[10px] p-4", priorityRail[block.metadata.priority ?? "medium"])}>
@@ -270,7 +291,7 @@ function TaskBlock({ block }) {
         <div className="task-block-header flex items-start gap-3">
           <Checkbox checked={block.metadata.completed} onChange={() => void toggleTask(block.id)} className="mt-1" />
           <input
-            className={clsx("min-w-0 flex-1 bg-transparent text-xl font-black outline-none", block.metadata.completed && "text-stone-400 line-through dark:text-[#5a5650]")}
+            className={clsx("min-w-0 flex-1 bg-transparent text-xl font-black outline-none", block.metadata.completed && "text-stone-400 line-through dark:text-[#5a5650]", block.metadata.failed && "text-red-500 line-through dark:text-red-400")}
             onChange={(event) => void updateTask(block.id, { title: event.target.value })}
             placeholder="Task title"
             value={block.content.title}
@@ -278,11 +299,22 @@ function TaskBlock({ block }) {
           <div className="task-block-actions flex shrink-0 flex-wrap gap-2">
             <IconButton icon={ArrowUp} title="Move up" onClick={() => void moveBlock(block.id, "up")} />
             <IconButton icon={ArrowDown} title="Move down" onClick={() => void moveBlock(block.id, "down")} />
+            <IconButton 
+              icon={XCircle} 
+              title={block.metadata.failed ? "Unfail task" : "Fail task"} 
+              onClick={() => void toggleFailTask(block.id)} 
+              className={clsx(
+                block.metadata.failed 
+                  ? "!bg-[#ff5a5f] !text-black border-black dark:!bg-[#5c1a1d] dark:!text-[#e8a0a2] dark:border-[#1e232a]" 
+                  : "bg-white text-stone-600 dark:bg-[#12151a] dark:text-[#7a7670]"
+              )}
+            />
             <IconButton icon={PanelRight} title="Open details" onClick={() => setSelectedTask(block.id)} />
+            <IconButton icon={block.metadata.archived ? ArchiveRestore : Archive} title={block.metadata.archived ? "Unarchive task" : "Archive task"} onClick={() => void toggleArchiveBlock(block.id)} />
             <IconButton danger icon={Trash2} title="Delete task" onClick={() => void deleteBlock(block.id)} />
           </div>
         </div>
-        <div className="task-block-controls flex flex-wrap gap-2 pl-8">
+        <div className="task-block-controls flex flex-wrap items-center gap-2 pl-8">
           <select className={clsx("nb-select h-10 px-2 text-sm font-black", priorityClasses[block.metadata.priority ?? "medium"])} onChange={(event) => void updateTask(block.id, { priority: event.target.value })} value={block.metadata.priority ?? "medium"}>
             <option value="high">High</option>
             <option value="medium">Medium</option>
@@ -310,11 +342,53 @@ function TaskBlock({ block }) {
               days
             </label>
           ) : null}
-          {blocked ? <Badge tone="red">Blocked</Badge> : null}
+          <button
+            className="nb-button h-10 px-3 text-xs font-black bg-white hover:bg-stone-50 text-stone-700 dark:bg-[#12151a] dark:text-[#7a7670]"
+            onClick={() => void addSubtask(block.id)}
+            type="button"
+          >
+            + Subtask
+          </button>
+          {blocked && !block.metadata.failed ? <Badge tone="red">Blocked</Badge> : null}
           {block.sourceBlockId ? <Badge>Linked note</Badge> : null}
           {block.metadata.scheduledDate ? <Badge>{block.metadata.scheduledStart ?? "Scheduled"}</Badge> : null}
           {block.metadata.reminderAt ? <Badge><Bell size={13} /> {formatShortDate(block.metadata.reminderAt)}</Badge> : null}
         </div>
+        {block.content.subtasks && block.content.subtasks.length > 0 ? (
+          <div className="task-block-subtasks pl-8 pr-2 pt-3 border-t border-dashed border-stone-300 dark:border-stone-850 grid gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black uppercase tracking-wider text-stone-500 dark:text-[#7a7670]">
+                Subtasks ({block.content.subtasks.filter(s => s.completed).length}/{block.content.subtasks.length})
+              </span>
+            </div>
+            <div className="grid gap-1.5 max-h-48 overflow-y-auto pr-1">
+              {block.content.subtasks.map((subtask) => (
+                <div className="flex items-center gap-2 group/subtask" key={subtask.id}>
+                  <Checkbox 
+                    checked={subtask.completed} 
+                    onChange={(event) => void updateSubtask(block.id, subtask.id, { completed: event.target.checked })} 
+                  />
+                  <input 
+                    className={clsx(
+                      "min-w-0 flex-1 bg-transparent text-sm font-bold outline-none", 
+                      subtask.completed && "text-stone-400 line-through dark:text-[#5a5650]"
+                    )} 
+                    onChange={(event) => void updateSubtask(block.id, subtask.id, { text: event.target.value })} 
+                    value={subtask.text} 
+                  />
+                  <button
+                    className="opacity-0 group-hover/subtask:opacity-100 transition-opacity text-stone-400 hover:text-red-500 p-0.5"
+                    onClick={() => void deleteSubtask(block.id, subtask.id)}
+                    title="Delete subtask"
+                    type="button"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
     </article>
   );
@@ -340,9 +414,24 @@ function ChecklistBlock({ block }) {
       </div>
       <div className="grid gap-2">
         {items.map((item) => (
-          <div className="flex items-center gap-3 rounded-lg border-[3px] border-black bg-[#f7f2e8] p-2 dark:border-[#1e232a] dark:bg-[#12151a]" key={item.id}>
+          <div 
+            className={clsx(
+              "flex items-center gap-3 rounded-lg border-[3px] p-2 transition-all duration-150",
+              item.completed 
+                ? "bg-[#e2dfd7] dark:bg-[#0d0e11] border-stone-400 dark:border-[#181c22] opacity-70"
+                : "bg-[#f7f2e8] dark:bg-[#12151a] border-black dark:border-[#1e232a]"
+            )} 
+            key={item.id}
+          >
             <Checkbox checked={item.completed} onChange={(event) => updateItems(items.map((entry) => entry.id === item.id ? { ...entry, completed: event.target.checked } : entry))} />
-            <input className="min-w-0 flex-1 bg-transparent font-bold outline-none" onChange={(event) => updateItems(items.map((entry) => entry.id === item.id ? { ...entry, text: event.target.value } : entry))} value={item.text} />
+            <input 
+              className={clsx(
+                "min-w-0 flex-1 bg-transparent font-bold outline-none transition-all duration-150",
+                item.completed ? "text-stone-500 line-through dark:text-stone-600 font-medium" : "text-black dark:text-[#c8c3ba]"
+              )} 
+              onChange={(event) => updateItems(items.map((entry) => entry.id === item.id ? { ...entry, text: event.target.value } : entry))} 
+              value={item.text} 
+            />
             <IconButton danger icon={X} title="Remove item" onClick={() => updateItems(items.filter((entry) => entry.id !== item.id))} />
           </div>
         ))}
@@ -508,4 +597,7 @@ function ImageCanvas({ alt, dataUrl, doDrag, endDrag, fullscreen, handleWheel, i
 }
 
 // ── Markdown preview ────────────────────────────────────────────
+
+
+
 

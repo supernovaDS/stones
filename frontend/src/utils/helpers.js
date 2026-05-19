@@ -3,12 +3,12 @@ import { formatShortDate, isOverdue, todayIso, toLocalDateString } from "./date"
 // ── Task filtering ──────────────────────────────────────────────
 
 export function taskMatchesFilter(task, filter) {
-  if (filter === "open") return !task.metadata.completed;
+  if (filter === "open") return !task.metadata.completed && !task.metadata.failed;
   if (filter === "done") return task.metadata.completed;
   if (filter === "today") return isToday(task.metadata.deadline);
-  if (filter === "overdue") return !task.metadata.completed && isOverdue(task.metadata.deadline);
-  if (filter === "upcoming") return !task.metadata.completed && task.metadata.deadline && task.metadata.deadline > todayIso();
-  if (filter === "no-date") return !task.metadata.completed && !task.metadata.deadline;
+  if (filter === "overdue") return !task.metadata.completed && !task.metadata.failed && isOverdue(task.metadata.deadline);
+  if (filter === "upcoming") return !task.metadata.completed && !task.metadata.failed && task.metadata.deadline && task.metadata.deadline > todayIso();
+  if (filter === "no-date") return !task.metadata.completed && !task.metadata.failed && !task.metadata.deadline;
   if (filter === "high") return task.metadata.priority === "high";
   return true;
 }

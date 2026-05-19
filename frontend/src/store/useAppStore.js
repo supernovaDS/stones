@@ -396,6 +396,9 @@ export const useAppStore = create((set, get) => ({
     }));
   },
 
+  addTitleBlock: async (pageId = get().activePageId) =>
+    addBlock(get, set, pageId, "title", { text: "" }),
+
   addNoteBlock: async (pageId = get().activePageId) =>
     addBlock(get, set, pageId, "note", { text: "" }),
 
@@ -533,11 +536,19 @@ export const useAppStore = create((set, get) => ({
   updateSubtask: async (taskId, subtaskId, patch) => {
     const task = get().blocks.find((block) => block.id === taskId);
     if (!task || task.type !== "task") return;
+    
+    const nextSubtasks = (task.content.subtasks ?? []).map((subtask) =>
+      subtask.id === subtaskId ? { ...subtask, ...patch } : subtask
+    );
+
     await get().updateTask(taskId, {
-      subtasks: (task.content.subtasks ?? []).map((subtask) =>
-        subtask.id === subtaskId ? { ...subtask, ...patch } : subtask
-      )
+      subtasks: nextSubtasks
     });
+
+    const hasIncompleteSubtasks = nextSubtasks.some((s) => !s.completed);
+    if (hasIncompleteSubtasks && task.metadata.completed) {
+      await get().toggleTask(taskId);
+    }
   },
 
   deleteSubtask: async (taskId, subtaskId) => {
@@ -557,6 +568,10 @@ export const useAppStore = create((set, get) => ({
     const updatedAt = nowIso();
     const block = get().blocks.find((item) => item.id === blockId);
     if (!block || block.type !== "task") return;
+    if (block.metadata.failed) {
+      set({ error: "Cannot complete a failed task. Unfail it first." });
+      return;
+    }
 
     const dependencies = block.content.dependencyIds ?? [];
     const blocked = dependencies.some((dependencyId) => {
@@ -597,6 +612,60 @@ export const useAppStore = create((set, get) => ({
           .concat(nextTask ? [nextTask] : [])
       )
     }));
+  },
+
+  toggleFailTask: async (blockId) => {
+    const updatedAt = nowIso();
+    const block = get().blocks.find((item) => item.id === blockId);
+    if (!block || block.type !== "task") return;
+
+    pushUndoSnapshot(get, set, "fail task");
+    const failed = !block.metadata.failed;
+    const updatedBlock = {
+      ...block,
+      metadata: {
+        ...block.metadata,
+        failed,
+        completed: false, // ensure it's not completed if failed
+        completedAt: undefined,
+        updatedAt
+      }
+    };
+
+    await db.blocks.put(updatedBlock);
+    await enqueueMutation("block", updatedBlock.id, "upsert", updatedBlock);
+    set((state) => ({
+      error: undefined,
+      blocks: sortBlocks(
+        state.blocks.map((item) => (item.id === blockId ? updatedBlock : item))
+      )
+    }));
+  },
+
+  toggleArchiveBlock: async (blockId) => {
+    const updatedAt = nowIso();
+    const block = get().blocks.find((item) => item.id === blockId);
+    if (!block) return;
+
+    pushUndoSnapshot(get, set, "archive block");
+    const archived = !block.metadata.archived;
+    const updatedBlock = {
+      ...block,
+      metadata: {
+        ...block.metadata,
+        archived,
+        updatedAt
+      }
+    };
+
+    await db.blocks.put(updatedBlock);
+    await enqueueMutation("block", updatedBlock.id, "upsert", updatedBlock);
+    set((state) => ({
+      blocks: sortBlocks(
+        state.blocks.map((item) => (item.id === blockId ? updatedBlock : item))
+      )
+    }));
+    get().setNotification(archived ? "Block archived" : "Block unarchived");
   },
 
   moveBlock: async (blockId, direction) => {

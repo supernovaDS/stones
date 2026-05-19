@@ -1,4 +1,4 @@
-import { Trash2 } from "lucide-react";
+import { Trash2, XCircle } from "lucide-react";
 import { clsx } from "clsx";
 import { useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
@@ -18,8 +18,8 @@ export function TaskListView({ searchQuery }) {
     .sort(compareTasksByDate);
   const groups = groupTasks(tasks, groupMode);
   const completedCount = allTasks.filter((t) => t.metadata.completed).length;
-  const highCount = allTasks.filter((t) => t.metadata.priority === "high" && !t.metadata.completed).length;
-  const overdueCount = allTasks.filter((t) => !t.metadata.completed && isOverdue(t.metadata.deadline)).length;
+  const highCount = allTasks.filter((t) => t.metadata.priority === "high" && !t.metadata.completed && !t.metadata.failed).length;
+  const overdueCount = allTasks.filter((t) => !t.metadata.completed && !t.metadata.failed && isOverdue(t.metadata.deadline)).length;
 
   return (
     <div className="bento-grid">
@@ -54,16 +54,32 @@ export function TaskListView({ searchQuery }) {
 }
 
 function TaskListCard({ task }) {
-  const { deleteBlock, setSelectedTask, toggleTask } = useAppStore();
+  const { deleteBlock, setSelectedTask, toggleTask, toggleFailTask } = useAppStore();
   return (
     <article className={clsx("bento-card grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 border-l-[10px] p-3 max-sm:grid-cols-[auto_1fr_auto]", priorityRail[task.metadata.priority ?? "medium"])}>
       <Checkbox checked={task.metadata.completed} onChange={() => void toggleTask(task.id)} />
       <button className="min-w-0 text-left" onClick={() => setSelectedTask(task.id)} type="button">
-        <span className={clsx("block truncate font-semibold", task.metadata.completed && "text-stone-400 line-through dark:text-[#5a5650]")}>{task.content.title || "Untitled task"}</span>
+        <span className={clsx("block truncate font-semibold", task.metadata.completed && "text-stone-400 line-through dark:text-[#5a5650]", task.metadata.failed && "text-red-500 line-through dark:text-red-400")}>{task.content.title || "Untitled task"}</span>
         <span className="text-xs text-stone-500 dark:text-[#5a5650]">{task.metadata.priority ?? "medium"} priority - {formatShortDate(task.metadata.deadline)}</span>
       </button>
       <span className={clsx("rounded-md border px-2 py-1 text-xs font-semibold", priorityClasses[task.metadata.priority ?? "medium"])}>{task.metadata.priority ?? "medium"}</span>
-      <button className="icon-button danger max-sm:col-start-3" onClick={() => void deleteBlock(task.id)} title="Delete task" type="button"><Trash2 size={15} /></button>
+      <div className="flex gap-1 max-sm:col-start-3">
+        <button 
+          className={clsx(
+            "icon-button", 
+            task.metadata.failed 
+              ? "!bg-[#ff5a5f] !text-black border-black dark:!bg-[#5c1a1d] dark:!text-[#e8a0a2] dark:border-[#1e232a]" 
+              : "bg-white text-stone-600 dark:bg-[#12151a] dark:text-[#7a7670]"
+          )} 
+          onClick={() => void toggleFailTask(task.id)} 
+          title={task.metadata.failed ? "Unfail task" : "Fail task"} 
+          type="button"
+        >
+          <XCircle size={15} />
+        </button>
+        <button className="icon-button danger" onClick={() => void deleteBlock(task.id)} title="Delete task" type="button"><Trash2 size={15} /></button>
+      </div>
     </article>
   );
 }
+
