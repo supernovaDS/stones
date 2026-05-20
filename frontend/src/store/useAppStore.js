@@ -101,6 +101,7 @@ export const useAppStore = create((set, get) => ({
   taskModalParams: null,
   undoStack: [],
   recentlyDeleted: [],
+  clipboard: null,
   theme: defaultTheme(),
   colorProfile: defaultColorProfile(),
 
@@ -167,18 +168,62 @@ export const useAppStore = create((set, get) => ({
   },
 
   syncDbUpdates: async () => {
-    const [workspaces, sections, pages, blocks] = await Promise.all([
+    const [dbWorkspaces, dbSections, dbPages, dbBlocks] = await Promise.all([
       db.workspaces.toArray(),
       db.sections.toArray(),
       db.pages.toArray(),
       db.blocks.toArray()
     ]);
-    set({
-      workspaces,
-      sections: sortSections(sections),
-      pages,
-      blocks: sortBlocks(blocks.map(normalizeBlock)),
-      activePageId: get().activePageId || pages[0]?.id
+
+    set((state) => {
+      // Build lookup maps from current in-memory state
+      const memWorkspaceMap = new Map(state.workspaces.map((w) => [w.id, w]));
+      const memSectionMap = new Map(state.sections.map((s) => [s.id, s]));
+      const memPageMap = new Map(state.pages.map((p) => [p.id, p]));
+      const memBlockMap = new Map(state.blocks.map((b) => [b.id, b]));
+
+      // Merge workspaces: take DB version only if it's newer
+      const mergedWorkspaces = dbWorkspaces.map((dbW) => {
+        const memW = memWorkspaceMap.get(dbW.id);
+        if (!memW) return dbW;
+        // If in-memory is same age or newer, keep it
+        if (memW.updatedAt && memW.updatedAt >= (dbW.updatedAt || "")) return memW;
+        return dbW;
+      });
+
+      // Merge sections
+      const mergedSections = dbSections.map((dbS) => {
+        const memS = memSectionMap.get(dbS.id);
+        if (!memS) return dbS;
+        if (memS.updatedAt && memS.updatedAt >= (dbS.updatedAt || "")) return memS;
+        return dbS;
+      });
+
+      // Merge pages
+      const mergedPages = dbPages.map((dbP) => {
+        const memP = memPageMap.get(dbP.id);
+        if (!memP) return dbP;
+        if (memP.updatedAt && memP.updatedAt >= (dbP.updatedAt || "")) return memP;
+        return dbP;
+      });
+
+      // Merge blocks: use metadata.updatedAt for comparison
+      const mergedBlocks = dbBlocks.map((dbB) => {
+        const memB = memBlockMap.get(dbB.id);
+        if (!memB) return normalizeBlock(dbB);
+        const memUpdated = memB.metadata?.updatedAt || "";
+        const dbUpdated = dbB.metadata?.updatedAt || "";
+        if (memUpdated && memUpdated >= dbUpdated) return memB;
+        return normalizeBlock(dbB);
+      });
+
+      return {
+        workspaces: mergedWorkspaces,
+        sections: sortSections(mergedSections),
+        pages: mergedPages,
+        blocks: sortBlocks(mergedBlocks),
+        activePageId: state.activePageId || mergedPages[0]?.id
+      };
     });
   },
 
@@ -594,9 +639,32 @@ export const useAppStore = create((set, get) => ({
         updatedAt
       }
     };
-    const nextTask = completed
-      ? makeNextRecurringTask(block, updatedAt, get)
-      : undefined;
+    let nextTask = undefined;
+    if (completed) {
+      // Only create a recurring copy if one doesn't already exist
+      // (prevents duplicates when un-checking then re-checking)
+      const recurrence = block.metadata.recurrence ?? "none";
+      if (recurrence !== "none") {
+        const nextDeadline = nextRecurringDate(
+          block.metadata.deadline,
+          recurrence,
+          block.metadata.customRecurrenceInterval
+        );
+        const alreadyExists = nextDeadline && get().blocks.some(
+          (b) =>
+            b.type === "task" &&
+            b.id !== blockId &&
+            b.pageId === block.pageId &&
+            b.content.title === block.content.title &&
+            b.metadata.recurrence === recurrence &&
+            !b.metadata.completed &&
+            b.metadata.deadline === nextDeadline
+        );
+        if (!alreadyExists) {
+          nextTask = makeNextRecurringTask(block, updatedAt, get);
+        }
+      }
+    }
 
     await db.transaction("rw", db.blocks, async () => {
       await db.blocks.put(updatedBlock);
@@ -779,6 +847,50 @@ export const useAppStore = create((set, get) => ({
     }));
     get().setNotification("Block deleted");
   },
+
+  cutBlock: (blockId) => {
+    const block = get().blocks.find((item) => item.id === blockId);
+    if (!block) return;
+    set({ clipboard: block });
+    get().setNotification(`${block.type.charAt(0).toUpperCase() + block.type.slice(1)} cut to clipboard`);
+  },
+
+  pasteBlock: async (targetPageId) => {
+    const block = get().clipboard;
+    if (!block || !targetPageId) return;
+
+    pushUndoSnapshot(get, set, `paste ${block.type}`);
+    const updatedAt = nowIso();
+    const state = get();
+    const order =
+      Math.max(
+        0,
+        ...state.blocks
+          .filter((b) => b.pageId === targetPageId)
+          .map((b) => b.order)
+      ) + 1;
+
+    const movedBlock = {
+      ...block,
+      pageId: targetPageId,
+      order,
+      metadata: { ...block.metadata, updatedAt }
+    };
+
+    await db.blocks.put(movedBlock);
+    await enqueueMutation("block", movedBlock.id, "upsert", movedBlock);
+    set((current) => ({
+      blocks: sortBlocks(
+        current.blocks.map((item) =>
+          item.id === block.id ? movedBlock : item
+        )
+      ),
+      clipboard: null
+    }));
+    get().setNotification(`${block.type.charAt(0).toUpperCase() + block.type.slice(1)} pasted`);
+  },
+
+  clearClipboard: () => set({ clipboard: null }),
 
   convertNoteToTask: async (blockId) => {
     const note = get().blocks.find((block) => block.id === blockId);
@@ -1105,10 +1217,20 @@ const makeNextRecurringTask = (task, createdAt, get) => {
         .map((block) => block.order)
     ) + 1;
 
+  // Reset subtasks to uncompleted for the new recurring instance
+  const resetSubtasks = (task.content.subtasks ?? []).map((subtask) => ({
+    ...subtask,
+    completed: false
+  }));
+
   return {
     ...task,
     id: createId("block"),
     order,
+    content: {
+      ...task.content,
+      subtasks: resetSubtasks
+    },
     metadata: {
       ...task.metadata,
       completed: false,

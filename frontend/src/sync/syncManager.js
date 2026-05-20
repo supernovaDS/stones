@@ -39,6 +39,7 @@ async function markQueueError(item, error) {
 }
 
 // ── Push: process the sync queue ──────────────────────────────
+// Returns a Set of entityIds that were successfully pushed.
 
 async function processQueue(userId) {
   const now = new Date().toISOString();
@@ -48,7 +49,9 @@ async function processQueue(userId) {
     .filter((item) => !item.nextAttemptAt || item.nextAttemptAt <= now)
     .sortBy("createdAt");
 
-  if (items.length === 0) return;
+  const pushedIds = new Set();
+
+  if (items.length === 0) return pushedIds;
 
   for (const item of items) {
     try {
@@ -78,23 +81,27 @@ async function processQueue(userId) {
           synced_at: now
         });
       });
+
+      pushedIds.add(item.entityId);
     } catch (error) {
       await markQueueError(item, error);
       throw error;
     }
   }
+
+  return pushedIds;
 }
 
 // ── Pull: fetch remote data and merge locally ─────────────────
 
-async function pullRemote(userId) {
-  await pullEntity("workspace", userId);
-  await pullEntity("section", userId);
-  await pullEntity("page", userId);
-  await pullEntity("block", userId);
+async function pullRemote(userId, recentlyPushedIds) {
+  await pullEntity("workspace", userId, recentlyPushedIds);
+  await pullEntity("section", userId, recentlyPushedIds);
+  await pullEntity("page", userId, recentlyPushedIds);
+  await pullEntity("block", userId, recentlyPushedIds);
 }
 
-async function pullEntity(entity, userId) {
+async function pullEntity(entity, userId, recentlyPushedIds) {
   const table = tableName(entity);
   const { data, error } = await supabase
     .from(table)
@@ -127,12 +134,20 @@ async function pullEntity(entity, userId) {
       // Never re-create something we're about to delete
       if (pendingDeleteIds.has(remote.id)) continue;
 
+      // Skip entities that were just pushed in this sync cycle — the remote
+      // version may be stale (hasn't propagated yet) so we trust local.
+      if (recentlyPushedIds.has(remote.id)) continue;
+
+      // Skip entities that have any pending local changes (upsert or otherwise)
+      if (pendingIds.has(remote.id)) continue;
+
       const localRecord = await localTable.get(remote.id);
       const localUpdatedAt = getLocalUpdatedAt(entity, localRecord);
       const remoteUpdatedAt = remote.updated_at || remote.created_at;
 
-      // Conflict resolution: if local has pending changes and is newer, skip
-      if (pendingIds.has(remote.id) && localUpdatedAt && localUpdatedAt > remoteUpdatedAt) {
+      // Only overwrite local if remote is strictly newer.
+      // If timestamps are equal or local is newer, keep local version.
+      if (localRecord && localUpdatedAt && localUpdatedAt >= remoteUpdatedAt) {
         continue;
       }
 
@@ -196,8 +211,8 @@ export const syncManager = {
       emit({ phase: "syncing", error: "", isOnline: true });
       try {
         await mirrorExistingData(userId);
-        await processQueue(userId);
-        await pullRemote(userId);
+        const pushedIds = await processQueue(userId);
+        await pullRemote(userId, pushedIds);
         await refreshPendingCount();
         emit({
           phase: "synced",
@@ -221,3 +236,4 @@ export const syncManager = {
     return inFlight;
   }
 };
+

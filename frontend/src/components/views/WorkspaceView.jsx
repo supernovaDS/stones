@@ -3,7 +3,7 @@ import { useAppStore } from "../../store/useAppStore";
 import { blockMatchesSearch } from "../../utils/helpers";
 import { BlockCard } from "../blocks";
 import { clsx } from "clsx";
-import { Archive, ChevronDown, ChevronUp, Plus, FileText, CheckSquare, List, Code2, Link, Image, Heading } from "lucide-react";
+import { Archive, ChevronDown, ChevronUp, ClipboardPaste, Plus, FileText, CheckSquare, List, Code2, Link, Image, Heading, X } from "lucide-react";
 
 function WeatherWidget() {
 // ... keeping weather widget ...
@@ -202,7 +202,7 @@ function AddBlockMenu({ pageId }) {
 }
 
 export function WorkspaceView({ pageId, searchQuery }) {
-  const { blocks, pages, renamePage } = useAppStore();
+  const { blocks, pages, renamePage, clipboard, pasteBlock, clearClipboard } = useAppStore();
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
 
   const page = pages.find((item) => item.id === pageId);
@@ -241,6 +241,46 @@ export function WorkspaceView({ pageId, searchQuery }) {
           </div>
         )}
         <AddBlockMenu pageId={pageId} />
+
+        {clipboard && (
+          <div className="bento-card flex items-center justify-between gap-4 border-[3px] border-dashed border-[#21caff] bg-[#e6fbff] p-4 dark:border-[#004d66] dark:bg-[#001a25]">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border-2 border-black bg-[#21caff] dark:border-[#1e232a] dark:bg-[#002535]">
+                <ClipboardPaste size={18} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-black uppercase tracking-wide text-stone-600 dark:text-[#7a7670]">Clipboard</p>
+                <p className="truncate font-bold text-black dark:text-[#c8c3ba]">
+                  {clipboard.type === "task" ? clipboard.content.title : clipboard.type === "note" ? (clipboard.content.text?.slice(0, 50) || "Note") : `${clipboard.type.charAt(0).toUpperCase() + clipboard.type.slice(1)} block`}
+                </p>
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              {clipboard.pageId !== pageId && (
+                <button
+                  className="nb-button primary flex items-center gap-2 px-4 py-2 text-sm font-black"
+                  onClick={() => void pasteBlock(pageId)}
+                  type="button"
+                >
+                  <ClipboardPaste size={16} /> Paste here
+                </button>
+              )}
+              {clipboard.pageId === pageId && (
+                <span className="text-xs font-black text-stone-400 dark:text-[#5a5650]">
+                  Navigate to another page to paste
+                </span>
+              )}
+              <button
+                className="icon-button"
+                onClick={clearClipboard}
+                title="Clear clipboard"
+                type="button"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+        )}
 
         {archivedBlocks.length > 0 && (
           <div className="mt-8">

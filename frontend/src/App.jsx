@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAppStore } from "./store/useAppStore";
 import { isOverdue, isToday } from "./utils/date";
 import { notifyDueReminders } from "./utils/helpers";
@@ -91,11 +91,19 @@ function App() {
   const dueToday = openTasks.filter((task) => isToday(task.metadata.deadline));
   const overdue = openTasks.filter((task) => isOverdue(task.metadata.deadline));
 
-  // ── Sync UI updates ─────────────────────────────────────────
+  // ── Sync UI updates (debounced) ─────────────────────────────
+  const syncDebounceRef = useRef(null);
   useEffect(() => {
     if (syncStatus.lastSyncedAt) {
-      void useAppStore.getState().syncDbUpdates?.();
+      if (syncDebounceRef.current) window.clearTimeout(syncDebounceRef.current);
+      syncDebounceRef.current = window.setTimeout(() => {
+        void useAppStore.getState().syncDbUpdates?.();
+        syncDebounceRef.current = null;
+      }, 300);
     }
+    return () => {
+      if (syncDebounceRef.current) window.clearTimeout(syncDebounceRef.current);
+    };
   }, [syncStatus.lastSyncedAt]);
 
   // ── Bootstrap ───────────────────────────────────────────────

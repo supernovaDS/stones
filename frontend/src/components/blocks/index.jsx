@@ -9,6 +9,7 @@ import {
   Move,
   PanelRight,
   Plus,
+  Scissors,
   Trash2,
   X,
   XCircle,
@@ -41,7 +42,7 @@ export function BlockCard({ block }) {
 // ── Block shell ─────────────────────────────────────────────────
 
 function BlockShell({ block, label, children, actions }) {
-  const { deleteBlock, moveBlock, toggleArchiveBlock } = useAppStore();
+  const { deleteBlock, moveBlock, toggleArchiveBlock, cutBlock } = useAppStore();
   return (
     <article className={clsx("bento-card h-full border-l-[10px] p-4", blockTypeRail[block.type] ?? "border-l-stone-400")}>
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -50,6 +51,7 @@ function BlockShell({ block, label, children, actions }) {
           <IconButton icon={ArrowUp} title="Move up" onClick={() => void moveBlock(block.id, "up")} />
           <IconButton icon={ArrowDown} title="Move down" onClick={() => void moveBlock(block.id, "down")} />
           {actions}
+          <IconButton icon={Scissors} title="Cut block" onClick={() => cutBlock(block.id)} />
           <IconButton icon={block.metadata.archived ? ArchiveRestore : Archive} title={block.metadata.archived ? "Unarchive block" : "Archive block"} onClick={() => void toggleArchiveBlock(block.id)} />
           <IconButton danger icon={Trash2} title="Delete block" onClick={() => void deleteBlock(block.id)} />
         </div>
@@ -283,7 +285,7 @@ function TitleBlock({ block }) {
 // ── Task block ──────────────────────────────────────────────────
 
 function TaskBlock({ block }) {
-  const { deleteBlock, setSelectedTask, toggleTask, toggleFailTask, updateTask, moveBlock, updateSubtask, deleteSubtask, addSubtask, toggleArchiveBlock } = useAppStore();
+  const { deleteBlock, setSelectedTask, toggleTask, toggleFailTask, updateTask, moveBlock, updateSubtask, deleteSubtask, addSubtask, toggleArchiveBlock, cutBlock } = useAppStore();
   const blocked = useIsBlocked(block);
   return (
     <article className={clsx("bento-card h-full border-l-[10px] p-4", priorityRail[block.metadata.priority ?? "medium"])}>
@@ -310,6 +312,7 @@ function TaskBlock({ block }) {
               )}
             />
             <IconButton icon={PanelRight} title="Open details" onClick={() => setSelectedTask(block.id)} />
+            <IconButton icon={Scissors} title="Cut task" onClick={() => cutBlock(block.id)} />
             <IconButton icon={block.metadata.archived ? ArchiveRestore : Archive} title={block.metadata.archived ? "Unarchive task" : "Archive task"} onClick={() => void toggleArchiveBlock(block.id)} />
             <IconButton danger icon={Trash2} title="Delete task" onClick={() => void deleteBlock(block.id)} />
           </div>
