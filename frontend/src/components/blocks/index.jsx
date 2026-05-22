@@ -498,7 +498,7 @@ function ImageBlock({ block }) {
   const startPos = useRef({ x: 0, y: 0 });
 
   const handleWheel = (e) => {
-    if (!e.shiftKey && !e.ctrlKey && !e.altKey) return;
+    if (!e.shiftKey) return;
     e.preventDefault();
     setScale((s) => Math.min(Math.max(0.5, s - e.deltaY * 0.005), 5));
   };
@@ -522,7 +522,7 @@ function ImageBlock({ block }) {
         <button type="button" className="nb-button px-3" onClick={() => setScale((s) => Math.max(s - 0.2, 0.5))}><ZoomOut size={16} /> Zoom</button>
         <button type="button" className="nb-button px-3" onClick={() => { setScale(1); setPan({ x: 0, y: 0 }); }}><Move size={16} /> Reset</button>
         <button type="button" className="nb-button px-3 bg-[#21caff] dark:bg-[#002535]" onClick={() => setFullscreen(true)}><Maximize2 size={16} /> Fullscreen</button>
-        <span className="self-center text-xs font-bold text-stone-600 dark:text-[#7a7670]">Scroll with Shift/Ctrl to zoom. Drag to pan.</span>
+        <span className="self-center text-xs font-bold text-stone-600 dark:text-[#7a7670]">Scroll with Shift to zoom. Drag to pan.</span>
       </div>
       {block.content.dataUrl ? (
         <ImageCanvas

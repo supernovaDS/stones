@@ -794,6 +794,31 @@
   }
 
   /* ═══════════════════════════════════════════════════════════
+     BREAKPOINT: ≤ 1200px  (tablet landscape / small desktop)
+     ═══════════════════════════════════════════════════════════ */
+  @media (max-width: 1200px) {
+    /* Weather & clock smaller and stacked on small screens to prevent overflow */
+    .weather-time {
+      font-size: 2.25rem !important;
+    }
+
+    .weather-temp {
+      font-size: 2rem !important;
+    }
+
+    .weather-layout {
+      align-items: flex-start !important;
+      flex-direction: column !important;
+      gap: 0.5rem !important;
+    }
+
+    .weather-meta {
+      width: 100% !important;
+      justify-content: space-between !important;
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════════════
      BREAKPOINT: ≤ 1024px  (tablet / small desktop)
      ═══════════════════════════════════════════════════════════ */
   @media (max-width: 1024px) {
@@ -1000,15 +1025,7 @@
       font-size: 2rem !important;
     }
 
-    .weather-layout {
-      align-items: flex-start;
-      flex-direction: column;
-    }
 
-    .weather-meta {
-      width: 100%;
-      justify-content: space-between;
-    }
 
     /* Calendar cells */
     .calendar-cell {
@@ -2403,12 +2420,12 @@
 }
 
 /* Recovery Section (Insights) */
-.profile-minimal .bento-card:has(h3:contains("Recovery")) {
+.profile-minimal .bento-card.recovery-card {
   border-color: #ddd6fe !important;
   /* Purple hue */
 }
 
-.profile-minimal.dark .bento-card:has(h3:contains("Recovery")) {
+.profile-minimal.dark .bento-card.recovery-card {
   border-color: rgba(109, 40, 217, 0.3) !important;
   border-left-color: #6d28d9 !important;
 }

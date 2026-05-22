@@ -44,7 +44,7 @@ export function InsightsView() {
           <HeaderButton disabled={!undoStack.length} icon={RotateCcw} label="Undo Last Change" onClick={() => void undoLastChange()} />
         </div>
       </section>
-      <section className="bento-card span-7 bg-white border-l-[10px] border-l-[#c4a8ff] p-4 text-black dark:bg-[#12151a] dark:border-l-[#1a1040] dark:text-[#c8c3ba]">
+      <section className="bento-card recovery-card span-7 bg-white border-l-[10px] border-l-[#c4a8ff] p-4 text-black dark:bg-[#12151a] dark:border-l-[#1a1040] dark:text-[#c8c3ba]">
         <h3 className="mb-3 text-xl font-black">Recovery</h3>
         <div className="grid gap-2">
           {recentlyDeleted.length ? recentlyDeleted.map((item) => (
