@@ -15,8 +15,7 @@ export function Sidebar({ dueToday, overdue, isOpen, onClose }) {
     setView,
     setSettingsOpen,
     theme,
-    view,
-    colorProfile
+    view
   } = useAppStore();
 
   const handleNav = (action) => {
@@ -37,8 +36,7 @@ export function Sidebar({ dueToday, overdue, isOpen, onClose }) {
             <h1 className="brand-word leading-tight">Stones</h1>
             <p className="text-xs font-black uppercase tracking-wide text-black/70 dark:text-[#7a7670]">Task + workspace</p>
           </div>
-          {colorProfile !== "glow" && (
-            <button
+          <button
               className="icon-button ml-auto"
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               title="Toggle dark mode"
@@ -46,7 +44,6 @@ export function Sidebar({ dueToday, overdue, isOpen, onClose }) {
             >
               {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
             </button>
-          )}
           <button
             className="icon-button sidebar-close-btn"
             onClick={onClose}

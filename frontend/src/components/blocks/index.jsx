@@ -42,9 +42,10 @@ export function BlockCard({ block }) {
 // ── Block shell ─────────────────────────────────────────────────
 
 function BlockShell({ block, label, children, actions }) {
-  const { deleteBlock, moveBlock, toggleArchiveBlock, cutBlock } = useAppStore();
+  const { deleteBlock, moveBlock, toggleArchiveBlock, cutBlock, clipboard } = useAppStore();
+  const isCut = clipboard?.some((b) => b.id === block.id);
   return (
-    <article className={clsx("bento-card h-full border-l-[10px] p-4", blockTypeRail[block.type] ?? "border-l-stone-400")}>
+    <article className={clsx("bento-card h-full border-l-[10px] p-4 transition-all duration-150", blockTypeRail[block.type] ?? "border-l-stone-400", isCut && "is-cut")}>
       <div className="mb-4 flex items-center justify-between gap-3">
         <p className="text-xs font-black uppercase tracking-wide text-stone-700 dark:text-[#7a7670]">{label}</p>
         <div className="block-actions flex flex-wrap gap-2">
@@ -285,10 +286,11 @@ function TitleBlock({ block }) {
 // ── Task block ──────────────────────────────────────────────────
 
 function TaskBlock({ block }) {
-  const { deleteBlock, setSelectedTask, toggleTask, toggleFailTask, updateTask, moveBlock, updateSubtask, deleteSubtask, addSubtask, toggleArchiveBlock, cutBlock } = useAppStore();
+  const { deleteBlock, setSelectedTask, toggleTask, toggleFailTask, updateTask, moveBlock, updateSubtask, deleteSubtask, addSubtask, toggleArchiveBlock, cutBlock, clipboard } = useAppStore();
   const blocked = useIsBlocked(block);
+  const isCut = clipboard?.some((b) => b.id === block.id);
   return (
-    <article className={clsx("bento-card h-full border-l-[10px] p-4", priorityRail[block.metadata.priority ?? "medium"])}>
+    <article className={clsx("bento-card h-full border-l-[10px] p-4 transition-all duration-150", priorityRail[block.metadata.priority ?? "medium"], isCut && "is-cut")}>
       <div className="grid gap-3">
         <div className="task-block-header flex items-start gap-3">
           <Checkbox checked={block.metadata.completed} onChange={() => void toggleTask(block.id)} className="mt-1" />
@@ -598,9 +600,3 @@ function ImageCanvas({ alt, dataUrl, doDrag, endDrag, fullscreen, handleWheel, i
     </div>
   );
 }
-
-// ── Markdown preview ────────────────────────────────────────────
-
-
-
-

@@ -223,9 +223,6 @@ export function WorkspaceView({ pageId, searchQuery }) {
           onChange={(event) => page && void renamePage(page.id, event.target.value)}
           value={page?.title ?? ""}
         />
-        <p className="mt-4 max-w-xl text-sm font-bold text-black/70">
-
-        </p>
       </section>
       <WeatherWidget />
       <section className="span-12 flex flex-col gap-8">
@@ -242,7 +239,7 @@ export function WorkspaceView({ pageId, searchQuery }) {
         )}
         <AddBlockMenu pageId={pageId} />
 
-        {clipboard && (
+        {clipboard?.length > 0 && (
           <div className="bento-card flex items-center justify-between gap-4 border-[3px] border-dashed border-[#21caff] bg-[#e6fbff] p-4 dark:border-[#004d66] dark:bg-[#001a25]">
             <div className="flex items-center gap-3 min-w-0">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border-2 border-black bg-[#21caff] dark:border-[#1e232a] dark:bg-[#002535]">
@@ -251,12 +248,14 @@ export function WorkspaceView({ pageId, searchQuery }) {
               <div className="min-w-0">
                 <p className="text-sm font-black uppercase tracking-wide text-stone-600 dark:text-[#7a7670]">Clipboard</p>
                 <p className="truncate font-bold text-black dark:text-[#c8c3ba]">
-                  {clipboard.type === "task" ? clipboard.content.title : clipboard.type === "note" ? (clipboard.content.text?.slice(0, 50) || "Note") : `${clipboard.type.charAt(0).toUpperCase() + clipboard.type.slice(1)} block`}
+                  {clipboard.length === 1 
+                    ? (clipboard[0].type === "task" ? clipboard[0].content.title : clipboard[0].type === "note" ? (clipboard[0].content.text?.slice(0, 50) || "Note") : `${clipboard[0].type.charAt(0).toUpperCase() + clipboard[0].type.slice(1)} block`)
+                    : `${clipboard.length} blocks selected`}
                 </p>
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              {clipboard.pageId !== pageId && (
+              {!clipboard.every(b => b.pageId === pageId) && (
                 <button
                   className="nb-button primary flex items-center gap-2 px-4 py-2 text-sm font-black"
                   onClick={() => void pasteBlock(pageId)}
@@ -265,7 +264,7 @@ export function WorkspaceView({ pageId, searchQuery }) {
                   <ClipboardPaste size={16} /> Paste here
                 </button>
               )}
-              {clipboard.pageId === pageId && (
+              {clipboard.every(b => b.pageId === pageId) && (
                 <span className="text-xs font-black text-stone-400 dark:text-[#5a5650]">
                   Navigate to another page to paste
                 </span>

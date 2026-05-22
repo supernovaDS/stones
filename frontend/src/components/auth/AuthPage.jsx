@@ -13,7 +13,7 @@ export function AuthPage() {
 
   useEffect(() => {
     const root = document.documentElement;
-    root.classList.remove("profile-minimal", "profile-glow");
+    root.classList.remove("profile-minimal");
     root.classList.add("profile-neo");
   }, []);
 

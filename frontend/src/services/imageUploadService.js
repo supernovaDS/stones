@@ -4,7 +4,7 @@ import { createUuid } from "../utils/ids";
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
-export function validateImageFile(file) {
+function validateImageFile(file) {
   if (!file) throw new Error("Choose an image first.");
   if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
     throw new Error("Use a JPG, PNG, WebP, or GIF image.");
@@ -14,7 +14,7 @@ export function validateImageFile(file) {
   }
 }
 
-export async function compressImage(file) {
+async function compressImage(file) {
   validateImageFile(file);
   if (file.type === "image/gif") return file;
   const { default: imageCompression } = await import("browser-image-compression");
@@ -46,19 +46,6 @@ export async function uploadTaskImage({ file, taskId, userId, oldPath }) {
   }
 
   return path;
-}
-
-export async function getTaskImageUrl(path) {
-  if (!path) return "";
-  if (path.startsWith("http")) return path;
-  if (!supabase) return "";
-
-  const { data, error } = await supabase.storage
-    .from(taskImagesBucket)
-    .createSignedUrl(path, 60 * 60);
-
-  if (error) throw error;
-  return data.signedUrl;
 }
 
 export async function deleteTaskImage(path) {

@@ -101,7 +101,7 @@ export const useAppStore = create((set, get) => ({
   taskModalParams: null,
   undoStack: [],
   recentlyDeleted: [],
-  clipboard: null,
+  clipboard: [],
   theme: defaultTheme(),
   colorProfile: defaultColorProfile(),
 
@@ -851,46 +851,62 @@ export const useAppStore = create((set, get) => ({
   cutBlock: (blockId) => {
     const block = get().blocks.find((item) => item.id === blockId);
     if (!block) return;
-    set({ clipboard: block });
-    get().setNotification(`${block.type.charAt(0).toUpperCase() + block.type.slice(1)} cut to clipboard`);
+    
+    const currentClipboard = get().clipboard || [];
+    const isCut = currentClipboard.some((b) => b.id === block.id);
+    
+    if (isCut) {
+      const nextClipboard = currentClipboard.filter((b) => b.id !== block.id);
+      set({ clipboard: nextClipboard });
+      get().setNotification(`${block.type.charAt(0).toUpperCase() + block.type.slice(1)} removed from clipboard`);
+    } else {
+      const nextClipboard = [...currentClipboard, block];
+      set({ clipboard: nextClipboard });
+      get().setNotification(`${nextClipboard.length} block(s) cut to clipboard`);
+    }
   },
 
   pasteBlock: async (targetPageId) => {
-    const block = get().clipboard;
-    if (!block || !targetPageId) return;
+    const clipboard = get().clipboard || [];
+    if (clipboard.length === 0 || !targetPageId) return;
 
-    pushUndoSnapshot(get, set, `paste ${block.type}`);
+    pushUndoSnapshot(get, set, `paste ${clipboard.length} blocks`);
     const updatedAt = nowIso();
     const state = get();
-    const order =
-      Math.max(
-        0,
-        ...state.blocks
-          .filter((b) => b.pageId === targetPageId)
-          .map((b) => b.order)
-      ) + 1;
+    
+    let baseOrder = Math.max(
+      0,
+      ...state.blocks
+        .filter((b) => b.pageId === targetPageId)
+        .map((b) => b.order)
+    );
 
-    const movedBlock = {
+    const movedBlocks = clipboard.map((block, index) => ({
       ...block,
       pageId: targetPageId,
-      order,
+      order: baseOrder + index + 1,
       metadata: { ...block.metadata, updatedAt }
-    };
+    }));
 
-    await db.blocks.put(movedBlock);
-    await enqueueMutation("block", movedBlock.id, "upsert", movedBlock);
+    await db.transaction("rw", db.blocks, async () => {
+      await Promise.all(movedBlocks.map(b => db.blocks.put(b)));
+    });
+    
+    await Promise.all(movedBlocks.map(b => enqueueMutation("block", b.id, "upsert", b)));
+    
     set((current) => ({
       blocks: sortBlocks(
-        current.blocks.map((item) =>
-          item.id === block.id ? movedBlock : item
-        )
+        current.blocks.map((item) => {
+          const moved = movedBlocks.find(mb => mb.id === item.id);
+          return moved ? moved : item;
+        })
       ),
-      clipboard: null
+      clipboard: []
     }));
-    get().setNotification(`${block.type.charAt(0).toUpperCase() + block.type.slice(1)} pasted`);
+    get().setNotification(`${clipboard.length} block(s) pasted`);
   },
 
-  clearClipboard: () => set({ clipboard: null }),
+  clearClipboard: () => set({ clipboard: [] }),
 
   convertNoteToTask: async (blockId) => {
     const note = get().blocks.find((block) => block.id === blockId);

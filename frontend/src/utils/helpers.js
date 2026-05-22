@@ -1,10 +1,11 @@
-import { formatShortDate, isOverdue, todayIso, toLocalDateString } from "./date";
+import { formatShortDate, isOverdue, isToday, todayIso, toLocalDateString } from "./date";
 
 // ── Task filtering ──────────────────────────────────────────────
 
 export function taskMatchesFilter(task, filter) {
   if (filter === "open") return !task.metadata.completed && !task.metadata.failed;
   if (filter === "done") return task.metadata.completed;
+  if (filter === "failed") return task.metadata.failed;
   if (filter === "today") return isToday(task.metadata.deadline);
   if (filter === "overdue") return !task.metadata.completed && !task.metadata.failed && isOverdue(task.metadata.deadline);
   if (filter === "upcoming") return !task.metadata.completed && !task.metadata.failed && task.metadata.deadline && task.metadata.deadline > todayIso();
@@ -12,11 +13,7 @@ export function taskMatchesFilter(task, filter) {
   if (filter === "high") return task.metadata.priority === "high";
   return true;
 }
-
-function isToday(value) {
-  return Boolean(value && value.slice(0, 10) === todayIso());
-}
-
+
 export function compareTasksByDate(a, b) {
   if (!a.metadata.deadline && !b.metadata.deadline) return 0;
   if (!a.metadata.deadline) return 1;
@@ -124,30 +121,6 @@ export function downloadText(filename, text, type) {
   URL.revokeObjectURL(url);
 }
 
-export function escapeHtml(value) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
-export function printPagePdf(title, markdown) {
-  const printWindow = window.open("", "_blank", "width=900,height=700");
-  if (!printWindow) return;
-  const body = markdown
-    .split(/\r?\n/)
-    .map((line) => {
-      if (line.startsWith("# ")) return `<h1>${escapeHtml(line.slice(2))}</h1>`;
-      if (line.startsWith("- [")) return `<p>${escapeHtml(line)}</p>`;
-      if (!line.trim()) return "<br />";
-      return `<p>${escapeHtml(line)}</p>`;
-    })
-    .join("");
-  printWindow.document.write(`<!doctype html><html><head><title>${escapeHtml(title)}</title><style>body{font-family:Inter,Arial,sans-serif;max-width:760px;margin:48px auto;color:#171717;line-height:1.55}h1{font-size:32px}p{font-size:14px}</style></head><body>${body}<script>window.onload=()=>window.print()</script></body></html>`);
-  printWindow.document.close();
-}
-
 // ── Markdown rendering ──────────────────────────────────────────
 
 export function getEmbedUrl(url) {
@@ -179,9 +152,7 @@ export function getEmbedUrl(url) {
   return null;
 }
 
-export function extractInternalLinks(text) {
-  return [...text.matchAll(/\[\[([^\]]+)\]\]/g)].map((match) => match[1].trim()).filter(Boolean);
-}
+
 
 // ── Notification helpers ────────────────────────────────────────
 

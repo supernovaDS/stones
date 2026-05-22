@@ -17,7 +17,7 @@ import { useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
 import { formatShortDate, toInputDate } from "../../utils/date";
 import { slugify, downloadText } from "../../utils/helpers";
-import { HeaderButton, IconButton, Checkbox } from "../ui";
+import { IconButton, Checkbox } from "../ui";
 
 // ── Task detail panel ───────────────────────────────────────────
 
@@ -93,77 +93,6 @@ export function TaskDetailPanel() {
         <button className="nb-button" onClick={() => { setActivePage(task.pageId); setSelectedTask(undefined); }} type="button"><Workflow size={16} />Open Page</button>
       </div>
     </aside>
-  );
-}
-
-// ── Task modal ──────────────────────────────────────────────────
-
-function TaskImageAttachment({ imagePath, onRemove, onUpload, user }) {
-  const [previewUrl, setPreviewUrl] = useState("");
-  const [dragging, setDragging] = useState(false);
-
-  useEffect(() => {
-    let mounted = true;
-    if (!imagePath) {
-      setPreviewUrl("");
-      return undefined;
-    }
-    getTaskImageUrl(imagePath)
-      .then((url) => {
-        if (mounted) setPreviewUrl(url);
-      })
-      .catch(() => {
-        if (mounted) setPreviewUrl("");
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [imagePath]);
-
-  const handleFile = (file) => {
-    if (!file || !user?.id) return;
-    onUpload(file);
-  };
-
-  return (
-    <section className="grid gap-2">
-      <h4 className="text-sm font-black">Image</h4>
-      <label
-        className="nb-textarea grid min-h-28 cursor-pointer place-items-center overflow-hidden px-3 py-4 text-center text-sm font-bold"
-        onDragEnter={(event) => {
-          event.preventDefault();
-          setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDragOver={(event) => event.preventDefault()}
-        onDrop={(event) => {
-          event.preventDefault();
-          setDragging(false);
-          handleFile(event.dataTransfer.files?.[0]);
-        }}
-      >
-        {previewUrl ? (
-          <img alt="Task attachment" className="max-h-48 w-full rounded-md object-contain" src={previewUrl} />
-        ) : (
-          <span className={dragging ? "text-[#21caff]" : "text-stone-600 dark:text-[#7a7670]"}>
-            <Image className="mx-auto mb-2" size={24} />
-            {user?.id ? "Drop or choose an image" : "Sign in to upload images"}
-          </span>
-        )}
-        <input
-          accept="image/jpeg,image/png,image/webp,image/gif"
-          className="hidden"
-          disabled={!user?.id}
-          onChange={(event) => handleFile(event.target.files?.[0])}
-          type="file"
-        />
-      </label>
-      {imagePath ? (
-        <button className="nb-button danger justify-self-start" onClick={onRemove} type="button">
-          Remove image
-        </button>
-      ) : null}
-    </section>
   );
 }
 

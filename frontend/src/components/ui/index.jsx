@@ -51,14 +51,6 @@ export function InsightCard({ color, label, value }) {
   );
 }
 
-export function Notice({ children, tone }) {
-  return (
-    <div className="toast-shell">
-      <div className={clsx("toast-popup", tone === "red" && "error")}>{children}</div>
-    </div>
-  );
-}
-
 export function Badge({ children, tone }) {
   return (
     <span className={clsx(

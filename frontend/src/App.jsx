@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "./store/useAppStore";
 import { isOverdue, isToday } from "./utils/date";
 import { notifyDueReminders } from "./utils/helpers";
@@ -113,15 +113,24 @@ function App() {
 
   // ── Theme sync ──────────────────────────────────────────────
   useEffect(() => {
-    // Glow profile is always dark-only
-    const isDark = theme === "dark" || colorProfile === "glow";
+    const isDark = theme === "dark";
+    
+    // Disable transitions temporarily to make theme switch instant
+    document.documentElement.classList.add("disable-transitions");
     document.documentElement.classList.toggle("dark", isDark);
+    
+    // Re-enable transitions after browser paints the new theme
+    const timer = setTimeout(() => {
+      document.documentElement.classList.remove("disable-transitions");
+    }, 50);
+    
+    return () => clearTimeout(timer);
   }, [theme, colorProfile]);
 
   // ── Color profile sync ─────────────────────────────────────
   useEffect(() => {
     const root = document.documentElement;
-    root.classList.remove("profile-neo", "profile-minimal", "profile-glow");
+    root.classList.remove("profile-neo", "profile-minimal");
     root.classList.add(`profile-${colorProfile}`);
   }, [colorProfile]);
 
