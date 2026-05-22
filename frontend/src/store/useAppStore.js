@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { db } from "../db/schema";
-import { extractTasksFromText } from "../services/ai";
+import { deleteTaskImage, uploadTaskImage } from "../services/imageUploadService";
+import { enqueueMutation } from "../sync/syncQueue";
 import {
   nextRecurringDate,
   normalizeDateText,
@@ -17,6 +18,17 @@ const sortSections = (sections) =>
   [...sections].sort((a, b) => a.order - b.order);
 
 const defaultTheme = () => localStorage.getItem("stones-theme") ?? "light";
+const defaultColorProfile = () => localStorage.getItem("stones-color-profile") ?? "neo";
+
+const getUniquePageTitle = (baseTitle, existingPages, excludeId = null) => {
+  let title = baseTitle;
+  let counter = 1;
+  while (existingPages.some((p) => p.title === title && p.id !== excludeId)) {
+    title = `${baseTitle} (${counter})`;
+    counter++;
+  }
+  return title;
+};
 
 const seedData = () => {
   const createdAt = nowIso();
@@ -72,7 +84,7 @@ const seedData = () => {
     }
   };
 
-  return { workspace, section, page, blocks: [note, task] };
+  return { workspace, section, page, blocks: [] };
 };
 
 export const useAppStore = create((set, get) => ({
@@ -83,15 +95,19 @@ export const useAppStore = create((set, get) => ({
   view: "workspace",
   loading: true,
   error: undefined,
-  aiStatus: undefined,
+  settingsOpen: false,
   selectedTaskId: undefined,
-  aiReview: undefined,
   notification: undefined,
+  taskModalParams: null,
   undoStack: [],
   recentlyDeleted: [],
+  clipboard: null,
   theme: defaultTheme(),
+  colorProfile: defaultColorProfile(),
 
-  initialize: async () => {
+  setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
+
+  initialize: async ({ skipSeed = false } = {}) => {
     set({ loading: true, error: undefined });
 
     let [workspaces, sections, pages, blocks] = await Promise.all([
@@ -101,7 +117,7 @@ export const useAppStore = create((set, get) => ({
       db.blocks.toArray()
     ]);
 
-    if (workspaces.length === 0) {
+    if (workspaces.length === 0 && !skipSeed) {
       const seed = seedData();
       await db.transaction(
         "rw",
@@ -151,12 +167,78 @@ export const useAppStore = create((set, get) => ({
     });
   },
 
+  syncDbUpdates: async () => {
+    const [dbWorkspaces, dbSections, dbPages, dbBlocks] = await Promise.all([
+      db.workspaces.toArray(),
+      db.sections.toArray(),
+      db.pages.toArray(),
+      db.blocks.toArray()
+    ]);
+
+    set((state) => {
+      // Build lookup maps from current in-memory state
+      const memWorkspaceMap = new Map(state.workspaces.map((w) => [w.id, w]));
+      const memSectionMap = new Map(state.sections.map((s) => [s.id, s]));
+      const memPageMap = new Map(state.pages.map((p) => [p.id, p]));
+      const memBlockMap = new Map(state.blocks.map((b) => [b.id, b]));
+
+      // Merge workspaces: take DB version only if it's newer
+      const mergedWorkspaces = dbWorkspaces.map((dbW) => {
+        const memW = memWorkspaceMap.get(dbW.id);
+        if (!memW) return dbW;
+        // If in-memory is same age or newer, keep it
+        if (memW.updatedAt && memW.updatedAt >= (dbW.updatedAt || "")) return memW;
+        return dbW;
+      });
+
+      // Merge sections
+      const mergedSections = dbSections.map((dbS) => {
+        const memS = memSectionMap.get(dbS.id);
+        if (!memS) return dbS;
+        if (memS.updatedAt && memS.updatedAt >= (dbS.updatedAt || "")) return memS;
+        return dbS;
+      });
+
+      // Merge pages
+      const mergedPages = dbPages.map((dbP) => {
+        const memP = memPageMap.get(dbP.id);
+        if (!memP) return dbP;
+        if (memP.updatedAt && memP.updatedAt >= (dbP.updatedAt || "")) return memP;
+        return dbP;
+      });
+
+      // Merge blocks: use metadata.updatedAt for comparison
+      const mergedBlocks = dbBlocks.map((dbB) => {
+        const memB = memBlockMap.get(dbB.id);
+        if (!memB) return normalizeBlock(dbB);
+        const memUpdated = memB.metadata?.updatedAt || "";
+        const dbUpdated = dbB.metadata?.updatedAt || "";
+        if (memUpdated && memUpdated >= dbUpdated) return memB;
+        return normalizeBlock(dbB);
+      });
+
+      return {
+        workspaces: mergedWorkspaces,
+        sections: sortSections(mergedSections),
+        pages: mergedPages,
+        blocks: sortBlocks(mergedBlocks),
+        activePageId: state.activePageId || mergedPages[0]?.id
+      };
+    });
+  },
+
   setView: (view) => set({ view }),
   setActivePage: (pageId) => set({ activePageId: pageId, view: "workspace" }),
   setSelectedTask: (taskId) => set({ selectedTaskId: taskId }),
+  openTaskModal: (params = {}) => set({ taskModalParams: params }),
+  closeTaskModal: () => set({ taskModalParams: null }),
   setTheme: (theme) => {
     localStorage.setItem("stones-theme", theme);
     set({ theme });
+  },
+  setColorProfile: (colorProfile) => {
+    localStorage.setItem("stones-color-profile", colorProfile);
+    set({ colorProfile });
   },
   setNotification: (msg) => {
     set({ notification: msg });
@@ -177,8 +259,7 @@ export const useAppStore = create((set, get) => ({
       blocks: sortBlocks((snapshot.data.blocks ?? []).map(normalizeBlock)),
       sections: sortSections(snapshot.data.sections ?? []),
       undoStack: rest,
-      selectedTaskId: undefined,
-      aiReview: undefined
+      selectedTaskId: undefined
     });
     get().setNotification(`Undid ${snapshot.label}`);
   },
@@ -190,6 +271,7 @@ export const useAppStore = create((set, get) => ({
     pushUndoSnapshot(get, set, `restore ${item.label}`);
     if (item.type === "block") {
       await db.blocks.put(item.payload.block);
+      await enqueueMutation("block", item.payload.block.id, "upsert", item.payload.block);
       set((state) => ({
         blocks: sortBlocks([...state.blocks, normalizeBlock(item.payload.block)]),
         recentlyDeleted: state.recentlyDeleted.filter((entry) => entry.id !== itemId)
@@ -248,12 +330,15 @@ export const useAppStore = create((set, get) => ({
       updatedAt: createdAt
     };
     await db.sections.add(section);
+    await enqueueMutation("section", section.id, "upsert", section);
     set((state) => ({ sections: sortSections([...state.sections, section]) }));
   },
 
   renameSection: async (sectionId, title) => {
     const updatedAt = nowIso();
     await db.sections.update(sectionId, { title, updatedAt });
+    const updated = get().sections.find((s) => s.id === sectionId);
+    if (updated) await enqueueMutation("section", sectionId, "upsert", { ...updated, title, updatedAt });
     set((state) => ({
       sections: state.sections.map((section) =>
         section.id === sectionId ? { ...section, title, updatedAt } : section
@@ -261,31 +346,37 @@ export const useAppStore = create((set, get) => ({
     }));
   },
 
-  createPage: async (sectionId = get().sections[0]?.id) => {
+  createPage: async (sectionId = get().sections[0]?.id, title = "Untitled page") => {
     const workspaceId = get().workspaces[0]?.id;
     if (!workspaceId) return;
 
     pushUndoSnapshot(get, set, "create page");
     const createdAt = nowIso();
+    const uniqueTitle = getUniquePageTitle(title, get().pages);
     const page = {
       id: createId("page"),
       workspaceId,
       sectionId,
-      title: "Untitled page",
+      title: uniqueTitle,
       createdAt,
       updatedAt: createdAt
     };
 
     await db.pages.add(page);
+    await enqueueMutation("page", page.id, "upsert", page);
     set((state) => ({
       pages: [...state.pages, page],
       activePageId: page.id,
       view: "workspace"
     }));
+    get().setNotification(`Page "${title}" created`);
   },
 
   movePageToSection: async (pageId, sectionId) => {
-    await db.pages.update(pageId, { sectionId, updatedAt: nowIso() });
+    const updatedAt = nowIso();
+    await db.pages.update(pageId, { sectionId, updatedAt });
+    const page = get().pages.find((p) => p.id === pageId);
+    if (page) await enqueueMutation("page", pageId, "upsert", { ...page, sectionId, updatedAt });
     set((state) => ({
       pages: state.pages.map((page) =>
         page.id === pageId ? { ...page, sectionId } : page
@@ -324,14 +415,14 @@ export const useAppStore = create((set, get) => ({
       metadata: { createdAt, updatedAt: createdAt }
     };
 
-    await db.transaction("rw", db.pages, db.blocks, async () => {
+    await db.transaction("rw", db.pages, async () => {
       await db.pages.add(page);
-      await db.blocks.add(note);
     });
+    await enqueueMutation("page", page.id, "upsert", page);
 
     set((current) => ({
       pages: [...current.pages, page],
-      blocks: sortBlocks([...current.blocks, note]),
+      blocks: current.blocks,
       activePageId: page.id,
       view: "workspace"
     }));
@@ -339,26 +430,36 @@ export const useAppStore = create((set, get) => ({
 
   renamePage: async (pageId, title) => {
     const updatedAt = nowIso();
-    await db.pages.update(pageId, { title, updatedAt });
+    const uniqueTitle = getUniquePageTitle(title, get().pages, pageId);
+    await db.pages.update(pageId, { title: uniqueTitle, updatedAt });
+    const page = get().pages.find((p) => p.id === pageId);
+    if (page) await enqueueMutation("page", pageId, "upsert", { ...page, title: uniqueTitle, updatedAt });
     set((state) => ({
       pages: state.pages.map((page) =>
-        page.id === pageId ? { ...page, title, updatedAt } : page
+        page.id === pageId ? { ...page, title: uniqueTitle, updatedAt } : page
       )
     }));
   },
 
+  addTitleBlock: async (pageId = get().activePageId) =>
+    addBlock(get, set, pageId, "title", { text: "" }),
+
   addNoteBlock: async (pageId = get().activePageId) =>
     addBlock(get, set, pageId, "note", { text: "" }),
 
-  addTaskBlock: async (pageId = get().activePageId, title = "") =>
-    addBlock(
+  addTaskBlock: async (taskData) => {
+    const pageId = taskData.pageId || get().activePageId;
+    if (!pageId) return;
+    return addBlock(
       get,
       set,
       pageId,
       "task",
-      { title, notes: "", subtasks: [], dependencyIds: [] },
-      { completed: false, priority: "medium", recurrence: "none" }
-    ),
+      { title: taskData.title, notes: taskData.notes || "", subtasks: [], dependencyIds: [] },
+      { completed: false, priority: taskData.priority || "medium", recurrence: "none", deadline: taskData.deadline },
+      { sourceBlockId: taskData.sourceBlockId }
+    );
+  },
 
   addChecklistBlock: async (pageId = get().activePageId) =>
     addBlock(get, set, pageId, "checklist", {
@@ -400,6 +501,7 @@ export const useAppStore = create((set, get) => ({
       metadata: { ...block.metadata, updatedAt }
     };
     await db.blocks.put(updatedBlock);
+    await enqueueMutation("block", updatedBlock.id, "upsert", updatedBlock);
     set((state) => ({
       blocks: state.blocks.map((item) =>
         item.id === blockId ? updatedBlock : item
@@ -455,9 +557,12 @@ export const useAppStore = create((set, get) => ({
     };
 
     await db.blocks.put(updatedBlock);
+    await enqueueMutation("block", updatedBlock.id, "upsert", updatedBlock);
     set((state) => ({
-      blocks: state.blocks.map((item) =>
-        item.id === blockId ? updatedBlock : item
+      blocks: sortBlocks(
+        state.blocks.map((item) =>
+          item.id === blockId ? updatedBlock : item
+        )
       )
     }));
   },
@@ -476,11 +581,19 @@ export const useAppStore = create((set, get) => ({
   updateSubtask: async (taskId, subtaskId, patch) => {
     const task = get().blocks.find((block) => block.id === taskId);
     if (!task || task.type !== "task") return;
+    
+    const nextSubtasks = (task.content.subtasks ?? []).map((subtask) =>
+      subtask.id === subtaskId ? { ...subtask, ...patch } : subtask
+    );
+
     await get().updateTask(taskId, {
-      subtasks: (task.content.subtasks ?? []).map((subtask) =>
-        subtask.id === subtaskId ? { ...subtask, ...patch } : subtask
-      )
+      subtasks: nextSubtasks
     });
+
+    const hasIncompleteSubtasks = nextSubtasks.some((s) => !s.completed);
+    if (hasIncompleteSubtasks && task.metadata.completed) {
+      await get().toggleTask(taskId);
+    }
   },
 
   deleteSubtask: async (taskId, subtaskId) => {
@@ -500,6 +613,10 @@ export const useAppStore = create((set, get) => ({
     const updatedAt = nowIso();
     const block = get().blocks.find((item) => item.id === blockId);
     if (!block || block.type !== "task") return;
+    if (block.metadata.failed) {
+      set({ error: "Cannot complete a failed task. Unfail it first." });
+      return;
+    }
 
     const dependencies = block.content.dependencyIds ?? [];
     const blocked = dependencies.some((dependencyId) => {
@@ -522,14 +639,39 @@ export const useAppStore = create((set, get) => ({
         updatedAt
       }
     };
-    const nextTask = completed
-      ? makeNextRecurringTask(block, updatedAt, get)
-      : undefined;
+    let nextTask = undefined;
+    if (completed) {
+      // Only create a recurring copy if one doesn't already exist
+      // (prevents duplicates when un-checking then re-checking)
+      const recurrence = block.metadata.recurrence ?? "none";
+      if (recurrence !== "none") {
+        const nextDeadline = nextRecurringDate(
+          block.metadata.deadline,
+          recurrence,
+          block.metadata.customRecurrenceInterval
+        );
+        const alreadyExists = nextDeadline && get().blocks.some(
+          (b) =>
+            b.type === "task" &&
+            b.id !== blockId &&
+            b.pageId === block.pageId &&
+            b.content.title === block.content.title &&
+            b.metadata.recurrence === recurrence &&
+            !b.metadata.completed &&
+            b.metadata.deadline === nextDeadline
+        );
+        if (!alreadyExists) {
+          nextTask = makeNextRecurringTask(block, updatedAt, get);
+        }
+      }
+    }
 
     await db.transaction("rw", db.blocks, async () => {
       await db.blocks.put(updatedBlock);
       if (nextTask) await db.blocks.add(nextTask);
     });
+    await enqueueMutation("block", updatedBlock.id, "upsert", updatedBlock);
+    if (nextTask) await enqueueMutation("block", nextTask.id, "upsert", nextTask);
     set((state) => ({
       error: undefined,
       blocks: sortBlocks(
@@ -538,6 +680,60 @@ export const useAppStore = create((set, get) => ({
           .concat(nextTask ? [nextTask] : [])
       )
     }));
+  },
+
+  toggleFailTask: async (blockId) => {
+    const updatedAt = nowIso();
+    const block = get().blocks.find((item) => item.id === blockId);
+    if (!block || block.type !== "task") return;
+
+    pushUndoSnapshot(get, set, "fail task");
+    const failed = !block.metadata.failed;
+    const updatedBlock = {
+      ...block,
+      metadata: {
+        ...block.metadata,
+        failed,
+        completed: false, // ensure it's not completed if failed
+        completedAt: undefined,
+        updatedAt
+      }
+    };
+
+    await db.blocks.put(updatedBlock);
+    await enqueueMutation("block", updatedBlock.id, "upsert", updatedBlock);
+    set((state) => ({
+      error: undefined,
+      blocks: sortBlocks(
+        state.blocks.map((item) => (item.id === blockId ? updatedBlock : item))
+      )
+    }));
+  },
+
+  toggleArchiveBlock: async (blockId) => {
+    const updatedAt = nowIso();
+    const block = get().blocks.find((item) => item.id === blockId);
+    if (!block) return;
+
+    pushUndoSnapshot(get, set, "archive block");
+    const archived = !block.metadata.archived;
+    const updatedBlock = {
+      ...block,
+      metadata: {
+        ...block.metadata,
+        archived,
+        updatedAt
+      }
+    };
+
+    await db.blocks.put(updatedBlock);
+    await enqueueMutation("block", updatedBlock.id, "upsert", updatedBlock);
+    set((state) => ({
+      blocks: sortBlocks(
+        state.blocks.map((item) => (item.id === blockId ? updatedBlock : item))
+      )
+    }));
+    get().setNotification(archived ? "Block archived" : "Block unarchived");
   },
 
   moveBlock: async (blockId, direction) => {
@@ -559,6 +755,8 @@ export const useAppStore = create((set, get) => ({
       await db.blocks.put(updatedBlock);
       await db.blocks.put(updatedTarget);
     });
+    await enqueueMutation("block", updatedBlock.id, "upsert", updatedBlock);
+    await enqueueMutation("block", updatedTarget.id, "upsert", updatedTarget);
 
     set((current) => ({
       blocks: sortBlocks(
@@ -585,6 +783,9 @@ export const useAppStore = create((set, get) => ({
       await Promise.all(pages.map((page) => db.pages.delete(page.id)));
       await Promise.all(blocks.map((block) => db.blocks.delete(block.id)));
     });
+    await enqueueMutation("section", sectionId, "delete", section);
+    await Promise.all(pages.map((page) => enqueueMutation("page", page.id, "delete", page)));
+    await Promise.all(blocks.map((block) => enqueueMutation("block", block.id, "delete", block)));
     const deletedItem = makeDeletedItem("section", section.title, {
       section,
       pages,
@@ -610,6 +811,8 @@ export const useAppStore = create((set, get) => ({
       await db.pages.delete(pageId);
       await Promise.all(blocks.map((block) => db.blocks.delete(block.id)));
     });
+    await enqueueMutation("page", pageId, "delete", page);
+    await Promise.all(blocks.map((block) => enqueueMutation("block", block.id, "delete", block)));
     const deletedItem = makeDeletedItem("page", page.title, { page, blocks });
     set((state) => ({
       pages: state.pages.filter((item) => item.id !== pageId),
@@ -617,6 +820,7 @@ export const useAppStore = create((set, get) => ({
       activePageId: state.activePageId === pageId ? state.pages.find((item) => item.id !== pageId)?.id : state.activePageId,
       recentlyDeleted: [deletedItem, ...state.recentlyDeleted].slice(0, 12)
     }));
+    get().setNotification(`Page "${page.title}" deleted`);
   },
 
   deleteBlock: async (blockId) => {
@@ -625,6 +829,10 @@ export const useAppStore = create((set, get) => ({
     if (!block) return;
 
     pushUndoSnapshot(get, set, `delete ${block.type}`);
+    await enqueueMutation("block", blockId, "delete", block);
+    if (block.type === "task" && block.content.imageUrl) {
+      await deleteTaskImage(block.content.imageUrl);
+    }
     await db.blocks.delete(blockId);
     const deletedItem = makeDeletedItem(
       "block",
@@ -637,45 +845,63 @@ export const useAppStore = create((set, get) => ({
         state.selectedTaskId === blockId ? undefined : state.selectedTaskId,
       recentlyDeleted: [deletedItem, ...state.recentlyDeleted].slice(0, 12)
     }));
+    get().setNotification("Block deleted");
   },
 
-  quickAddTask: async (input, pageId = get().activePageId) => {
-    const title = input.trim();
-    if (!title) return;
-
-    const parsed = parseQuickTask(title);
-    await createTaskFromExtraction(
-      {
-        title: parsed.title,
-        priority: parsed.priority,
-        dueText: parsed.dueText
-      },
-      pageId,
-      get,
-      set,
-      {
-        deadline: parsed.deadline,
-        recurrence: parsed.recurrence,
-        customRecurrenceInterval: parsed.customRecurrenceInterval
-      }
-    );
+  cutBlock: (blockId) => {
+    const block = get().blocks.find((item) => item.id === blockId);
+    if (!block) return;
+    set({ clipboard: block });
+    get().setNotification(`${block.type.charAt(0).toUpperCase() + block.type.slice(1)} cut to clipboard`);
   },
+
+  pasteBlock: async (targetPageId) => {
+    const block = get().clipboard;
+    if (!block || !targetPageId) return;
+
+    pushUndoSnapshot(get, set, `paste ${block.type}`);
+    const updatedAt = nowIso();
+    const state = get();
+    const order =
+      Math.max(
+        0,
+        ...state.blocks
+          .filter((b) => b.pageId === targetPageId)
+          .map((b) => b.order)
+      ) + 1;
+
+    const movedBlock = {
+      ...block,
+      pageId: targetPageId,
+      order,
+      metadata: { ...block.metadata, updatedAt }
+    };
+
+    await db.blocks.put(movedBlock);
+    await enqueueMutation("block", movedBlock.id, "upsert", movedBlock);
+    set((current) => ({
+      blocks: sortBlocks(
+        current.blocks.map((item) =>
+          item.id === block.id ? movedBlock : item
+        )
+      ),
+      clipboard: null
+    }));
+    get().setNotification(`${block.type.charAt(0).toUpperCase() + block.type.slice(1)} pasted`);
+  },
+
+  clearClipboard: () => set({ clipboard: null }),
 
   convertNoteToTask: async (blockId) => {
     const note = get().blocks.find((block) => block.id === blockId);
     if (!note || note.type !== "note" || !note.content.text.trim()) return;
 
-    await createTaskFromExtraction(
-      {
-        title: note.content.text.trim().split("\n")[0],
-        priority: "medium",
-        sourceBlockId: note.id,
-        pageId: note.pageId
-      },
-      note.pageId,
-      get,
-      set
-    );
+    get().openTaskModal({
+      title: note.content.text.trim().split("\n")[0],
+      priority: "medium",
+      sourceBlockId: note.id,
+      pageId: note.pageId
+    });
   },
 
   convertTextToTask: async (blockId, text) => {
@@ -683,88 +909,13 @@ export const useAppStore = create((set, get) => ({
     const title = text?.trim();
     if (!note || note.type !== "note" || !title) return;
 
-    await createTaskFromExtraction(
-      {
-        title: title.split("\n")[0],
-        priority: "medium",
-        sourceBlockId: note.id,
-        pageId: note.pageId
-      },
-      note.pageId,
-      get,
-      set
-    );
-  },
-
-  extractTasksWithAi: async (blockId) => {
-    const note = get().blocks.find((block) => block.id === blockId);
-    if (!note || note.type !== "note" || !note.content.text.trim()) return;
-
-    set({ aiStatus: "Extracting tasks...", error: undefined });
-    try {
-      const result = await extractTasksFromText(
-        note.content.text,
-        note.id,
-        note.pageId
-      );
-      set({
-        aiReview: {
-          sourceBlockId: note.id,
-          pageId: note.pageId,
-          provider: result.provider,
-          tasks: result.tasks.map((task) => ({
-            ...task,
-            deadline: normalizeDateText(task.dueText),
-            priority: task.priority ?? "medium",
-            selected: true
-          }))
-        },
-        aiStatus: `Review ${result.tasks.length} extracted task${result.tasks.length === 1 ? "" : "s"} from ${result.provider}.`
-      });
-    } catch {
-      set({
-        error:
-          "AI extraction is unavailable. Start the backend or create tasks manually.",
-        aiStatus: undefined
-      });
-    }
-  },
-
-  updateAiDraft: (index, patch) => {
-    set((state) => {
-      if (!state.aiReview) return {};
-      return {
-        aiReview: {
-          ...state.aiReview,
-          tasks: state.aiReview.tasks.map((task, taskIndex) =>
-            taskIndex === index ? { ...task, ...patch } : task
-          )
-        }
-      };
+    get().openTaskModal({
+      title: title.split("\n")[0],
+      priority: "medium",
+      sourceBlockId: note.id,
+      pageId: note.pageId
     });
   },
-
-  acceptAiReview: async () => {
-    const review = get().aiReview;
-    if (!review) return;
-    const selectedTasks = review.tasks.filter(
-      (task) => task.selected && task.title.trim()
-    );
-    for (const task of selectedTasks) {
-      await createTaskFromExtraction(
-        { ...task, sourceBlockId: review.sourceBlockId, pageId: review.pageId },
-        review.pageId,
-        get,
-        set
-      );
-    }
-    set({
-      aiReview: undefined,
-      aiStatus: `Added ${selectedTasks.length} reviewed task${selectedTasks.length === 1 ? "" : "s"}.`
-    });
-  },
-
-  dismissAiReview: () => set({ aiReview: undefined, aiStatus: undefined }),
 
   exportBackup: () => ({
     version: 2,
@@ -860,10 +1011,55 @@ export const useAppStore = create((set, get) => ({
       selectedTaskId: undefined,
       aiReview: undefined
     });
+  },
+
+  uploadTaskAttachment: async (taskId, file, userId) => {
+    const block = get().blocks.find((item) => item.id === taskId);
+    if (!block || block.type !== "task") return;
+
+    pushUndoSnapshot(get, set, "upload task image");
+    const updatedAt = nowIso();
+    const imageUrl = await uploadTaskImage({
+      file,
+      taskId,
+      userId,
+      oldPath: block.content.imageUrl
+    });
+    const updatedBlock = {
+      ...block,
+      content: { ...block.content, imageUrl },
+      metadata: { ...block.metadata, updatedAt }
+    };
+    await db.blocks.put(updatedBlock);
+    await enqueueMutation("block", updatedBlock.id, "upsert", updatedBlock);
+    set((state) => ({
+      blocks: state.blocks.map((item) => (item.id === taskId ? updatedBlock : item))
+    }));
+    get().setNotification("Image uploaded");
+  },
+
+  removeTaskAttachment: async (taskId) => {
+    const block = get().blocks.find((item) => item.id === taskId);
+    if (!block || block.type !== "task" || !block.content.imageUrl) return;
+
+    pushUndoSnapshot(get, set, "remove task image");
+    const updatedAt = nowIso();
+    await deleteTaskImage(block.content.imageUrl);
+    const updatedBlock = {
+      ...block,
+      content: { ...block.content, imageUrl: undefined },
+      metadata: { ...block.metadata, updatedAt }
+    };
+    await db.blocks.put(updatedBlock);
+    await enqueueMutation("block", updatedBlock.id, "upsert", updatedBlock);
+    set((state) => ({
+      blocks: state.blocks.map((item) => (item.id === taskId ? updatedBlock : item))
+    }));
+    get().setNotification("Image removed");
   }
 }));
 
-const addBlock = async (get, set, pageId, type, content, metadata = {}) => {
+const addBlock = async (get, set, pageId, type, content, metadata = {}, extra = {}) => {
   if (!pageId) return;
   pushUndoSnapshot(get, set, `create ${type}`);
   const state = get();
@@ -881,11 +1077,13 @@ const addBlock = async (get, set, pageId, type, content, metadata = {}) => {
     type,
     order,
     content,
-    metadata: { createdAt, updatedAt: createdAt, ...metadata }
+    metadata: { createdAt, updatedAt: createdAt, ...metadata },
+    ...extra
   };
   await db.blocks.add(block);
+  await enqueueMutation("block", block.id, "upsert", block);
   set((current) => ({ blocks: sortBlocks([...current.blocks, block]) }));
-  get().setNotification("Block created successfully");
+  get().setNotification(`${type.charAt(0).toUpperCase() + type.slice(1)} added`);
 };
 
 const createTaskFromExtraction = async (
@@ -1019,10 +1217,20 @@ const makeNextRecurringTask = (task, createdAt, get) => {
         .map((block) => block.order)
     ) + 1;
 
+  // Reset subtasks to uncompleted for the new recurring instance
+  const resetSubtasks = (task.content.subtasks ?? []).map((subtask) => ({
+    ...subtask,
+    completed: false
+  }));
+
   return {
     ...task,
     id: createId("block"),
     order,
+    content: {
+      ...task.content,
+      subtasks: resetSubtasks
+    },
     metadata: {
       ...task.metadata,
       completed: false,

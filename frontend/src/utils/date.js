@@ -5,7 +5,7 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, {
 
 const pad = (value) => String(value).padStart(2, "0");
 
-const toLocalDateString = (date) =>
+export const toLocalDateString = (date) =>
   `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 
 const toLocalDateTimeString = (date) =>
@@ -32,7 +32,7 @@ export const formatShortDate = (value) => {
     return "No date";
   }
 
-  const dateStr = value.includes("T") ? value : `${value}T00:00:00`;
+  const dateStr = value.includes("T") ? value : `${value}T12:00:00`;
   const date = new Date(dateStr);
   if (Number.isNaN(date.getTime())) return value;
 
