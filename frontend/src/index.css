@@ -778,6 +778,15 @@
     display: inline;
   }
 
+  /* Weather & clock default desktop styling to prevent overflow */
+  .weather-time {
+    font-size: 2.75rem !important;
+  }
+
+  .weather-temp {
+    font-size: 2.25rem !important;
+  }
+
   /* ═══════════════════════════════════════════════════════════
      BREAKPOINT: ≤ 1100px  (tablet / small desktop)
      ═══════════════════════════════════════════════════════════ */
@@ -794,10 +803,10 @@
   }
 
   /* ═══════════════════════════════════════════════════════════
-     BREAKPOINT: ≤ 1200px  (tablet landscape / small desktop)
+     BREAKPOINT: ≤ 1600px  (laptop / tablet landscape)
      ═══════════════════════════════════════════════════════════ */
-  @media (max-width: 1200px) {
-    /* Weather & clock smaller and stacked on small screens to prevent overflow */
+  @media (max-width: 1600px) {
+    /* Weather & clock smaller and stacked on standard laptops & small screens to prevent overflow */
     .weather-time {
       font-size: 2.25rem !important;
     }
