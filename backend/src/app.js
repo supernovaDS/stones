@@ -4,7 +4,6 @@ import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import morgan from "morgan";
 import { env } from "./config/env.js";
-import { aiRouter } from "./features/ai/aiRoutes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { notFound } from "./middleware/notFound.js";
 import { healthRouter } from "./routes/healthRoutes.js";
@@ -31,7 +30,6 @@ export const createApp = () => {
   );
 
   app.use("/api/health", healthRouter);
-  app.use("/api/ai", aiRouter);
 
   app.use(notFound);
   app.use(errorHandler);

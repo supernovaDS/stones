@@ -593,6 +593,8 @@ export const useAppStore = create((set, get) => ({
     const hasIncompleteSubtasks = nextSubtasks.some((s) => !s.completed);
     if (hasIncompleteSubtasks && task.metadata.completed) {
       await get().toggleTask(taskId);
+    } else if (!hasIncompleteSubtasks && !task.metadata.completed && nextSubtasks.length > 0) {
+      await get().toggleTask(taskId);
     }
   },
 

@@ -1,10 +1,9 @@
 import { clsx } from "clsx";
-import { FilePlus, Moon, Sun, Trash2, Settings, X } from "lucide-react";
+import { Moon, Sun, Trash2, Settings, X, Plus } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { navItems } from "../../utils/constants";
-import { Metric } from "../ui";
 
-export function Sidebar({ dueToday, overdue, isOpen, onClose }) {
+export function Sidebar({ isOpen, onClose }) {
   const {
     activePageId,
     createPage,
@@ -38,12 +37,13 @@ export function Sidebar({ dueToday, overdue, isOpen, onClose }) {
           </div>
           <button
               className="icon-button ml-auto"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              title="Toggle dark mode"
+              onClick={() => setSettingsOpen(true)}
+              title="Settings"
               type="button"
             >
-              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+              <Settings size={16} />
             </button>
+
           <button
             className="icon-button sidebar-close-btn"
             onClick={onClose}
@@ -77,6 +77,25 @@ export function Sidebar({ dueToday, overdue, isOpen, onClose }) {
         <p className="text-xs font-black uppercase tracking-wide text-stone-700 dark:text-[#7a7670]">
           Pages
         </p>
+        <button
+          className="icon-button !h-6 !w-6"
+          onClick={() => {
+            const defaultDate = new Date().toLocaleDateString(undefined, {
+              weekday: "short",
+              month: "short",
+              day: "numeric"
+            });
+            const title = window.prompt("Enter page name:", defaultDate);
+            if (title !== null) {
+              void createPage(undefined, title || defaultDate);
+              onClose?.();
+            }
+          }}
+          title="New Page"
+          type="button"
+        >
+          <Plus size={14} />
+        </button>
       </div>
 
       <div className="mx-4 flex min-h-[8rem] flex-1 flex-col gap-2 overflow-auto pb-2 pr-3">
@@ -90,7 +109,7 @@ export function Sidebar({ dueToday, overdue, isOpen, onClose }) {
               <span className="truncate min-w-0 flex-1">{page.title}</span>
             </button>
             <button
-              className="absolute right-4 grid h-7 w-7 place-items-center rounded-md text-stone-500 opacity-0 transition hover:bg-[#ff5a5f] hover:text-black group-hover:opacity-100 dark:text-[#7a7670] dark:hover:bg-[#3d1215] dark:hover:text-[#e8a0a2]"
+              className="absolute right-4 grid h-7 w-7 place-items-center rounded-md text-stone-500 opacity-100 md:opacity-0 transition hover:bg-[#ff5a5f] hover:text-black group-hover:opacity-100 dark:text-[#7a7670] dark:hover:bg-[#3d1215] dark:hover:text-[#e8a0a2]"
               onClick={() => void deletePage(page.id)}
               title="Delete page"
               type="button"
@@ -101,45 +120,6 @@ export function Sidebar({ dueToday, overdue, isOpen, onClose }) {
         ))}
       </div>
 
-      <button
-        className="nb-button primary mx-4 mt-4"
-        onClick={() => {
-          const defaultDate = new Date().toLocaleDateString(undefined, {
-            weekday: "short",
-            month: "short",
-            day: "numeric"
-          });
-          const title = window.prompt("Enter page name:", defaultDate);
-          if (title !== null) {
-            void createPage(undefined, title || defaultDate);
-            onClose?.();
-          }
-        }}
-        type="button"
-      >
-        <FilePlus size={16} />
-        New Page
-      </button>
-
-      <div className="mx-4 mt-6">
-        <p className="text-xs font-black uppercase tracking-wide text-stone-700 dark:text-[#7a7670]">
-          Tasks:
-        </p>
-      </div>
-
-      <div className="m-4 grid grid-cols-2 gap-3">
-        <Metric label="Today" value={dueToday.toString()} color="blue" />
-        <Metric label="Overdue" value={overdue.toString()} color="red" />
-      </div>
-
-      <button
-        className="nav-button mx-4 mb-4"
-        onClick={() => handleNav(() => setSettingsOpen(true))}
-        type="button"
-      >
-        <Settings size={17} />
-        Settings
-      </button>
     </aside>
   );
 }

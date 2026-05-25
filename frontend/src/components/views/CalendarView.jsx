@@ -3,15 +3,15 @@ import { clsx } from "clsx";
 import { useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
 import { formatShortDate, todayIso, toDateInput, toLocalDateString } from "../../utils/date";
-import { shiftMonth, getCalendarDays, priorityDot, blockMatchesSearch } from "../../utils/helpers";
+import { shiftMonth, getCalendarDays, priorityDot } from "../../utils/helpers";
 import { Checkbox } from "../ui";
 import { priorityRail } from "../../utils/constants";
 
-export function CalendarView({ searchQuery }) {
+export function CalendarView() {
   const { blocks, openTaskModal, setSelectedTask, toggleTask, toggleFailTask } = useAppStore();
   const [cursor, setCursor] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(todayIso());
-  const tasks = blocks.filter((block) => block.type === "task").filter((task) => blockMatchesSearch(task, searchQuery));
+  const tasks = blocks.filter((block) => block.type === "task");
   const days = getCalendarDays(cursor);
   const monthLabel = cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
   const selectedTasks = tasks.filter((task) => toDateInput(task.metadata.deadline) === selectedDay);
@@ -82,7 +82,7 @@ export function CalendarView({ searchQuery }) {
       <aside className="bento-card span-4 bg-white p-4 text-black dark:bg-[#12151a] dark:text-[#c8c3ba]">
         <h3 className="mb-3 text-2xl font-black">{formatShortDate(selectedDay)}</h3>
         {selectedDay >= todayIso() && (
-          <button className="nb-button action mb-4" onClick={() => void openTaskModal({ deadline: selectedDay, pageId: useAppStore.getState().activePageId })} type="button">
+          <button className="nb-button action mb-4" onClick={() => void openTaskModal({ deadline: selectedDay, pageId: "system-calendar" })} type="button">
             <Plus size={16} /> Add task for day
           </button>
         )}

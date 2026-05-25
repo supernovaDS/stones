@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
-import { blockMatchesSearch } from "../../utils/helpers";
 import { BlockCard } from "../blocks";
 import { clsx } from "clsx";
 import { Archive, ChevronDown, ChevronUp, ClipboardPaste, Plus, FileText, CheckSquare, List, Code2, Link, Image, Heading, X } from "lucide-react";
@@ -22,6 +21,20 @@ function WeatherWidget() {
         async (position) => {
           try {
             const { latitude, longitude } = position.coords;
+            
+            const cachedWeather = sessionStorage.getItem("stones_weather");
+            if (cachedWeather) {
+              try {
+                const parsed = JSON.parse(cachedWeather);
+                if (Date.now() - parsed.timestamp < 15 * 60 * 1000) {
+                  setWeather(parsed.data);
+                  return;
+                }
+              } catch (err) {
+                // Ignore parse error and fetch fresh
+              }
+            }
+
             const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code`);
             if (!res.ok) throw new Error("Network response was not ok");
             const data = await res.json();
@@ -36,7 +49,9 @@ function WeatherWidget() {
             else if (code >= 80 && code <= 82) { desc = "Showers"; icon = "🚿"; }
             else if (code >= 95 && code <= 99) { desc = "Storm"; icon = "⛈️"; }
             
-            setWeather({ temp, desc, icon });
+            const weatherData = { temp, desc, icon };
+            setWeather(weatherData);
+            sessionStorage.setItem("stones_weather", JSON.stringify({ data: weatherData, timestamp: Date.now() }));
           } catch (e) {
             setWeather({ temp: null, desc: "Unavailable", icon: "⚠️" });
           }
@@ -148,11 +163,11 @@ function AddBlockMenu({ pageId }) {
   return (
     <div className="relative flex flex-col items-center py-4">
       {isOpen && (
-        <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
+        <div className="fixed inset-0 z-50" onClick={() => setIsOpen(false)} />
       )}
 
       {isOpen && (
-        <div className="absolute bottom-20 z-20 grid w-64 grid-cols-2 gap-2 rounded-xl border-[3px] border-black bg-white p-3 shadow-[6px_6px_0_#111] animate-in fade-in slide-in-from-bottom-2 duration-150 dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[4px_4px_0_#000]">
+        <div className="absolute bottom-20 z-50 grid w-64 grid-cols-2 gap-2 rounded-xl border-[3px] border-black bg-white p-3 shadow-[6px_6px_0_#111] animate-in fade-in slide-in-from-bottom-2 duration-150 dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[4px_4px_0_#000]">
           <button
             className="nb-button col-span-2 flex items-center gap-3 p-2.5 transition hover:-translate-y-0.5 hover:shadow-[3px_3px_0_#111]"
             onClick={() => {
@@ -201,14 +216,13 @@ function AddBlockMenu({ pageId }) {
   );
 }
 
-export function WorkspaceView({ pageId, searchQuery }) {
+export function WorkspaceView({ pageId }) {
   const { blocks, pages, renamePage, clipboard, pasteBlock, clearClipboard } = useAppStore();
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
 
   const page = pages.find((item) => item.id === pageId);
   const pageBlocks = blocks
     .filter((block) => block.pageId === pageId)
-    .filter((block) => blockMatchesSearch(block, searchQuery))
     .sort((a, b) => a.order - b.order);
 
   const activeBlocks = pageBlocks.filter((block) => !block.metadata.archived);
@@ -234,7 +248,7 @@ export function WorkspaceView({ pageId, searchQuery }) {
           ))
         ) : (
           <div className="bento-card bg-[#2ef2a6] p-8 text-center dark:bg-[#0a3d28]">
-            <p className="text-2xl font-black">No active blocks match this search.</p>
+            <p className="text-2xl font-black">No active blocks on this page.</p>
           </div>
         )}
         <AddBlockMenu pageId={pageId} />

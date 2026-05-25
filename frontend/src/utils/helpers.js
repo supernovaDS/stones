@@ -8,7 +8,7 @@ export function taskMatchesFilter(task, filter) {
   if (filter === "failed") return task.metadata.failed;
   if (filter === "today") return isToday(task.metadata.deadline);
   if (filter === "overdue") return !task.metadata.completed && !task.metadata.failed && isOverdue(task.metadata.deadline);
-  if (filter === "upcoming") return !task.metadata.completed && !task.metadata.failed && task.metadata.deadline && task.metadata.deadline > todayIso();
+  if (filter === "upcoming") return !task.metadata.completed && !task.metadata.failed && task.metadata.deadline && task.metadata.deadline.slice(0, 10) > todayIso();
   if (filter === "no-date") return !task.metadata.completed && !task.metadata.failed && !task.metadata.deadline;
   if (filter === "high") return task.metadata.priority === "high";
   return true;
@@ -43,22 +43,6 @@ function groupLabel(deadline, mode) {
     return `Week of ${formatShortDate(toLocalDateString(start))}`;
   }
   return date.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-}
-
-// ── Block search ────────────────────────────────────────────────
-
-export function blockMatchesSearch(block, query) {
-  const normalized = query.trim().toLowerCase();
-  if (!normalized) return true;
-  const content = {
-    task: `${block.content.title} ${block.content.notes ?? ""}`,
-    note: block.content.text,
-    checklist: (block.content.items ?? []).map((item) => item.text).join(" "),
-    code: `${block.content.language} ${block.content.code}`,
-    link: `${block.content.title} ${block.content.url}`,
-    image: `${block.content.name} ${block.content.caption}`
-  }[block.type] ?? "";
-  return content.toLowerCase().includes(normalized);
 }
 
 // ── Calendar helpers ────────────────────────────────────────────
