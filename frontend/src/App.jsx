@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "./store/useAppStore";
 import { isOverdue, isToday } from "./utils/date";
 import { notifyDueReminders } from "./utils/helpers";
@@ -9,7 +9,7 @@ import { ArrowDown, ArrowUp } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { AuthPage } from "./components/auth/AuthPage";
 import { Sidebar } from "./components/layout/Sidebar";
-import { Topbar, SearchBar } from "./components/layout/Topbar";
+import { Topbar } from "./components/layout/Topbar";
 import { WorkspaceView, TaskListView, CalendarView, InsightsView } from "./components/views";
 import { TaskDetailPanel, TaskModal, CommandPalette, SettingsModal } from "./components/modals";
 
@@ -36,7 +36,6 @@ function App() {
     view
   } = useAppStore();
 
-  const [searchQuery, setSearchQuery] = useState("");
   const [commandOpen, setCommandOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -45,21 +44,29 @@ function App() {
   const [isScrollVisible, setIsScrollVisible] = useState(false);
 
   useEffect(() => {
+    let ticking = false;
+
     const handleScroll = () => {
-      const scrollTop = window.scrollY;
-      const docHeight = document.documentElement.scrollHeight;
-      const winHeight = window.innerHeight;
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const scrollTop = window.scrollY;
+          const docHeight = document.documentElement.scrollHeight;
+          const winHeight = window.innerHeight;
 
-      if (docHeight > winHeight + 150) {
-        setIsScrollVisible(true);
-      } else {
-        setIsScrollVisible(false);
-      }
+          if (docHeight > winHeight + 150) {
+            setIsScrollVisible(true);
+          } else {
+            setIsScrollVisible(false);
+          }
 
-      if (scrollTop > (docHeight - winHeight) / 2) {
-        setScrollDirection("up");
-      } else {
-        setScrollDirection("down");
+          if (scrollTop > (docHeight - winHeight) / 2) {
+            setScrollDirection("up");
+          } else {
+            setScrollDirection("down");
+          }
+          ticking = false;
+        });
+        ticking = true;
       }
     };
 
@@ -88,8 +95,6 @@ function App() {
   const activePage = pages.find((page) => page.id === activePageId);
   const tasks = blocks.filter((block) => block.type === "task");
   const openTasks = tasks.filter((task) => !task.metadata.completed && !task.metadata.failed);
-  const dueToday = openTasks.filter((task) => isToday(task.metadata.deadline));
-  const overdue = openTasks.filter((task) => isOverdue(task.metadata.deadline));
 
   // ── Sync UI updates (debounced) ─────────────────────────────
   const syncDebounceRef = useRef(null);
@@ -113,15 +118,24 @@ function App() {
 
   // ── Theme sync ──────────────────────────────────────────────
   useEffect(() => {
-    // Glow profile is always dark-only
-    const isDark = theme === "dark" || colorProfile === "glow";
+    const isDark = theme === "dark";
+    
+    // Disable transitions temporarily to make theme switch instant
+    document.documentElement.classList.add("disable-transitions");
     document.documentElement.classList.toggle("dark", isDark);
+    
+    // Re-enable transitions after browser paints the new theme
+    const timer = setTimeout(() => {
+      document.documentElement.classList.remove("disable-transitions");
+    }, 50);
+    
+    return () => clearTimeout(timer);
   }, [theme, colorProfile]);
 
   // ── Color profile sync ─────────────────────────────────────
   useEffect(() => {
     const root = document.documentElement;
-    root.classList.remove("profile-neo", "profile-minimal", "profile-glow");
+    root.classList.remove("profile-neo", "profile-minimal");
     root.classList.add(`profile-${colorProfile}`);
   }, [colorProfile]);
 
@@ -203,30 +217,23 @@ function App() {
           onClick={() => setSidebarOpen(false)}
         />
         <Sidebar
-          dueToday={dueToday.length}
-          overdue={overdue.length}
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
         />
 
         <section className="content-shell">
           <Topbar
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
             onCommandOpen={() => setCommandOpen(true)}
             onMenuToggle={() => setSidebarOpen((prev) => !prev)}
             activePage={activePage}
             view={view}
             syncStatus={syncStatus}
           />
-
-          <SearchBar searchQuery={searchQuery} onSearchChange={setSearchQuery} />
-
           {view === "workspace" && activePage ? (
-            <WorkspaceView pageId={activePage.id} searchQuery={searchQuery} />
+            <WorkspaceView pageId={activePage.id} />
           ) : null}
-          {view === "tasks" ? <TaskListView searchQuery={searchQuery} /> : null}
-          {view === "calendar" ? <CalendarView searchQuery={searchQuery} /> : null}
+          {view === "tasks" ? <TaskListView /> : null}
+          {view === "calendar" ? <CalendarView /> : null}
           {view === "insights" ? <InsightsView /> : null}
         </section>
       </div>
@@ -246,9 +253,9 @@ function App() {
       <Toaster 
         position="top-center" 
         toastOptions={{
-          className: "border-4 border-black !bg-[#2ef2a6] !text-[#111111] !font-black !text-base shadow-[9px_9px_0_#111] rounded-[10px] dark:border-[#1e232a] dark:!bg-[#0a6b42] dark:!text-[#c8c3ba] dark:shadow-[6px_6px_0_#000] !p-4 !rounded-xl !border-4 !opacity-100",
+          className: "toast-success",
           error: {
-            className: "!bg-[#ff5a5f] border-4 border-black !text-[#111111] !font-black !text-base shadow-[9px_9px_0_#111] rounded-[10px] dark:border-[#1e232a] dark:!bg-[#3d1215] dark:!text-[#e8a0a2] dark:shadow-[6px_6px_0_#000]"
+            className: "toast-error"
           }
         }} 
       />
@@ -256,8 +263,8 @@ function App() {
         <button
           className={
             colorProfile === "minimal"
-              ? "fixed bottom-6 right-6 z-40 flex h-12 w-12 items-center justify-center rounded-full border border-stone-200 bg-white text-stone-700 shadow-md transition-all hover:bg-stone-50 hover:shadow-lg active:scale-95 dark:border-stone-800 dark:bg-[#12151a] dark:text-[#c8c3ba] dark:shadow-none animate-in fade-in zoom-in-75 duration-200"
-              : "fixed bottom-6 right-6 z-40 flex h-12 w-12 items-center justify-center rounded-full border-[3px] border-black bg-[#ffdc4a] text-black shadow-[4px_4px_0_#111] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0_#111] active:translate-y-0 active:shadow-[2px_2px_0_#111] dark:border-black dark:bg-[#21caff] dark:text-black dark:shadow-[3px_3px_0_#000] animate-in fade-in zoom-in-75 duration-200"
+              ? "scroll-btn-minimal"
+              : "scroll-btn"
           }
           onClick={handleScrollClick}
           title={scrollDirection === "up" ? "Scroll to top" : "Scroll to bottom"}

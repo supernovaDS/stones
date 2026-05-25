@@ -18,6 +18,7 @@ export function InsightsView() {
   } = useAppStore();
   const tasks = blocks.filter((block) => block.type === "task");
   const completed = tasks.filter((task) => task.metadata.completed);
+  const failed = tasks.filter((task) => task.metadata.failed);
   const streak = useMemo(() => calculateStreak(tasks), [tasks]);
   const completionRate = tasks.length ? Math.round((completed.length / tasks.length) * 100) : 0;
 
@@ -31,9 +32,10 @@ export function InsightsView() {
 
   return (
     <div className="bento-grid">
-      <div className="span-12 grid grid-cols-4 gap-4 max-lg:grid-cols-2 max-sm:grid-cols-1">
+      <div className="span-12 grid grid-cols-5 gap-4 max-xl:grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
         <Metric label="Tasks" value={tasks.length.toString()} color="blue" />
         <Metric label="Completed" value={completed.length.toString()} color="green" />
+        <Metric label="Failed" value={failed.length.toString()} color="red" />
         <Metric label="Rate" value={`${completionRate}%`} color="purple" />
         <Metric label="Streak" value={`${streak}d`} color="orange" />
       </div>

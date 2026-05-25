@@ -17,7 +17,7 @@ import { useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
 import { formatShortDate, toInputDate } from "../../utils/date";
 import { slugify, downloadText } from "../../utils/helpers";
-import { HeaderButton, IconButton, Checkbox } from "../ui";
+import { IconButton, Checkbox } from "../ui";
 
 // ── Task detail panel ───────────────────────────────────────────
 
@@ -90,80 +90,11 @@ export function TaskDetailPanel() {
           <button className="nb-button flex-1" onClick={() => void toggleFailTask(task.id)} type="button"><XCircle size={16} />{task.metadata.failed ? "Unfail Task" : "Fail Task"}</button>
         </div>
         {source?.type === "note" ? <div className="rounded-lg border-[3px] border-black bg-[#fff1b8] p-3 shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[3px_3px_0_#000]"><p className="mb-1 text-xs font-black uppercase tracking-wide text-stone-600 dark:text-[#7a7670]">Source note</p><p className="line-clamp-4 text-sm font-bold text-stone-700 dark:text-[#7a7670]">{source.content.text}</p></div> : null}
-        <button className="nb-button" onClick={() => { setActivePage(task.pageId); setSelectedTask(undefined); }} type="button"><Workflow size={16} />Open Page</button>
+        {task.pageId !== "system-calendar" && (
+          <button className="nb-button" onClick={() => { setActivePage(task.pageId); setSelectedTask(undefined); }} type="button"><Workflow size={16} />Open Page</button>
+        )}
       </div>
     </aside>
-  );
-}
-
-// ── Task modal ──────────────────────────────────────────────────
-
-function TaskImageAttachment({ imagePath, onRemove, onUpload, user }) {
-  const [previewUrl, setPreviewUrl] = useState("");
-  const [dragging, setDragging] = useState(false);
-
-  useEffect(() => {
-    let mounted = true;
-    if (!imagePath) {
-      setPreviewUrl("");
-      return undefined;
-    }
-    getTaskImageUrl(imagePath)
-      .then((url) => {
-        if (mounted) setPreviewUrl(url);
-      })
-      .catch(() => {
-        if (mounted) setPreviewUrl("");
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [imagePath]);
-
-  const handleFile = (file) => {
-    if (!file || !user?.id) return;
-    onUpload(file);
-  };
-
-  return (
-    <section className="grid gap-2">
-      <h4 className="text-sm font-black">Image</h4>
-      <label
-        className="nb-textarea grid min-h-28 cursor-pointer place-items-center overflow-hidden px-3 py-4 text-center text-sm font-bold"
-        onDragEnter={(event) => {
-          event.preventDefault();
-          setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDragOver={(event) => event.preventDefault()}
-        onDrop={(event) => {
-          event.preventDefault();
-          setDragging(false);
-          handleFile(event.dataTransfer.files?.[0]);
-        }}
-      >
-        {previewUrl ? (
-          <img alt="Task attachment" className="max-h-48 w-full rounded-md object-contain" src={previewUrl} />
-        ) : (
-          <span className={dragging ? "text-[#21caff]" : "text-stone-600 dark:text-[#7a7670]"}>
-            <Image className="mx-auto mb-2" size={24} />
-            {user?.id ? "Drop or choose an image" : "Sign in to upload images"}
-          </span>
-        )}
-        <input
-          accept="image/jpeg,image/png,image/webp,image/gif"
-          className="hidden"
-          disabled={!user?.id}
-          onChange={(event) => handleFile(event.target.files?.[0])}
-          type="file"
-        />
-      </label>
-      {imagePath ? (
-        <button className="nb-button danger justify-self-start" onClick={onRemove} type="button">
-          Remove image
-        </button>
-      ) : null}
-    </section>
   );
 }
 
@@ -222,9 +153,9 @@ export function TaskModal({ initialParams, onClose, onSubmit }) {
               <input type="time" className="nb-input px-3 py-2 font-bold" value={time} onChange={(e) => setTime(e.target.value)} />
             </label>
           </div>
-          <div className="mt-4 flex justify-end gap-2">
-            <button type="button" className="rich-button" onClick={onClose}>Cancel</button>
-            <button type="submit" className="nb-button action">Create Task</button>
+          <div className="mt-4 flex gap-2">
+            <button type="button" className="nb-button flex-1" onClick={onClose}>Cancel</button>
+            <button type="submit" className="nb-button action flex-1">Create Task</button>
           </div>
         </form>
       </div>

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
-import { blockMatchesSearch } from "../../utils/helpers";
 import { BlockCard } from "../blocks";
 import { clsx } from "clsx";
 import { Archive, ChevronDown, ChevronUp, ClipboardPaste, Plus, FileText, CheckSquare, List, Code2, Link, Image, Heading, X } from "lucide-react";
@@ -22,6 +21,20 @@ function WeatherWidget() {
         async (position) => {
           try {
             const { latitude, longitude } = position.coords;
+            
+            const cachedWeather = sessionStorage.getItem("stones_weather");
+            if (cachedWeather) {
+              try {
+                const parsed = JSON.parse(cachedWeather);
+                if (Date.now() - parsed.timestamp < 15 * 60 * 1000) {
+                  setWeather(parsed.data);
+                  return;
+                }
+              } catch (err) {
+                // Ignore parse error and fetch fresh
+              }
+            }
+
             const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code`);
             if (!res.ok) throw new Error("Network response was not ok");
             const data = await res.json();
@@ -36,7 +49,9 @@ function WeatherWidget() {
             else if (code >= 80 && code <= 82) { desc = "Showers"; icon = "🚿"; }
             else if (code >= 95 && code <= 99) { desc = "Storm"; icon = "⛈️"; }
             
-            setWeather({ temp, desc, icon });
+            const weatherData = { temp, desc, icon };
+            setWeather(weatherData);
+            sessionStorage.setItem("stones_weather", JSON.stringify({ data: weatherData, timestamp: Date.now() }));
           } catch (e) {
             setWeather({ temp: null, desc: "Unavailable", icon: "⚠️" });
           }
@@ -148,11 +163,11 @@ function AddBlockMenu({ pageId }) {
   return (
     <div className="relative flex flex-col items-center py-4">
       {isOpen && (
-        <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
+        <div className="fixed inset-0 z-50" onClick={() => setIsOpen(false)} />
       )}
 
       {isOpen && (
-        <div className="absolute bottom-20 z-20 grid w-64 grid-cols-2 gap-2 rounded-xl border-[3px] border-black bg-white p-3 shadow-[6px_6px_0_#111] animate-in fade-in slide-in-from-bottom-2 duration-150 dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[4px_4px_0_#000]">
+        <div className="absolute bottom-20 z-50 grid w-64 grid-cols-2 gap-2 rounded-xl border-[3px] border-black bg-white p-3 shadow-[6px_6px_0_#111] animate-in fade-in slide-in-from-bottom-2 duration-150 dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[4px_4px_0_#000]">
           <button
             className="nb-button col-span-2 flex items-center gap-3 p-2.5 transition hover:-translate-y-0.5 hover:shadow-[3px_3px_0_#111]"
             onClick={() => {
@@ -201,14 +216,13 @@ function AddBlockMenu({ pageId }) {
   );
 }
 
-export function WorkspaceView({ pageId, searchQuery }) {
+export function WorkspaceView({ pageId }) {
   const { blocks, pages, renamePage, clipboard, pasteBlock, clearClipboard } = useAppStore();
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
 
   const page = pages.find((item) => item.id === pageId);
   const pageBlocks = blocks
     .filter((block) => block.pageId === pageId)
-    .filter((block) => blockMatchesSearch(block, searchQuery))
     .sort((a, b) => a.order - b.order);
 
   const activeBlocks = pageBlocks.filter((block) => !block.metadata.archived);
@@ -223,9 +237,6 @@ export function WorkspaceView({ pageId, searchQuery }) {
           onChange={(event) => page && void renamePage(page.id, event.target.value)}
           value={page?.title ?? ""}
         />
-        <p className="mt-4 max-w-xl text-sm font-bold text-black/70">
-
-        </p>
       </section>
       <WeatherWidget />
       <section className="span-12 flex flex-col gap-8">
@@ -237,12 +248,12 @@ export function WorkspaceView({ pageId, searchQuery }) {
           ))
         ) : (
           <div className="bento-card bg-[#2ef2a6] p-8 text-center dark:bg-[#0a3d28]">
-            <p className="text-2xl font-black">No active blocks match this search.</p>
+            <p className="text-2xl font-black">No active blocks on this page.</p>
           </div>
         )}
         <AddBlockMenu pageId={pageId} />
 
-        {clipboard && (
+        {clipboard?.length > 0 && (
           <div className="bento-card flex items-center justify-between gap-4 border-[3px] border-dashed border-[#21caff] bg-[#e6fbff] p-4 dark:border-[#004d66] dark:bg-[#001a25]">
             <div className="flex items-center gap-3 min-w-0">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border-2 border-black bg-[#21caff] dark:border-[#1e232a] dark:bg-[#002535]">
@@ -251,12 +262,14 @@ export function WorkspaceView({ pageId, searchQuery }) {
               <div className="min-w-0">
                 <p className="text-sm font-black uppercase tracking-wide text-stone-600 dark:text-[#7a7670]">Clipboard</p>
                 <p className="truncate font-bold text-black dark:text-[#c8c3ba]">
-                  {clipboard.type === "task" ? clipboard.content.title : clipboard.type === "note" ? (clipboard.content.text?.slice(0, 50) || "Note") : `${clipboard.type.charAt(0).toUpperCase() + clipboard.type.slice(1)} block`}
+                  {clipboard.length === 1 
+                    ? (clipboard[0].type === "task" ? clipboard[0].content.title : clipboard[0].type === "note" ? (clipboard[0].content.text?.slice(0, 50) || "Note") : `${clipboard[0].type.charAt(0).toUpperCase() + clipboard[0].type.slice(1)} block`)
+                    : `${clipboard.length} blocks selected`}
                 </p>
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              {clipboard.pageId !== pageId && (
+              {!clipboard.every(b => b.pageId === pageId) && (
                 <button
                   className="nb-button primary flex items-center gap-2 px-4 py-2 text-sm font-black"
                   onClick={() => void pasteBlock(pageId)}
@@ -265,7 +278,7 @@ export function WorkspaceView({ pageId, searchQuery }) {
                   <ClipboardPaste size={16} /> Paste here
                 </button>
               )}
-              {clipboard.pageId === pageId && (
+              {clipboard.every(b => b.pageId === pageId) && (
                 <span className="text-xs font-black text-stone-400 dark:text-[#5a5650]">
                   Navigate to another page to paste
                 </span>

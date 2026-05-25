@@ -4,6 +4,11 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+.disable-transitions,
+.disable-transitions * {
+  transition: none !important;
+}
+
 @layer base {
   :root {
     color: #15120f;
@@ -155,8 +160,8 @@
     box-shadow: 4px 4px 0 var(--dark-shadow);
   }
 
-  .brutal-card,
-  .app-card {
+  .brutal-card {
+    position: relative;
     border: 4px solid #111111;
     border-radius: 8px;
     background: #fffdf6;
@@ -168,21 +173,25 @@
       border-color 180ms ease;
   }
 
-  .brutal-card:hover,
-  .app-card:hover {
+  .brutal-card::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    z-index: -1;
+  }
+
+  .brutal-card:hover {
     transform: translate(-2px, -2px);
     box-shadow: 10px 10px 0 #111111;
   }
 
-  .dark .brutal-card,
-  .dark .app-card {
+  .dark .brutal-card {
     border-color: var(--dark-border);
     background: var(--dark-surface);
     box-shadow: 4px 4px 0 var(--dark-shadow);
   }
 
-  .dark .brutal-card:hover,
-  .dark .app-card:hover {
+  .dark .brutal-card:hover {
     box-shadow: 6px 6px 0 var(--dark-shadow);
   }
 
@@ -199,6 +208,7 @@
   }
 
   .bento-card {
+    position: relative;
     min-width: 0;
     border: 4px solid #111111;
     border-radius: 8px;
@@ -208,7 +218,15 @@
       transform 150ms ease,
       box-shadow 150ms ease,
       background-color 180ms ease,
-      border-color 180ms ease;
+      border-color 180ms ease,
+      opacity 150ms ease;
+  }
+
+  .bento-card::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    z-index: -1;
   }
 
   .bento-card:hover {
@@ -224,6 +242,11 @@
 
   .dark .bento-card:hover {
     box-shadow: 6px 6px 0 var(--dark-shadow);
+  }
+
+  .bento-card.is-cut {
+    opacity: 0.55;
+    border-style: dashed !important;
   }
 
   .nb-button,
@@ -431,46 +454,6 @@
     box-shadow: 3px 3px 0 var(--dark-shadow);
   }
 
-  .page-chip {
-    border: 3px solid #111111;
-    border-radius: 8px;
-    background: #ffffff;
-    padding: 0.65rem 2.4rem 0.65rem 0.75rem;
-    font-size: 0.9rem;
-    font-weight: 750;
-    text-align: left;
-    box-shadow: 4px 4px 0 #111111;
-    transition:
-      transform 120ms ease,
-      box-shadow 120ms ease,
-      border-color 160ms ease,
-      background-color 160ms ease,
-      color 160ms ease;
-  }
-
-  .page-chip:hover,
-  .page-chip.active {
-    border-color: #111111;
-    background: #ffdc4a;
-    box-shadow: 4px 4px 0 #111111;
-    transform: translate(-1px, -1px);
-  }
-
-  .dark .page-chip {
-    border-color: var(--dark-border);
-    background: var(--dark-surface-raised);
-    color: var(--dark-text);
-    box-shadow: 3px 3px 0 var(--dark-shadow);
-  }
-
-  .dark .page-chip:hover,
-  .dark .page-chip.active {
-    border-color: var(--dark-border);
-    background: var(--dark-highlight);
-    color: #6fd09a;
-    box-shadow: 3px 3px 0 var(--dark-shadow);
-  }
-
   .priority-high {
     border-color: #111111;
     background: #ff5a5f !important;
@@ -537,46 +520,6 @@
     border-color: var(--dark-border);
     background: var(--dark-surface);
     box-shadow: 8px 8px 0 var(--dark-shadow);
-  }
-
-  .toast-shell {
-    position: fixed;
-    inset-inline: 0;
-    top: 1.25rem;
-    z-index: 60;
-    display: flex;
-    justify-content: center;
-    padding-inline: 1rem;
-    pointer-events: none;
-  }
-
-  .toast-popup {
-    max-width: min(92vw, 560px);
-    border: 4px solid #111111;
-    border-radius: 10px;
-    background: #2ef2a6;
-    padding: 1rem 1.25rem;
-    color: #111111;
-    font-size: 1rem;
-    font-weight: 900;
-    box-shadow: 9px 9px 0 #111111;
-    animation: toast-in 180ms ease-out;
-  }
-
-  .toast-popup.error {
-    background: #ff5a5f;
-  }
-
-  .dark .toast-popup {
-    border-color: var(--dark-border);
-    background: var(--dark-accent-green);
-    color: var(--dark-text);
-    box-shadow: 6px 6px 0 var(--dark-shadow);
-  }
-
-  .dark .toast-popup.error {
-    background: var(--dark-accent-red);
-    color: #e8a0a2;
   }
 
   .brand-word {
@@ -663,12 +606,6 @@
     box-shadow: 4px 4px 0 var(--dark-shadow);
   }
 
-  .rte-dropdown--list {
-    flex-direction: column;
-    gap: 2px;
-    min-width: 120px;
-  }
-
   .rte-swatch {
     width: 26px;
     height: 26px;
@@ -732,6 +669,23 @@
   .heatmap-grid {
     grid-template-columns: repeat(14, minmax(0, 1fr));
   }
+
+  /* ── Toaster and Scroll Buttons ────────────────────────────── */
+  .toast-success {
+    @apply border-4 border-black !bg-[#2ef2a6] !text-[#111111] !font-black !text-base shadow-[9px_9px_0_#111] rounded-[10px] dark:border-[#1e232a] dark:!bg-[#0a6b42] dark:!text-[#c8c3ba] dark:shadow-[6px_6px_0_#000] !p-4 !rounded-xl !border-4 !opacity-100;
+  }
+
+  .toast-error {
+    @apply !bg-[#ff5a5f] border-4 border-black !text-[#111111] !font-black !text-base shadow-[9px_9px_0_#111] rounded-[10px] dark:border-[#1e232a] dark:!bg-[#3d1215] dark:!text-[#e8a0a2] dark:shadow-[6px_6px_0_#000];
+  }
+
+  .scroll-btn-minimal {
+    @apply fixed bottom-6 right-6 z-40 flex h-12 w-12 items-center justify-center rounded-full border border-stone-200 bg-white text-stone-700 shadow-md transition-all hover:bg-stone-50 hover:shadow-lg active:scale-95 dark:border-stone-800 dark:bg-[#12151a] dark:text-[#c8c3ba] dark:shadow-none duration-200;
+  }
+
+  .scroll-btn {
+    @apply fixed bottom-6 right-6 z-40 flex h-12 w-12 items-center justify-center rounded-full border-[3px] border-black bg-[#ffdc4a] text-black shadow-[4px_4px_0_#111] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0_#111] active:translate-y-0 active:shadow-[2px_2px_0_#111] dark:border-black dark:bg-[#21caff] dark:text-black dark:shadow-[3px_3px_0_#000] duration-200;
+  }
 }
 
 @layer utilities {
@@ -747,20 +701,12 @@
     grid-column: span 7 / span 7;
   }
 
-  .span-6 {
-    grid-column: span 6 / span 6;
-  }
-
   .span-5 {
     grid-column: span 5 / span 5;
   }
 
   .span-4 {
     grid-column: span 4 / span 4;
-  }
-
-  .span-3 {
-    grid-column: span 3 / span 3;
   }
 
   /* ── Hamburger button (hidden on desktop) ──────────────────── */
@@ -776,6 +722,15 @@
   /* ── Desktop: header buttons show label ──────────────────── */
   .header-btn-label {
     display: inline;
+  }
+
+  /* Weather & clock default desktop styling to prevent overflow */
+  .weather-time {
+    font-size: 2.75rem !important;
+  }
+
+  .weather-temp {
+    font-size: 2.25rem !important;
   }
 
   /* ═══════════════════════════════════════════════════════════
@@ -794,10 +749,10 @@
   }
 
   /* ═══════════════════════════════════════════════════════════
-     BREAKPOINT: ≤ 1200px  (tablet landscape / small desktop)
+     BREAKPOINT: ≤ 1600px  (laptop / tablet landscape)
      ═══════════════════════════════════════════════════════════ */
-  @media (max-width: 1200px) {
-    /* Weather & clock smaller and stacked on small screens to prevent overflow */
+  @media (max-width: 1600px) {
+    /* Weather & clock smaller and stacked on standard laptops & small screens to prevent overflow */
     .weather-time {
       font-size: 2.25rem !important;
     }
@@ -1117,18 +1072,6 @@
 
   to {
     opacity: 1;
-  }
-}
-
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(-14px) scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
   }
 }
 
@@ -1810,33 +1753,6 @@
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.3),
     0 24px 64px rgba(0, 0, 0, 0.4);
-}
-
-.profile-minimal .toast-popup {
-  border: 1px solid #d1fae5;
-  border-radius: 0.5rem;
-  background: #ecfdf5;
-  color: #065f46;
-  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.12);
-}
-
-.profile-minimal .toast-popup.error {
-  border-color: #fecaca;
-  background: #fef2f2;
-  color: #991b1b;
-}
-
-.profile-minimal.dark .toast-popup {
-  border-color: rgba(5, 150, 105, 0.3);
-  background: rgba(5, 150, 105, 0.15);
-  color: #6ee7b7;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-}
-
-.profile-minimal.dark .toast-popup.error {
-  border-color: rgba(127, 29, 29, 0.4);
-  background: rgba(127, 29, 29, 0.2);
-  color: #fecaca;
 }
 
 .profile-minimal .brand-word {
@@ -2597,9 +2513,6 @@
   background: rgba(180, 83, 9, 0.15) !important;
   box-shadow: 0 0 0 1px #b45309 !important;
 }
-
-/* Import glow profile */
-@import "./glow-profile.css";
 
 .profile-minimal .priority-high,
 .profile-minimal .priority-medium,

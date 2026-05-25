@@ -1,14 +1,18 @@
 import {
   ArrowDown,
+  ArrowLeft,
+  ArrowRight,
   ArrowUp,
   Bell,
   Code2,
+  ImagePlus,
   Link,
   Maximize2,
   Minimize2,
   Move,
   PanelRight,
   Plus,
+  RotateCw,
   Scissors,
   Trash2,
   X,
@@ -42,9 +46,10 @@ export function BlockCard({ block }) {
 // ── Block shell ─────────────────────────────────────────────────
 
 function BlockShell({ block, label, children, actions }) {
-  const { deleteBlock, moveBlock, toggleArchiveBlock, cutBlock } = useAppStore();
+  const { deleteBlock, moveBlock, toggleArchiveBlock, cutBlock, clipboard } = useAppStore();
+  const isCut = clipboard?.some((b) => b.id === block.id);
   return (
-    <article className={clsx("bento-card h-full border-l-[10px] p-4", blockTypeRail[block.type] ?? "border-l-stone-400")}>
+    <article className={clsx("bento-card h-full border-l-[10px] p-4 transition-all duration-150", blockTypeRail[block.type] ?? "border-l-stone-400", isCut && "is-cut")}>
       <div className="mb-4 flex items-center justify-between gap-3">
         <p className="text-xs font-black uppercase tracking-wide text-stone-700 dark:text-[#7a7670]">{label}</p>
         <div className="block-actions flex flex-wrap gap-2">
@@ -285,10 +290,11 @@ function TitleBlock({ block }) {
 // ── Task block ──────────────────────────────────────────────────
 
 function TaskBlock({ block }) {
-  const { deleteBlock, setSelectedTask, toggleTask, toggleFailTask, updateTask, moveBlock, updateSubtask, deleteSubtask, addSubtask, toggleArchiveBlock, cutBlock } = useAppStore();
+  const { deleteBlock, setSelectedTask, toggleTask, toggleFailTask, updateTask, moveBlock, updateSubtask, deleteSubtask, addSubtask, toggleArchiveBlock, cutBlock, clipboard } = useAppStore();
   const blocked = useIsBlocked(block);
+  const isCut = clipboard?.some((b) => b.id === block.id);
   return (
-    <article className={clsx("bento-card h-full border-l-[10px] p-4", priorityRail[block.metadata.priority ?? "medium"])}>
+    <article className={clsx("bento-card h-full border-l-[10px] p-4 transition-all duration-150", priorityRail[block.metadata.priority ?? "medium"], isCut && "is-cut")}>
       <div className="grid gap-3">
         <div className="task-block-header flex items-start gap-3">
           <Checkbox checked={block.metadata.completed} onChange={() => void toggleTask(block.id)} className="mt-1" />
@@ -495,7 +501,57 @@ function ImageBlock({ block }) {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  const [rotation, setRotation] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(0);
   const startPos = useRef({ x: 0, y: 0 });
+  const fileInputRef = useRef(null);
+
+  // Normalize images for backward compatibility
+  const images = block.content.images || (block.content.dataUrl ? [{ dataUrl: block.content.dataUrl, name: block.content.name, caption: block.content.caption }] : []);
+  const currentImage = images[activeIndex] || {};
+
+  const resetView = () => {
+    setScale(1);
+    setPan({ x: 0, y: 0 });
+    setRotation(0);
+  };
+
+  const handlePrev = () => {
+    if (activeIndex > 0) {
+      setActiveIndex(activeIndex - 1);
+      resetView();
+    }
+  };
+
+  const handleNext = () => {
+    if (activeIndex < images.length - 1) {
+      setActiveIndex(activeIndex + 1);
+      resetView();
+    }
+  };
+
+  const handleAddImage = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const newImages = [...images, { dataUrl: ev.target.result, name: file.name, caption: "" }];
+      updateBlockContent(block.id, { images: newImages });
+      setActiveIndex(newImages.length - 1);
+      resetView();
+    };
+    reader.readAsDataURL(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleDeleteImage = () => {
+    const newImages = images.filter((_, i) => i !== activeIndex);
+    updateBlockContent(block.id, { images: newImages });
+    if (activeIndex >= newImages.length) {
+      setActiveIndex(Math.max(0, newImages.length - 1));
+    }
+    resetView();
+  };
 
   const handleWheel = (e) => {
     if (!e.shiftKey) return;
@@ -516,44 +572,91 @@ function ImageBlock({ block }) {
   const endDrag = () => setIsDragging(false);
 
   return (
-    <BlockShell block={block} label="Image">
-      <div className="mb-3 flex flex-wrap gap-2">
+    <BlockShell block={block} label="Image Gallery">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <button type="button" className="nb-button px-3" onClick={() => setScale((s) => Math.min(s + 0.2, 5))}><ZoomIn size={16} /> Zoom</button>
         <button type="button" className="nb-button px-3" onClick={() => setScale((s) => Math.max(s - 0.2, 0.5))}><ZoomOut size={16} /> Zoom</button>
-        <button type="button" className="nb-button px-3" onClick={() => { setScale(1); setPan({ x: 0, y: 0 }); }}><Move size={16} /> Reset</button>
+        <button type="button" className="nb-button px-3" onClick={() => setRotation((r) => r + 90)}><RotateCw size={16} /> Rotate</button>
+        <button type="button" className="nb-button px-3" onClick={resetView}><Move size={16} /> Reset</button>
         <button type="button" className="nb-button px-3 bg-[#21caff] dark:bg-[#002535]" onClick={() => setFullscreen(true)}><Maximize2 size={16} /> Fullscreen</button>
-        <span className="self-center text-xs font-bold text-stone-600 dark:text-[#7a7670]">Scroll with Shift to zoom. Drag to pan.</span>
+        
+        <div className="ml-auto flex items-center gap-2">
+          <button type="button" className="nb-button px-3 action" onClick={() => fileInputRef.current?.click()}>
+            <ImagePlus size={16} /> Add Image
+          </button>
+          <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleAddImage} />
+          {images.length > 0 && (
+            <button type="button" className="icon-button danger" onClick={handleDeleteImage} title="Delete this image">
+              <Trash2 size={16} />
+            </button>
+          )}
+        </div>
       </div>
-      {block.content.dataUrl ? (
+      
+      {images.length > 1 && (
+        <div className="mb-3 flex items-center gap-3 rounded-lg bg-stone-100 p-2 dark:bg-[#12151a]">
+          <button type="button" className="icon-button" onClick={handlePrev} disabled={activeIndex === 0}><ArrowLeft size={16} /></button>
+          <span className="flex-1 text-center text-sm font-black">Image {activeIndex + 1} of {images.length}</span>
+          <button type="button" className="icon-button" onClick={handleNext} disabled={activeIndex === images.length - 1}><ArrowRight size={16} /></button>
+        </div>
+      )}
+
+      {currentImage.dataUrl ? (
         <ImageCanvas
-          alt={block.content.caption ?? block.content.name ?? "Workspace image"}
-          dataUrl={block.content.dataUrl}
+          alt={currentImage.caption ?? currentImage.name ?? "Workspace image"}
+          dataUrl={currentImage.dataUrl}
           doDrag={doDrag}
           endDrag={endDrag}
           handleWheel={handleWheel}
           isDragging={isDragging}
           pan={pan}
+          rotation={rotation}
           scale={scale}
           startDrag={startDrag}
         />
-      ) : null}
-      <input className="nb-input mt-1 w-full px-3 py-2 text-sm" onChange={(event) => void updateBlockContent(block.id, { caption: event.target.value })} placeholder="Caption" value={block.content.caption ?? ""} />
-      {fullscreen && block.content.dataUrl ? (
+      ) : (
+        <div className="flex h-40 items-center justify-center rounded-lg border-[3px] border-dashed border-stone-300 dark:border-[#1e232a]">
+          <span className="text-sm font-bold text-stone-500 dark:text-[#7a7670]">No images in this block</span>
+        </div>
+      )}
+      <input 
+        className="nb-input mt-1 w-full px-3 py-2 text-sm" 
+        onChange={(event) => {
+          if (images.length === 0) return;
+          const newImages = [...images];
+          newImages[activeIndex] = { ...newImages[activeIndex], caption: event.target.value };
+          updateBlockContent(block.id, { images: newImages });
+        }} 
+        placeholder="Caption for current image" 
+        value={currentImage.caption ?? ""} 
+        disabled={images.length === 0}
+      />
+      {fullscreen && currentImage.dataUrl ? (
         <div className="modal-backdrop" onClick={() => setFullscreen(false)}>
           <div className="modal-card w-[min(96vw,1100px)] p-4" onClick={(event) => event.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <p className="text-lg font-black">{block.content.caption || block.content.name || "Image preview"}</p>
+            <div className="mb-3 flex flex-wrap items-center gap-3">
+              <p className="flex-1 min-w-[200px] text-lg font-black">{currentImage.caption || currentImage.name || "Image preview"}</p>
+              
+              {images.length > 1 && (
+                <div className="flex items-center gap-2">
+                  <button type="button" className="icon-button" onClick={handlePrev} disabled={activeIndex === 0}><ArrowLeft size={16} /></button>
+                  <span className="text-sm font-black w-16 text-center">{activeIndex + 1} / {images.length}</span>
+                  <button type="button" className="icon-button" onClick={handleNext} disabled={activeIndex === images.length - 1}><ArrowRight size={16} /></button>
+                </div>
+              )}
+
               <button className="icon-button" onClick={() => setFullscreen(false)} type="button"><Minimize2 size={16} /></button>
             </div>
             <ImageCanvas
-              alt={block.content.caption ?? block.content.name ?? "Workspace image"}
-              dataUrl={block.content.dataUrl}
+              alt={currentImage.caption ?? currentImage.name ?? "Workspace image"}
+              dataUrl={currentImage.dataUrl}
               doDrag={doDrag}
               endDrag={endDrag}
               fullscreen
               handleWheel={handleWheel}
               isDragging={isDragging}
               pan={pan}
+              rotation={rotation}
               scale={scale}
               startDrag={startDrag}
             />
@@ -566,7 +669,7 @@ function ImageBlock({ block }) {
 
 // ── Image canvas ────────────────────────────────────────────────
 
-function ImageCanvas({ alt, dataUrl, doDrag, endDrag, fullscreen, handleWheel, isDragging, pan, scale, startDrag }) {
+function ImageCanvas({ alt, dataUrl, doDrag, endDrag, fullscreen, handleWheel, isDragging, pan, rotation, scale, startDrag }) {
   return (
     <div
       className={clsx(
@@ -587,7 +690,7 @@ function ImageCanvas({ alt, dataUrl, doDrag, endDrag, fullscreen, handleWheel, i
         className="h-full w-full object-contain pointer-events-none select-none"
         src={dataUrl}
         style={{
-          transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
+          transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale}) rotate(${rotation}deg)`,
           transformOrigin: "center",
           transition: isDragging ? "none" : "transform 110ms ease"
         }}
@@ -598,9 +701,3 @@ function ImageCanvas({ alt, dataUrl, doDrag, endDrag, fullscreen, handleWheel, i
     </div>
   );
 }
-
-// ── Markdown preview ────────────────────────────────────────────
-
-
-
-

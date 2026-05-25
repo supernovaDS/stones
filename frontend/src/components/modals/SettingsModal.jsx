@@ -1,4 +1,4 @@
-import { X, Check, LogOut, User } from "lucide-react";
+import { X, Check, LogOut, User, Moon, Sun } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useAppStore } from "../../store/useAppStore";
 import { clsx } from "clsx";
@@ -29,7 +29,7 @@ const PROFILES = [
 ];
 
 export function SettingsModal() {
-  const { colorProfile, setColorProfile, setSettingsOpen } = useAppStore();
+  const { colorProfile, setColorProfile, theme, setTheme, setSettingsOpen } = useAppStore();
   const { user, signOut } = useAuth();
 
   return (
@@ -106,6 +106,26 @@ export function SettingsModal() {
               </button>
             );
           })}
+        </div>
+
+        <div className="mt-8">
+          <p className="mb-4 text-sm font-black uppercase tracking-wide text-stone-700 dark:text-[#7a7670]">
+            Appearance
+          </p>
+          <div className="flex items-center justify-between rounded-xl border-[3px] border-[#111111] bg-white p-4 shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[3px_3px_0_#000]">
+            <div>
+              <p className="text-base font-black">Theme Mode</p>
+              <p className="text-xs font-bold text-stone-500 dark:text-[#7a7670]">Toggle light or dark interface</p>
+            </div>
+            <button
+              className="nb-button px-4 py-2"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              type="button"
+            >
+              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+              {theme === "dark" ? "Light Mode" : "Dark Mode"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
