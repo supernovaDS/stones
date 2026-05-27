@@ -11,7 +11,7 @@ import { AuthPage } from "./components/auth/AuthPage";
 import { Sidebar } from "./components/layout/Sidebar";
 import { Topbar } from "./components/layout/Topbar";
 import { WorkspaceView, TaskListView, CalendarView, InsightsView } from "./components/views";
-import { TaskDetailPanel, TaskModal, CommandPalette, SettingsModal } from "./components/modals";
+import { TaskDetailPanel, TaskModal, CommandPalette, SettingsModal, RecurringTasksModal } from "./components/modals";
 
 function App() {
   const auth = useAuth();
@@ -31,6 +31,8 @@ function App() {
     setNotification,
     taskModalParams,
     settingsOpen,
+    recurringTasksOpen,
+    setRecurringTasksOpen,
     theme,
     undoLastChange,
     view
@@ -250,6 +252,7 @@ function App() {
       ) : null}
       {commandOpen ? <CommandPalette onClose={() => setCommandOpen(false)} /> : null}
       {settingsOpen ? <SettingsModal /> : null}
+      {recurringTasksOpen ? <RecurringTasksModal onClose={() => setRecurringTasksOpen(false)} /> : null}
       <Toaster 
         position="top-center" 
         toastOptions={{

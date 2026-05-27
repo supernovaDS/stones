@@ -106,6 +106,10 @@ export const useAppStore = create((set, get) => ({
   colorProfile: defaultColorProfile(),
 
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
+  recurringTasksOpen: false,
+  editingRepeatedTaskId: null,
+  setRecurringTasksOpen: (recurringTasksOpen) => set({ recurringTasksOpen }),
+  setEditingRepeatedTaskId: (editingRepeatedTaskId) => set({ editingRepeatedTaskId }),
 
   initialize: async ({ skipSeed = false } = {}) => {
     set({ loading: true, error: undefined });
@@ -472,12 +476,14 @@ export const useAppStore = create((set, get) => ({
       code: "// Write code here"
     }),
 
-  addLinkBlock: async (pageId = get().activePageId) =>
-    addBlock(get, set, pageId, "link", {
+  addLinkBlock: async (pageId = get().activePageId) => {
+    const linkId = createId("link-item");
+    return addBlock(get, set, pageId, "link", {
       title: "Useful link",
       url: "https://example.com",
-      description: ""
-    }),
+      links: [{ id: linkId, title: "Useful link", url: "https://example.com" }]
+    });
+  },
 
   addImageBlock: async (file, pageId = get().activePageId) => {
     if (!file || !pageId) return;
@@ -612,6 +618,13 @@ export const useAppStore = create((set, get) => ({
     get().updateTask(taskId, { dependencyIds }),
 
   toggleTask: async (blockId) => {
+    if (blockId.startsWith("virtual_")) {
+      const parts = blockId.split("_");
+      const templateId = parts[1];
+      const dateStr = parts[2];
+      await get().toggleRepeatedTaskInstance(templateId, dateStr);
+      return;
+    }
     const updatedAt = nowIso();
     const block = get().blocks.find((item) => item.id === blockId);
     if (!block || block.type !== "task") return;
@@ -736,6 +749,132 @@ export const useAppStore = create((set, get) => ({
       )
     }));
     get().setNotification(archived ? "Block archived" : "Block unarchived");
+  },
+
+  addRepeatedTask: async (taskData) => {
+    pushUndoSnapshot(get, set, "create repeated task");
+    const createdAt = nowIso();
+    const newTemplate = {
+      id: createId("block"),
+      pageId: "system-recurring-templates",
+      type: "recurring_template",
+      order: 0,
+      content: {
+        title: taskData.title,
+        notes: taskData.notes || ""
+      },
+      metadata: {
+        priority: taskData.priority || "medium",
+        recurrence: taskData.recurrence || "daily",
+        customInterval: taskData.customInterval ? Number(taskData.customInterval) : undefined,
+        customUnit: taskData.customUnit || undefined,
+        startDate: taskData.startDate || todayIso(),
+        deadlineTime: taskData.deadlineTime || undefined,
+        createdAt,
+        updatedAt: createdAt
+      }
+    };
+    await db.blocks.add(newTemplate);
+    await enqueueMutation("block", newTemplate.id, "upsert", newTemplate);
+    set((current) => ({ blocks: sortBlocks([...current.blocks, newTemplate]) }));
+    get().setNotification("Repeating task created");
+  },
+
+  updateRepeatedTask: async (id, taskData) => {
+    const template = get().blocks.find(b => b.id === id);
+    if (!template) return;
+    pushUndoSnapshot(get, set, "update repeated task");
+    const updatedAt = nowIso();
+    const updatedTemplate = {
+      ...template,
+      content: {
+        ...template.content,
+        title: taskData.title,
+        notes: taskData.notes || ""
+      },
+      metadata: {
+        ...template.metadata,
+        priority: taskData.priority || "medium",
+        recurrence: taskData.recurrence || "daily",
+        customInterval: taskData.customInterval ? Number(taskData.customInterval) : undefined,
+        customUnit: taskData.customUnit || undefined,
+        startDate: taskData.startDate || template.metadata.startDate,
+        deadlineTime: taskData.deadlineTime || undefined,
+        updatedAt
+      }
+    };
+    await db.blocks.put(updatedTemplate);
+    await enqueueMutation("block", id, "upsert", updatedTemplate);
+    set((current) => ({
+      blocks: sortBlocks(current.blocks.map(b => b.id === id ? updatedTemplate : b))
+    }));
+    get().setNotification("Repeating task updated");
+  },
+
+  deleteRepeatedTask: async (id) => {
+    const template = get().blocks.find(b => b.id === id);
+    if (!template) return;
+    pushUndoSnapshot(get, set, "delete repeated task");
+    
+    // Find all completions associated with this template
+    const completionsToDelete = get().blocks.filter(
+      b => b.type === "completed_repeat" && b.content.templateId === id
+    );
+    
+    await db.transaction("rw", db.blocks, async () => {
+      await db.blocks.delete(id);
+      for (const comp of completionsToDelete) {
+        await db.blocks.delete(comp.id);
+      }
+    });
+
+    await enqueueMutation("block", id, "delete", template);
+    for (const comp of completionsToDelete) {
+      await enqueueMutation("block", comp.id, "delete", comp);
+    }
+
+    const completionIds = new Set(completionsToDelete.map(c => c.id));
+    set((current) => ({
+      blocks: sortBlocks(current.blocks.filter(b => b.id !== id && !completionIds.has(b.id)))
+    }));
+    get().setNotification("Repeating task deleted");
+  },
+
+  toggleRepeatedTaskInstance: async (templateId, dateStr) => {
+    const compId = `comp_${templateId}_${dateStr}`;
+    const existing = get().blocks.find(b => b.id === compId);
+    
+    pushUndoSnapshot(get, set, "toggle repeated task instance");
+    
+    if (existing) {
+      await db.blocks.delete(compId);
+      await enqueueMutation("block", compId, "delete", existing);
+      set((current) => ({
+        blocks: sortBlocks(current.blocks.filter(b => b.id !== compId))
+      }));
+    } else {
+      const createdAt = nowIso();
+      const newCompletion = {
+        id: compId,
+        pageId: "system-recurring-completions",
+        type: "completed_repeat",
+        order: 0,
+        content: {
+          templateId
+        },
+        metadata: {
+          completedDate: dateStr,
+          completedAt: createdAt,
+          createdAt,
+          updatedAt: createdAt
+        }
+      };
+      await db.blocks.add(newCompletion);
+      await enqueueMutation("block", compId, "upsert", newCompletion);
+      set((current) => ({
+        blocks: sortBlocks([...current.blocks, newCompletion])
+      }));
+    }
   },
 
   moveBlock: async (blockId, direction) => {
@@ -988,7 +1127,11 @@ export const useAppStore = create((set, get) => ({
         );
       }
       if (block.type === "link") {
-        lines.push(`[${block.content.title}](${block.content.url})`, "");
+        const links = block.content.links || [{ title: block.content.title || "Useful link", url: block.content.url || "" }];
+        for (const l of links) {
+          lines.push(`[${l.title || "Link"}](${l.url || ""})`);
+        }
+        lines.push("");
       }
       if (block.type === "image") {
         lines.push(`![${block.content.caption ?? block.content.name ?? "image"}]()`, "");

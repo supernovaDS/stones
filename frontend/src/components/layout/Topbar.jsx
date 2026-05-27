@@ -2,6 +2,7 @@ import {
   Command,
   Menu,
   RotateCcw,
+  Repeat,
 } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { viewTitle } from "../../utils/helpers";
@@ -12,7 +13,8 @@ export function Topbar({ onCommandOpen, onMenuToggle, activePage, view, syncStat
 
   const {
     undoLastChange,
-    undoStack
+    undoStack,
+    setRecurringTasksOpen
   } = useAppStore();
 
   return (
@@ -42,6 +44,11 @@ export function Topbar({ onCommandOpen, onMenuToggle, activePage, view, syncStat
       </div>
       <div className="topbar-actions flex flex-wrap items-center gap-2">
         <SyncStatusIndicator status={syncStatus} onSync={() => void syncStatus?.syncNow?.()} />
+        <HeaderButton
+          icon={Repeat}
+          label="Recurring Tasks"
+          onClick={() => setRecurringTasksOpen(true)}
+        />
         <HeaderButton icon={Command} label="Menu" onClick={onCommandOpen} />
         <HeaderButton
           disabled={!undoStack.length}

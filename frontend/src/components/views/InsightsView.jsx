@@ -5,6 +5,7 @@ import { useAppStore } from "../../store/useAppStore";
 import { formatShortDate, toLocalDateString } from "../../utils/date";
 import { calculateStreak, heatColor, getCalendarDays, shiftMonth } from "../../utils/helpers";
 import { HeaderButton, IconButton, Metric } from "../ui";
+import { getHistoryVirtualTasks } from "../../utils/recurrence";
 
 export function InsightsView() {
   const {
@@ -16,8 +17,15 @@ export function InsightsView() {
     undoLastChange,
     undoStack
   } = useAppStore();
-  const tasks = blocks.filter((block) => block.type === "task");
-  const completed = tasks.filter((task) => task.metadata.completed);
+
+  const historyVirtualTasks = useMemo(() => getHistoryVirtualTasks(blocks, 30), [blocks]);
+
+  const tasks = useMemo(() => {
+    const realTasks = blocks.filter((block) => block.type === "task");
+    return [...realTasks, ...historyVirtualTasks];
+  }, [blocks, historyVirtualTasks]);
+
+  const completed = useMemo(() => tasks.filter((task) => task.metadata.completed), [tasks]);
   const failed = tasks.filter((task) => task.metadata.failed);
   const streak = useMemo(() => calculateStreak(tasks), [tasks]);
   const completionRate = tasks.length ? Math.round((completed.length / tasks.length) * 100) : 0;
