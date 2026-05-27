@@ -49,7 +49,7 @@ function BlockShell({ block, label, children, actions }) {
   const { deleteBlock, moveBlock, toggleArchiveBlock, cutBlock, clipboard } = useAppStore();
   const isCut = clipboard?.some((b) => b.id === block.id);
   return (
-    <article className={clsx("bento-card h-full border-l-[10px] p-4 transition-all duration-150", blockTypeRail[block.type] ?? "border-l-stone-400", isCut && "is-cut")}>
+    <article className={clsx("bento-card block-shell h-full border-l-[10px] p-4 transition-all duration-150", `block-type-${block.type}`, blockTypeRail[block.type] ?? "border-l-stone-400", isCut && "is-cut")}>
       <div className="mb-4 flex items-center justify-between gap-3">
         <p className="text-xs font-black uppercase tracking-wide text-stone-700 dark:text-[#7a7670]">{label}</p>
         <div className="block-actions flex flex-wrap gap-2">
@@ -149,6 +149,14 @@ function RichToolbar({ editorRef }) {
         U
       </button>
 
+      {/* Link */}
+      <button className="rich-button" onMouseDown={(e) => e.preventDefault()} onClick={() => {
+        const url = window.prompt("Enter link URL:", "https://");
+        if (url) exec("createLink", url);
+      }} type="button" title="Insert link">
+        <Link size={14} strokeWidth={2.5} />
+      </button>
+
       <span className="rte-sep" />
 
       {/* Align */}
@@ -204,6 +212,7 @@ function RichToolbar({ editorRef }) {
 function NoteBlock({ block }) {
   const { blocks, setSelectedTask, updateBlockContent } = useAppStore();
   const editorRef = useRef(null);
+  const [activeLink, setActiveLink] = useState(null);
   const linkedTasks = blocks.filter((task) => task.type === "task" && task.sourceBlockId === block.id);
   const isInitializing = useRef(false);
 
@@ -242,14 +251,57 @@ function NoteBlock({ block }) {
       label="Note"
     >
       <RichToolbar editorRef={editorRef} />
-      <div
-        className="nb-textarea rte-editor min-h-36 w-full px-4 py-3 text-base leading-7"
-        contentEditable
-        onInput={handleInput}
-        ref={editorRef}
-        suppressContentEditableWarning
-        data-placeholder="Write a note, meeting thought, or rough plan..."
-      />
+      <div className="relative">
+        <div
+          className="nb-textarea rte-editor min-h-36 w-full px-4 py-3 text-base leading-7"
+          contentEditable
+          onInput={handleInput}
+          onClick={(e) => {
+            if (e.target.tagName === "A") {
+              const editorRect = editorRef.current.getBoundingClientRect();
+              const linkRect = e.target.getBoundingClientRect();
+              setActiveLink({
+                url: e.target.href,
+                top: linkRect.bottom - editorRect.top + 8,
+                left: Math.max(0, linkRect.left - editorRect.left),
+              });
+            } else {
+              setActiveLink(null);
+            }
+          }}
+          onMouseOver={(e) => {
+            if (e.target.tagName === "A") {
+              const editorRect = editorRef.current.getBoundingClientRect();
+              const linkRect = e.target.getBoundingClientRect();
+              setActiveLink({
+                url: e.target.href,
+                top: linkRect.bottom - editorRect.top + 8,
+                left: Math.max(0, linkRect.left - editorRect.left),
+              });
+            }
+          }}
+          ref={editorRef}
+          suppressContentEditableWarning
+          data-placeholder="Write a note, meeting thought, or rough plan..."
+        />
+        {activeLink && (
+          <div
+            className="absolute z-10 flex items-center gap-3 rounded-md border-[2px] border-black bg-white px-3 py-2 shadow-[3px_3px_0_#111] dark:border-[#1e232a] dark:bg-[#0c0e11] dark:shadow-[2px_2px_0_#000]"
+            style={{ top: activeLink.top, left: activeLink.left }}
+          >
+            <span className="max-w-[200px] truncate text-xs text-stone-500 dark:text-[#7a7670]">{activeLink.url}</span>
+            <a
+              className="text-xs font-black text-blue-500 hover:underline"
+              href={activeLink.url}
+              onClick={() => setActiveLink(null)}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              Go to link
+            </a>
+          </div>
+        )}
+      </div>
       {linkedTasks.length ? (
         <div className="mt-4 rounded-lg border-[3px] border-black bg-[#f1f5ff] p-3 shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[3px_3px_0_#000]">
           <p className="mb-2 text-xs font-black uppercase tracking-wide text-stone-700 dark:text-[#7a7670]">Linked tasks</p>
@@ -294,7 +346,7 @@ function TaskBlock({ block }) {
   const blocked = useIsBlocked(block);
   const isCut = clipboard?.some((b) => b.id === block.id);
   return (
-    <article className={clsx("bento-card h-full border-l-[10px] p-4 transition-all duration-150", priorityRail[block.metadata.priority ?? "medium"], isCut && "is-cut")}>
+    <article className={clsx("bento-card block-shell block-type-task h-full border-l-[10px] p-4 transition-all duration-150", priorityRail[block.metadata.priority ?? "medium"], isCut && "is-cut")}>
       <div className="grid gap-3">
         <div className="task-block-header flex items-start gap-3">
           <Checkbox checked={block.metadata.completed} onChange={() => void toggleTask(block.id)} className="mt-1" />
@@ -470,24 +522,83 @@ function CodeBlock({ block }) {
 
 function LinkBlock({ block }) {
   const { updateBlockContent } = useAppStore();
-  const embedUrl = getEmbedUrl(block.content.url);
+  const rawLinks = block.content.links || [];
+  const links = rawLinks.length > 0
+    ? rawLinks
+    : [{ id: "legacy-link", title: block.content.title || "Useful link", url: block.content.url || "https://example.com" }];
+
+  const updateLinks = (nextLinks) => {
+    const firstLink = nextLinks[0] || {};
+    void updateBlockContent(block.id, {
+      links: nextLinks,
+      title: firstLink.title || "",
+      url: firstLink.url || ""
+    });
+  };
 
   return (
-    <BlockShell block={block} label="External link">
-      <div className="grid gap-2">
-        <input className="bg-transparent text-xl font-black outline-none" onChange={(event) => void updateBlockContent(block.id, { title: event.target.value })} value={block.content.title ?? ""} />
-        <input className="nb-input px-3 py-2 text-sm" onChange={(event) => void updateBlockContent(block.id, { url: event.target.value })} value={block.content.url ?? ""} />
-        <a className="nb-button primary justify-self-start" href={block.content.url} rel="noreferrer" target="_blank">
-          <Link size={16} /> Open link
-        </a>
-        {embedUrl ? (
-          <iframe
-            className="mt-2 w-full max-w-[560px] aspect-video h-auto rounded-lg border-[3px] border-black shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:shadow-[3px_3px_0_#000]"
-            src={embedUrl}
-            allow="autoplay; encrypted-media; picture-in-picture"
-            allowFullScreen
-          />
-        ) : null}
+    <BlockShell block={block} label="External links">
+      <div className="grid gap-4">
+        {links.map((link, index) => {
+          const embedUrl = getEmbedUrl(link.url);
+          return (
+            <div
+              key={link.id || index}
+              className="link-block-item flex flex-col gap-2 rounded-lg border-2 border-black bg-stone-50 p-3 shadow-[2px_2px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[1px_1px_0_#000]"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  className="min-w-0 flex-1 bg-transparent text-lg font-black outline-none"
+                  onChange={(event) => updateLinks(links.map((item, i) => i === index ? { ...item, title: event.target.value } : item))}
+                  placeholder="Link title..."
+                  value={link.title ?? ""}
+                />
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <a
+                    className="nb-button primary flex h-9 items-center justify-center px-3 text-xs"
+                    href={link.url}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    <Link size={12} /> Open
+                  </a>
+                  {links.length > 1 && (
+                    <IconButton
+                      danger
+                      icon={Trash2}
+                      onClick={() => updateLinks(links.filter((_, i) => i !== index))}
+                      title="Remove link"
+                    />
+                  )}
+                </div>
+              </div>
+              <input
+                className="nb-input h-9 px-3 text-xs"
+                onChange={(event) => updateLinks(links.map((item, i) => i === index ? { ...item, url: event.target.value } : item))}
+                placeholder="URL (https://...)"
+                value={link.url ?? ""}
+              />
+              {embedUrl ? (
+                <iframe
+                  className="mt-2 w-full max-w-[560px] aspect-video h-auto rounded-lg border-[3px] border-black shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:shadow-[3px_3px_0_#000]"
+                  src={embedUrl}
+                  allow="autoplay; encrypted-media; picture-in-picture"
+                  allowFullScreen
+                />
+              ) : null}
+            </div>
+          );
+        })}
+        <button
+          className="nb-button action justify-self-start px-3 py-2 text-xs"
+          onClick={() => {
+            const newId = crypto.randomUUID ? crypto.randomUUID() : `link_${Date.now()}`;
+            updateLinks([...links, { id: newId, title: "New link", url: "https://" }]);
+          }}
+          type="button"
+        >
+          <Plus size={14} /> Add Link
+        </button>
       </div>
     </BlockShell>
   );
@@ -573,7 +684,7 @@ function ImageBlock({ block }) {
 
   return (
     <BlockShell block={block} label="Image Gallery">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div className="image-block-toolbar mb-3 flex flex-wrap items-center gap-2">
         <button type="button" className="nb-button px-3" onClick={() => setScale((s) => Math.min(s + 0.2, 5))}><ZoomIn size={16} /> Zoom</button>
         <button type="button" className="nb-button px-3" onClick={() => setScale((s) => Math.max(s - 0.2, 0.5))}><ZoomOut size={16} /> Zoom</button>
         <button type="button" className="nb-button px-3" onClick={() => setRotation((r) => r + 90)}><RotateCw size={16} /> Rotate</button>

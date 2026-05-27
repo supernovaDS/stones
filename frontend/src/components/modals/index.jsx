@@ -228,3 +228,4 @@ function CommandGroup({ children, label }) {
 }
 
 export { SettingsModal } from "./SettingsModal";
+export { RecurringTasksModal } from "./RecurringTasksModal";

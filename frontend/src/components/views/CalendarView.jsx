@@ -6,15 +6,32 @@ import { formatShortDate, todayIso, toDateInput, toLocalDateString } from "../..
 import { shiftMonth, getCalendarDays, priorityDot } from "../../utils/helpers";
 import { Checkbox } from "../ui";
 import { priorityRail } from "../../utils/constants";
+import { getVirtualTasksForDate } from "../../utils/recurrence";
 
 export function CalendarView() {
-  const { blocks, openTaskModal, setSelectedTask, toggleTask, toggleFailTask } = useAppStore();
+  const {
+    blocks,
+    openTaskModal,
+    setSelectedTask,
+    toggleTask,
+    toggleFailTask,
+    setRecurringTasksOpen,
+    setEditingRepeatedTaskId
+  } = useAppStore();
   const [cursor, setCursor] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(todayIso());
   const tasks = blocks.filter((block) => block.type === "task");
   const days = getCalendarDays(cursor);
   const monthLabel = cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-  const selectedTasks = tasks.filter((task) => toDateInput(task.metadata.deadline) === selectedDay);
+
+  // Compute virtual tasks for all calendar days
+  const virtualTasks = days.flatMap((day) => {
+    const key = toLocalDateString(day);
+    return getVirtualTasksForDate(key, blocks);
+  });
+
+  const allCalendarTasks = [...tasks, ...virtualTasks];
+  const selectedTasks = allCalendarTasks.filter((task) => toDateInput(task.metadata.deadline) === selectedDay);
 
   return (
     <div className="bento-grid">
@@ -27,7 +44,7 @@ export function CalendarView() {
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => <div className="text-center text-xs font-black uppercase text-stone-700 dark:text-[#7a7670]" key={day}>{day}</div>)}
         {days.map((day) => {
           const key = toLocalDateString(day);
-          const dayTasks = tasks.filter((task) => toDateInput(task.metadata.deadline) === key);
+          const dayTasks = allCalendarTasks.filter((task) => toDateInput(task.metadata.deadline) === key);
           const inMonth = day.getMonth() === cursor.getMonth();
           const isToday = key === todayIso();
           const isPast = key < todayIso();
@@ -81,11 +98,13 @@ export function CalendarView() {
       </section>
       <aside className="bento-card span-4 bg-white p-4 text-black dark:bg-[#12151a] dark:text-[#c8c3ba]">
         <h3 className="mb-3 text-2xl font-black">{formatShortDate(selectedDay)}</h3>
-        {selectedDay >= todayIso() && (
-          <button className="nb-button action mb-4" onClick={() => void openTaskModal({ deadline: selectedDay, pageId: "system-calendar" })} type="button">
-            <Plus size={16} /> Add task for day
-          </button>
-        )}
+        <div className="flex flex-col gap-2 mb-4">
+          {selectedDay >= todayIso() && (
+            <button className="nb-button action w-full" onClick={() => void openTaskModal({ deadline: selectedDay, pageId: "system-calendar" })} type="button">
+              <Plus size={16} /> Add task for day
+            </button>
+          )}
+        </div>
         <div className="grid gap-2">
           {selectedTasks.length ? selectedTasks.map((task) => {
             const isCompleted = task.metadata.completed;
@@ -110,7 +129,14 @@ export function CalendarView() {
                   />
                   <button 
                     className="min-w-0 flex-1 text-left" 
-                    onClick={() => setSelectedTask(task.id)} 
+                    onClick={() => {
+                      if (task.isVirtual) {
+                        setEditingRepeatedTaskId(task.templateId);
+                        setRecurringTasksOpen(true);
+                      } else {
+                        setSelectedTask(task.id);
+                      }
+                    }} 
                     type="button"
                   >
                     <span 
@@ -121,6 +147,7 @@ export function CalendarView() {
                       )}
                     >
                       {task.content.title || "Untitled task"}
+                      {task.isVirtual && " (Repeating)"}
                     </span>
                     <span className="text-xs text-stone-500 dark:text-[#7a7670] capitalize">
                       {task.metadata.priority ?? "medium"} Priority
@@ -128,19 +155,21 @@ export function CalendarView() {
                   </button>
                 </div>
                 <div className="flex flex-shrink-0 items-center gap-1">
-                  <button 
-                    className={clsx(
-                      "icon-button !h-8 !w-8", 
-                      isFailed 
-                        ? "!bg-[#ff5a5f] !text-black border-black dark:!bg-[#5c1a1d] dark:!text-[#e8a0a2] dark:border-[#1e232a]" 
-                        : "bg-white text-stone-600 dark:bg-[#12151a] dark:text-[#7a7670]"
-                    )} 
-                    onClick={() => void toggleFailTask(task.id)} 
-                    title={isFailed ? "Unfail task" : "Fail task"} 
-                    type="button"
-                  >
-                    <XCircle size={14} />
-                  </button>
+                  {!task.isVirtual && (
+                    <button 
+                      className={clsx(
+                        "icon-button !h-8 !w-8", 
+                        isFailed 
+                          ? "!bg-[#ff5a5f] !text-black border-black dark:!bg-[#5c1a1d] dark:!text-[#e8a0a2] dark:border-[#1e232a]" 
+                          : "bg-white text-stone-600 dark:bg-[#12151a] dark:text-[#7a7670]"
+                      )} 
+                      onClick={() => void toggleFailTask(task.id)} 
+                      title={isFailed ? "Unfail task" : "Fail task"} 
+                      type="button"
+                    >
+                      <XCircle size={14} />
+                    </button>
+                  )}
                 </div>
               </div>
             );

@@ -6,25 +6,47 @@ import { formatShortDate, isOverdue, isToday } from "../../utils/date";
 import { priorityRail, priorityClasses } from "../../utils/constants";
 import { taskMatchesFilter, compareTasksByDate, groupTasks } from "../../utils/helpers";
 import { InsightCard, Checkbox } from "../ui";
+import { getVirtualTasksForFilter, getHistoryVirtualTasks } from "../../utils/recurrence";
 
 export function TaskListView() {
-  const { blocks } = useAppStore();
+  const { blocks, setRecurringTasksOpen, setEditingRepeatedTaskId } = useAppStore();
   const [filter, setFilter] = useState("open");
   const [groupMode, setGroupMode] = useState("none");
   const allTasks = blocks.filter((b) => b.type === "task");
-  const tasks = allTasks
-    .filter((t) => taskMatchesFilter(t, filter))
-    .sort(compareTasksByDate);
+
+  const virtualTasks = getVirtualTasksForFilter(filter, blocks);
+  const tasks = [
+    ...allTasks.filter((t) => taskMatchesFilter(t, filter)),
+    ...virtualTasks
+  ].sort(compareTasksByDate);
+
   const groups = groupTasks(tasks, groupMode);
-  const completedCount = allTasks.filter((t) => t.metadata.completed).length;
-  const highCount = allTasks.filter((t) => t.metadata.priority === "high" && !t.metadata.completed && !t.metadata.failed).length;
-  const overdueCount = allTasks.filter((t) => !t.metadata.completed && !t.metadata.failed && isOverdue(t.metadata.deadline)).length;
-  const todayCount = allTasks.filter((t) => !t.metadata.completed && !t.metadata.failed && isToday(t.metadata.deadline)).length;
+
+  const historyVirtual = getHistoryVirtualTasks(blocks, 30);
+  const virtualHigh = getVirtualTasksForFilter("high", blocks);
+  const virtualToday = getVirtualTasksForFilter("today", blocks).filter((t) => !t.metadata.completed);
+  const virtualOverdue = getVirtualTasksForFilter("overdue", blocks);
+
+  const totalTasksCount = allTasks.length + historyVirtual.length;
+  const totalCompletedCount =
+    allTasks.filter((t) => t.metadata.completed).length +
+    historyVirtual.filter((t) => t.metadata.completed).length;
+  const completionPercent = totalTasksCount ? Math.round((totalCompletedCount / totalTasksCount) * 100) : 0;
+
+  const highCount =
+    allTasks.filter((t) => t.metadata.priority === "high" && !t.metadata.completed && !t.metadata.failed).length +
+    virtualHigh.length;
+  const overdueCount =
+    allTasks.filter((t) => !t.metadata.completed && !t.metadata.failed && isOverdue(t.metadata.deadline)).length +
+    virtualOverdue.length;
+  const todayCount =
+    allTasks.filter((t) => !t.metadata.completed && !t.metadata.failed && isToday(t.metadata.deadline)).length +
+    virtualToday.length;
 
   return (
     <div className="bento-grid">
       <section className="span-12 grid grid-cols-4 gap-4 max-lg:grid-cols-2">
-        <InsightCard color="green" label="Completion" value={`${Math.round((completedCount / Math.max(1, allTasks.length)) * 100)}%`} />
+        <InsightCard color="green" label="Completion" value={`${completionPercent}%`} />
         <InsightCard color="orange" label="High Priority" value={highCount.toString()} />
         <InsightCard color="blue" label="Today" value={todayCount.toString()} />
         <InsightCard color="purple" label="Overdue" value={overdueCount.toString()} />
@@ -55,30 +77,47 @@ export function TaskListView() {
 }
 
 function TaskListCard({ task }) {
-  const { deleteBlock, setSelectedTask, toggleTask, toggleFailTask } = useAppStore();
+  const { deleteBlock, setSelectedTask, toggleTask, toggleFailTask, setRecurringTasksOpen, setEditingRepeatedTaskId } = useAppStore();
+  
+  const handleTitleClick = () => {
+    if (task.isVirtual) {
+      setEditingRepeatedTaskId(task.templateId);
+      setRecurringTasksOpen(true);
+    } else {
+      setSelectedTask(task.id);
+    }
+  };
+
   return (
     <article className={clsx("bento-card grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 border-l-[10px] p-3 max-sm:grid-cols-[auto_1fr_auto]", priorityRail[task.metadata.priority ?? "medium"])}>
       <Checkbox checked={task.metadata.completed} onChange={() => void toggleTask(task.id)} />
-      <button className="min-w-0 text-left" onClick={() => setSelectedTask(task.id)} type="button">
+      <button className="min-w-0 text-left" onClick={handleTitleClick} type="button">
         <span className={clsx("block truncate font-semibold", task.metadata.completed && "text-stone-400 line-through dark:text-[#5a5650]", task.metadata.failed && "text-red-500 line-through dark:text-red-400")}>{task.content.title || "Untitled task"}</span>
-        <span className="text-xs text-stone-500 dark:text-[#5a5650]">{task.metadata.priority ?? "medium"} priority - {formatShortDate(task.metadata.deadline)}</span>
+        <span className="text-xs text-stone-500 dark:text-[#5a5650]">
+          {task.metadata.priority ?? "medium"} priority - {formatShortDate(task.metadata.deadline)}
+          {task.isVirtual && " (Repeating)"}
+        </span>
       </button>
       <span className={clsx("rounded-md border px-2 py-1 text-xs font-semibold", priorityClasses[task.metadata.priority ?? "medium"])}>{task.metadata.priority ?? "medium"}</span>
       <div className="flex gap-1 max-sm:col-start-3">
-        <button 
-          className={clsx(
-            "icon-button", 
-            task.metadata.failed 
-              ? "!bg-[#ff5a5f] !text-black border-black dark:!bg-[#5c1a1d] dark:!text-[#e8a0a2] dark:border-[#1e232a]" 
-              : "bg-white text-stone-600 dark:bg-[#12151a] dark:text-[#7a7670]"
-          )} 
-          onClick={() => void toggleFailTask(task.id)} 
-          title={task.metadata.failed ? "Unfail task" : "Fail task"} 
-          type="button"
-        >
-          <XCircle size={15} />
-        </button>
-        <button className="icon-button danger" onClick={() => void deleteBlock(task.id)} title="Delete task" type="button"><Trash2 size={15} /></button>
+        {!task.isVirtual && (
+          <button 
+            className={clsx(
+              "icon-button", 
+              task.metadata.failed 
+                ? "!bg-[#ff5a5f] !text-black border-black dark:!bg-[#5c1a1d] dark:!text-[#e8a0a2] dark:border-[#1e232a]" 
+                : "bg-white text-stone-600 dark:bg-[#12151a] dark:text-[#7a7670]"
+            )} 
+            onClick={() => void toggleFailTask(task.id)} 
+            title={task.metadata.failed ? "Unfail task" : "Fail task"} 
+            type="button"
+          >
+            <XCircle size={15} />
+          </button>
+        )}
+        {!task.isVirtual && (
+          <button className="icon-button danger" onClick={() => void deleteBlock(task.id)} title="Delete task" type="button"><Trash2 size={15} /></button>
+        )}
       </div>
     </article>
   );
