@@ -8,9 +8,8 @@ const envSchema = z.object({
     .enum(["development", "test", "production"])
     .default("development"),
   PORT: z.coerce.number().int().positive().default(4000),
-  CORS_ORIGIN: z.string().default("http://localhost:5173"),
-  GEMINI_API_KEY: z.string().optional(),
-  GEMINI_MODEL: z.string().default("gemini-3.1-flash-lite-preview")
+  CORS_ORIGIN: z.string().default("http://localhost:5173")
 });
 
 export const env = envSchema.parse(process.env);
+

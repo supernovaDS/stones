@@ -86,7 +86,7 @@ export function Sidebar({ isOpen, onClose }) {
         </p>
         <div className="flex gap-1">
           <button
-            className="icon-button !h-6 !w-auto px-2 text-[10px] font-bold uppercase tracking-wider"
+            className="icon-button pages-btn !h-6 !w-auto px-2 text-[10px] font-bold uppercase tracking-wider"
             onClick={() => {
               const name = window.prompt("Enter section name:");
               if (name) {
@@ -99,7 +99,7 @@ export function Sidebar({ isOpen, onClose }) {
             + Section
           </button>
           <button
-            className="icon-button !h-6 !w-6"
+            className="icon-button pages-btn !h-6 !w-6"
             onClick={() => {
               const defaultDate = new Date().toLocaleDateString(undefined, {
                 weekday: "short",

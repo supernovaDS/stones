@@ -2839,3 +2839,33 @@
   background: #0f172a !important;
   box-shadow: none !important;
 }
+
+/* ── Sidebar Pages Button Shadow and Border Adjustments ── */
+.sidebar-shell .pages-btn {
+  box-shadow: 2px 2px 0 #111111 !important;
+  border-width: 2px !important;
+}
+
+.sidebar-shell .pages-btn:hover {
+  transform: translate(-1px, -1px) !important;
+  box-shadow: 3px 3px 0 #111111 !important;
+}
+
+.sidebar-shell .pages-btn:active {
+  transform: translate(1px, 1px) !important;
+  box-shadow: 0.5px 0.5px 0 #111111 !important;
+}
+
+.dark .sidebar-shell .pages-btn {
+  box-shadow: 1.5px 1.5px 0 var(--dark-shadow) !important;
+  border-color: var(--dark-border) !important;
+}
+
+.dark .sidebar-shell .pages-btn:hover {
+  box-shadow: 2.5px 2.5px 0 var(--dark-shadow) !important;
+}
+
+.dark .sidebar-shell .pages-btn:active {
+  box-shadow: 0.5px 0.5px 0 var(--dark-shadow) !important;
+}
+

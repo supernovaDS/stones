@@ -47,7 +47,9 @@ export function Topbar({ onCommandOpen, onMenuToggle, activePage, view }) {
           label="Recurring Tasks"
           onClick={() => setRecurringTasksOpen(true)}
         />
-        <HeaderButton icon={Command} label="Menu" onClick={onCommandOpen} />
+        {!(view === "tasks" || view === "calendar" || view === "insights") && (
+          <HeaderButton icon={Command} label="Menu" onClick={onCommandOpen} />
+        )}
         <HeaderButton
           disabled={!undoStack.length}
           icon={RotateCcw}
