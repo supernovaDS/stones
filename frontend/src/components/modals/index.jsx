@@ -31,7 +31,7 @@ export function TaskDetailPanel() {
   const dependencies = task.content.dependencyIds ?? [];
 
   return (
-    <aside className="task-detail-panel fixed inset-y-0 right-0 z-30 w-[430px] max-w-full overflow-auto border-l-[5px] border-black bg-[#fff7e8] p-5 shadow-[-10px_0_0_#111] dark:border-[#1e232a] dark:bg-[#0c0e11] dark:shadow-[-6px_0_0_#000]">
+    <aside className="task-detail-panel fixed inset-y-0 right-0 z-30 w-[430px] max-w-full overflow-auto border-l-[3px] border-black bg-[#fff7e8] p-5 shadow-[-4px_0_0_#111] dark:border-[#1e232a] dark:bg-[#0c0e11] dark:shadow-[-3px_0_0_#000]">
       <div className="mb-5 flex items-center justify-between gap-3">
         <div className="min-w-0"><p className="text-xs font-black uppercase tracking-wide text-stone-600 dark:text-[#7a7670]">Task details</p><h3 className="truncate text-xl font-black">{page?.title ?? "Workspace"}</h3></div>
         <IconButton icon={X} title="Close details" onClick={() => setSelectedTask(undefined)} />
@@ -47,16 +47,7 @@ export function TaskDetailPanel() {
           Deadline
           <input className="nb-input w-full px-3 py-2 font-bold" onChange={(event) => void updateTask(task.id, { deadline: event.target.value })} type="datetime-local" value={toInputDate(task.metadata.deadline)} />
         </label>
-        <label className="grid gap-1 text-sm font-black">
-          Repeat
-          <select className="nb-select w-full px-3 py-2 font-bold" onChange={(event) => void updateTask(task.id, { recurrence: event.target.value })} value={task.metadata.recurrence ?? "none"}><option value="none">No repeat</option><option value="daily">Daily</option><option value="weekdays">Weekdays</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="custom">Custom days</option></select>
-        </label>
-        {task.metadata.recurrence === "custom" && (
-          <label className="grid gap-1 text-sm font-black animate-in fade-in slide-in-from-top-1 duration-150">
-            Interval (Days)
-            <input className="nb-input w-full px-3 py-2 font-bold" min="1" onChange={(event) => void updateTask(task.id, { customRecurrenceInterval: event.target.value })} type="number" value={task.metadata.customRecurrenceInterval ?? 1} />
-          </label>
-        )}
+
         <label className="grid gap-1 text-sm font-black">
           Reminder
           <input className="nb-input w-full px-3 py-2 font-bold" onChange={(event) => void updateTask(task.id, { reminderAt: event.target.value })} type="datetime-local" value={toInputDate(task.metadata.reminderAt)} />
@@ -199,16 +190,13 @@ export function CommandPalette({ onClose }) {
   return (
     <div className="modal-backdrop place-items-start pt-24">
       <section className="modal-card mx-auto max-w-xl p-2">
-        <div className="flex items-center gap-2 border-b-[4px] border-black px-3 py-3 text-stone-600 dark:border-[#1e232a] dark:text-[#7a7670]"><Command size={18} /><input autoFocus className="min-w-0 flex-1 bg-transparent text-sm font-black text-stone-900 outline-none dark:text-[#c8c3ba]" onChange={(event) => setQuery(event.target.value)} placeholder="Type /task, /note, or search pages and tasks..." value={query} /><button className="icon-button" onClick={onClose} type="button"><X size={16} /></button></div>
+        <div className="flex items-center gap-2 border-b-[4px] border-black px-3 py-3 text-stone-600 dark:border-[#1e232a] dark:text-[#7a7670]"><Command size={18} /><input autoFocus className="min-w-0 flex-1 bg-transparent text-sm font-black text-stone-900 outline-none dark:text-[#c8c3ba]" onChange={(event) => setQuery(event.target.value)} placeholder="Type /note, or search pages..." value={query} /><button className="icon-button" onClick={onClose} type="button"><X size={16} /></button></div>
         <div className="max-h-[60vh] overflow-auto p-2">
           <CommandGroup label="Commands">
             {actions.map(([shortcut, label, Icon, run]) => <button className="nb-button justify-start bg-white text-left dark:bg-[#12151a]" key={shortcut} onClick={() => { run(); onClose(); }} type="button"><Icon size={16} /><span className="min-w-0 flex-1">{label}</span><span className="kbd">{shortcut}</span></button>)}
           </CommandGroup>
           <CommandGroup label="Pages">
             {pageResults.map((page) => <button className="nb-button justify-start bg-white text-left dark:bg-[#12151a]" key={page.id} onClick={() => { setActivePage(page.id); onClose(); }} type="button"><Workflow size={15} />{page.title}</button>)}
-          </CommandGroup>
-          <CommandGroup label="Tasks">
-            {taskResults.map((task) => <button className="nb-button justify-start bg-white text-left dark:bg-[#12151a]" key={task.id} onClick={() => { setSelectedTask(task.id); onClose(); }} type="button"><Check size={15} /><span className="min-w-0 flex-1 truncate">{task.content.title || "Untitled task"}</span><span className="text-xs font-black text-stone-500 dark:text-[#5a5650]">{formatShortDate(task.metadata.deadline)}</span></button>)}
           </CommandGroup>
         </div>
       </section>

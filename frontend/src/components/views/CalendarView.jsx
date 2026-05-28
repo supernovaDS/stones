@@ -155,21 +155,19 @@ export function CalendarView() {
                   </button>
                 </div>
                 <div className="flex flex-shrink-0 items-center gap-1">
-                  {!task.isVirtual && (
-                    <button 
-                      className={clsx(
-                        "icon-button !h-8 !w-8", 
-                        isFailed 
-                          ? "!bg-[#ff5a5f] !text-black border-black dark:!bg-[#5c1a1d] dark:!text-[#e8a0a2] dark:border-[#1e232a]" 
-                          : "bg-white text-stone-600 dark:bg-[#12151a] dark:text-[#7a7670]"
-                      )} 
-                      onClick={() => void toggleFailTask(task.id)} 
-                      title={isFailed ? "Unfail task" : "Fail task"} 
-                      type="button"
-                    >
-                      <XCircle size={14} />
-                    </button>
-                  )}
+                  <button 
+                    className={clsx(
+                      "icon-button !h-8 !w-8", 
+                      isFailed 
+                        ? "!bg-[#ff5a5f] !text-black border-black dark:!bg-[#5c1a1d] dark:!text-[#e8a0a2] dark:border-[#1e232a]" 
+                        : "bg-white text-stone-600 dark:bg-[#12151a] dark:text-[#7a7670]"
+                    )} 
+                    onClick={() => void toggleFailTask(task.id)} 
+                    title={isFailed ? "Unfail task" : "Fail task"} 
+                    type="button"
+                  >
+                    <XCircle size={14} />
+                  </button>
                 </div>
               </div>
             );

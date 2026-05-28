@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Repeat, Pencil, Trash2, Plus, ArrowLeft, Clock, Calendar } from "lucide-react";
+import { X, Repeat, Pencil, Trash2, Plus, ArrowLeft, Clock, Calendar, ListChecks } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { todayIso, formatShortDate } from "../../utils/date";
 
@@ -24,7 +24,9 @@ export function RecurringTasksModal({ onClose }) {
   const [customInterval, setCustomInterval] = useState(1);
   const [customUnit, setCustomUnit] = useState("days");
   const [startDate, setStartDate] = useState(todayIso());
+  const [endDate, setEndDate] = useState("");
   const [deadlineTime, setDeadlineTime] = useState("");
+  const [subtasks, setSubtasks] = useState([]);
 
   // Handle opening form for edit or create
   useEffect(() => {
@@ -38,7 +40,9 @@ export function RecurringTasksModal({ onClose }) {
         setCustomInterval(template.metadata?.customInterval || 1);
         setCustomUnit(template.metadata?.customUnit || "days");
         setStartDate(template.metadata?.startDate || todayIso());
+        setEndDate(template.metadata?.endDate || "");
         setDeadlineTime(template.metadata?.deadlineTime || "");
+        setSubtasks(template.content?.subtasks || []);
         setIsFormOpen(true);
       }
     } else {
@@ -50,7 +54,9 @@ export function RecurringTasksModal({ onClose }) {
       setCustomInterval(1);
       setCustomUnit("days");
       setStartDate(todayIso());
+      setEndDate("");
       setDeadlineTime("");
+      setSubtasks([]);
     }
   }, [editingRepeatedTaskId, isFormOpen]);
 
@@ -62,6 +68,18 @@ export function RecurringTasksModal({ onClose }) {
   const handleCloseForm = () => {
     setIsFormOpen(false);
     setEditingRepeatedTaskId(null);
+  };
+
+  const handleAddSubtask = () => {
+    setSubtasks([...subtasks, { id: `sub_${Date.now()}`, text: "", completed: false }]);
+  };
+
+  const handleUpdateSubtask = (id, text) => {
+    setSubtasks(subtasks.map((s) => (s.id === id ? { ...s, text } : s)));
+  };
+
+  const handleDeleteSubtask = (id) => {
+    setSubtasks(subtasks.filter((s) => s.id !== id));
   };
 
   const handleSubmit = async (e) => {
@@ -76,7 +94,9 @@ export function RecurringTasksModal({ onClose }) {
       customInterval: recurrence === "custom" ? Number(customInterval) : undefined,
       customUnit: recurrence === "custom" ? customUnit : undefined,
       startDate,
-      deadlineTime: deadlineTime || undefined
+      endDate: endDate || undefined,
+      deadlineTime: deadlineTime || undefined,
+      subtasks: subtasks
     };
 
     if (editingRepeatedTaskId) {
@@ -126,11 +146,10 @@ export function RecurringTasksModal({ onClose }) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
-        className="modal-card w-[min(90vw,720px)] max-h-[85vh] flex flex-col p-6"
+        className="modal-card w-[min(90vw,720px)] p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Modal Header */}
-        <div className="mb-5 flex items-center justify-between shrink-0">
+        <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Repeat className="text-[#21caff] dark:text-[#00c0ff]" size={24} />
             <h2 className="text-2xl font-black">
@@ -142,11 +161,9 @@ export function RecurringTasksModal({ onClose }) {
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div className="flex-1 overflow-auto pr-1">
-          {isFormOpen ? (
-            /* CREATE / EDIT FORM VIEW */
-            <form onSubmit={handleSubmit} className="grid gap-4">
+        {isFormOpen ? (
+          /* CREATE / EDIT FORM VIEW */
+          <form id="recurring-form" onSubmit={handleSubmit} className="grid gap-4">
               <label className="grid gap-1 text-sm font-black">
                 Title
                 <input
@@ -239,6 +256,18 @@ export function RecurringTasksModal({ onClose }) {
                   />
                 </label>
                 <label className="grid gap-1 text-sm font-black">
+                  Ends On (optional)
+                  <input
+                    className="nb-input w-full px-3 py-2 font-bold"
+                    onChange={(e) => setEndDate(e.target.value)}
+                    type="date"
+                    value={endDate}
+                  />
+                </label>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
+                <label className="grid gap-1 text-sm font-black">
                   Due Time (optional)
                   <input
                     className="nb-input w-full px-3 py-2 font-bold"
@@ -249,7 +278,45 @@ export function RecurringTasksModal({ onClose }) {
                 </label>
               </div>
 
-              <div className="mt-4 flex gap-2 shrink-0">
+              <div className="grid gap-2 border-t-2 border-dashed border-black dark:border-[#1e232a] pt-4 mt-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-black uppercase">Subtasks</h4>
+                  <button
+                    className="nb-button min-h-0 px-3 py-1 text-xs"
+                    onClick={handleAddSubtask}
+                    type="button"
+                  >
+                    Add Subtask
+                  </button>
+                </div>
+                <div className="grid gap-2 max-h-[160px] overflow-y-auto overflow-x-hidden pr-1">
+                  {subtasks.map((sub, idx) => (
+                    <div className="flex items-center gap-2" key={sub.id}>
+                      <span className="text-xs font-black text-stone-500 dark:text-[#7a7670]">{idx + 1}.</span>
+                      <input
+                        className="nb-input min-w-0 flex-1 px-3 py-1.5 text-sm font-bold"
+                        onChange={(e) => handleUpdateSubtask(sub.id, e.target.value)}
+                        placeholder="e.g. Check list, Send report"
+                        required
+                        type="text"
+                        value={sub.text}
+                      />
+                      <button
+                        className="icon-button danger !h-8 !w-8 shrink-0"
+                        onClick={() => handleDeleteSubtask(sub.id)}
+                        title="Delete subtask"
+                        type="button"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  ))}
+                  {subtasks.length === 0 && (
+                    <p className="text-xs text-stone-400 dark:text-[#5a5650] font-black italic">No subtasks defined yet.</p>
+                  )}
+                </div>
+              </div>
+              <div className="mt-4 flex gap-2 pt-4 border-t-2 border-dashed border-stone-200 dark:border-[#1e232a]">
                 <button className="nb-button flex-1" onClick={handleCloseForm} type="button">
                   <ArrowLeft size={16} /> Back
                 </button>
@@ -260,8 +327,16 @@ export function RecurringTasksModal({ onClose }) {
             </form>
           ) : (
             /* LIST VIEW */
-            <div className="flex flex-col h-full gap-4">
-              <div className="grid gap-3 max-h-[50vh] overflow-auto pr-1">
+            <div className="grid gap-4">
+              <button
+                className="nb-button action w-full py-3 flex items-center justify-center gap-2 font-black"
+                onClick={handleOpenCreate}
+                type="button"
+              >
+                <Plus size={18} /> Create New Repeating Task
+              </button>
+
+              <div className="grid gap-3">
                 {templates.length > 0 ? (
                   templates.map((template) => (
                     <div
@@ -281,10 +356,22 @@ export function RecurringTasksModal({ onClose }) {
                             <Calendar size={12} />
                             Started {formatShortDate(template.metadata?.startDate)}
                           </span>
+                          {template.metadata?.endDate && (
+                            <span className="flex items-center gap-1 text-[#ff5a5f] font-black">
+                              <Calendar size={12} />
+                              Ends {formatShortDate(template.metadata.endDate)}
+                            </span>
+                          )}
                           {template.metadata?.deadlineTime && (
                             <span className="flex items-center gap-1">
                               <Clock size={12} />
                               At {template.metadata.deadlineTime}
+                            </span>
+                          )}
+                          {template.content?.subtasks && template.content.subtasks.length > 0 && (
+                            <span className="flex items-center gap-1 text-[#ffb84d] font-black">
+                              <ListChecks size={12} />
+                              {template.content.subtasks.length} subtasks
                             </span>
                           )}
                         </div>
@@ -316,17 +403,8 @@ export function RecurringTasksModal({ onClose }) {
                   </div>
                 )}
               </div>
-
-              <button
-                className="nb-button action w-full py-3 flex items-center justify-center gap-2 font-black shrink-0"
-                onClick={handleOpenCreate}
-                type="button"
-              >
-                <Plus size={18} /> Create New Repeating Task
-              </button>
             </div>
           )}
-        </div>
       </div>
     </div>
   );

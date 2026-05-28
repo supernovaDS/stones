@@ -13,6 +13,9 @@ export function isOccurringOnDate(template, dateStr) {
   const startStr = template.metadata?.startDate;
   if (!startStr || dateStr < startStr) return false;
 
+  const endStr = template.metadata?.endDate;
+  if (endStr && dateStr > endStr) return false;
+
   const recurrence = template.metadata?.recurrence || "none";
   if (recurrence === "daily") return true;
 
@@ -95,11 +98,15 @@ export function getVirtualTasksForDate(dateStr, blocks) {
   const completions = blocks.filter(
     (b) => b.type === "completed_repeat" && b.metadata?.completedDate === dateStr && !b.deleted
   );
+  const failures = blocks.filter(
+    (b) => b.type === "failed_repeat" && b.metadata?.failedDate === dateStr && !b.deleted
+  );
 
   return templates
     .filter((template) => isOccurringOnDate(template, dateStr))
     .map((template) => {
       const isCompleted = completions.some((c) => c.content?.templateId === template.id);
+      const isFailed = failures.some((f) => f.content?.templateId === template.id);
       return {
         id: `virtual_${template.id}_${dateStr}`,
         isVirtual: true,
@@ -107,11 +114,13 @@ export function getVirtualTasksForDate(dateStr, blocks) {
         type: "task",
         content: {
           title: template.content?.title || "Untitled task",
-          notes: template.content?.notes || ""
+          notes: template.content?.notes || "",
+          subtasks: template.content?.subtasks || []
         },
         metadata: {
           deadline: dateStr + (template.metadata?.deadlineTime ? `T${template.metadata.deadlineTime}` : ""),
           completed: isCompleted,
+          failed: isFailed,
           priority: template.metadata?.priority || "medium",
           isRepeated: true
         }
@@ -138,7 +147,7 @@ export function getVirtualTasksForFilter(filter, blocks) {
       date.setDate(date.getDate() - i);
       const dateStr = toLocalDateString(date);
       const dayTasks = getVirtualTasksForDate(dateStr, blocks);
-      list.push(...dayTasks.filter((t) => !t.metadata.completed));
+      list.push(...dayTasks.filter((t) => !t.metadata.completed && !t.metadata.failed));
     }
     return list;
   }
@@ -151,7 +160,7 @@ export function getVirtualTasksForFilter(filter, blocks) {
       date.setDate(date.getDate() + i);
       const dateStr = toLocalDateString(date);
       const dayTasks = getVirtualTasksForDate(dateStr, blocks);
-      list.push(...dayTasks.filter((t) => !t.metadata.completed));
+      list.push(...dayTasks.filter((t) => !t.metadata.completed && !t.metadata.failed));
     }
     return list;
   }
@@ -169,7 +178,8 @@ export function getVirtualTasksForFilter(filter, blocks) {
         type: "task",
         content: {
           title: template?.content?.title || "Recurring Task",
-          notes: template?.content?.notes || ""
+          notes: template?.content?.notes || "",
+          subtasks: template?.content?.subtasks || []
         },
         metadata: {
           deadline: dateStr + (template?.metadata?.deadlineTime ? `T${template.metadata.deadlineTime}` : ""),
@@ -182,8 +192,36 @@ export function getVirtualTasksForFilter(filter, blocks) {
     });
   }
 
+  if (filter === "failed") {
+    // Return all failed repeat instances
+    const failures = blocks.filter((b) => b.type === "failed_repeat" && !b.deleted);
+    return failures.map((f) => {
+      const template = templates.find((t) => t.id === f.content?.templateId);
+      const dateStr = f.metadata?.failedDate;
+      return {
+        id: `virtual_${f.content?.templateId}_${dateStr}`,
+        isVirtual: true,
+        templateId: f.content?.templateId,
+        type: "task",
+        content: {
+          title: template?.content?.title || "Recurring Task",
+          notes: template?.content?.notes || "",
+          subtasks: template?.content?.subtasks || []
+        },
+        metadata: {
+          deadline: dateStr + (template?.metadata?.deadlineTime ? `T${template.metadata.deadlineTime}` : ""),
+          completed: false,
+          failed: true,
+          failedAt: f.metadata?.failedAt,
+          priority: template?.metadata?.priority || "medium",
+          isRepeated: true
+        }
+      };
+    });
+  }
+
   if (filter === "open") {
-    const todayTasks = getVirtualTasksForDate(todayStr, blocks).filter((t) => !t.metadata.completed);
+    const todayTasks = getVirtualTasksForDate(todayStr, blocks).filter((t) => !t.metadata.completed && !t.metadata.failed);
     const overdueTasks = getVirtualTasksForFilter("overdue", blocks);
     return [...todayTasks, ...overdueTasks];
   }
@@ -197,7 +235,8 @@ export function getVirtualTasksForFilter(filter, blocks) {
     const open = getVirtualTasksForFilter("open", blocks);
     const upcoming = getVirtualTasksForFilter("upcoming", blocks);
     const done = getVirtualTasksForFilter("done", blocks);
-    return [...open, ...upcoming, ...done];
+    const failed = getVirtualTasksForFilter("failed", blocks);
+    return [...open, ...upcoming, ...done, ...failed];
   }
 
   return [];
@@ -210,6 +249,7 @@ export function getHistoryVirtualTasks(blocks, limitDays = 30) {
   const list = [];
   const templates = blocks.filter((b) => b.type === "recurring_template" && !b.deleted);
   const completions = blocks.filter((b) => b.type === "completed_repeat" && !b.deleted);
+  const failures = blocks.filter((b) => b.type === "failed_repeat" && !b.deleted);
 
   templates.forEach((template) => {
     const startStr = template.metadata?.startDate;
@@ -228,18 +268,24 @@ export function getHistoryVirtualTasks(blocks, limitDays = 30) {
         const comp = completions.find(
           (c) => c.content?.templateId === template.id && c.metadata?.completedDate === dateStr
         );
+        const fail = failures.find(
+          (f) => f.content?.templateId === template.id && f.metadata?.failedDate === dateStr
+        );
         list.push({
           id: `virtual_${template.id}_${dateStr}`,
           isVirtual: true,
           type: "task",
           content: {
             title: template.content?.title || "Untitled task",
-            notes: template.content?.notes || ""
+            notes: template.content?.notes || "",
+            subtasks: template.content?.subtasks || []
           },
           metadata: {
             deadline: dateStr + (template.metadata?.deadlineTime ? `T${template.metadata.deadlineTime}` : ""),
             completed: !!comp,
             completedAt: comp ? comp.metadata?.completedAt : undefined,
+            failed: !!fail,
+            failedAt: fail ? fail.metadata?.failedAt : undefined,
             priority: template.metadata?.priority || "medium",
             isRepeated: true
           }

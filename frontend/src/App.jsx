@@ -229,7 +229,6 @@ function App() {
             onMenuToggle={() => setSidebarOpen((prev) => !prev)}
             activePage={activePage}
             view={view}
-            syncStatus={syncStatus}
           />
           {view === "workspace" && activePage ? (
             <WorkspaceView pageId={activePage.id} />
@@ -251,7 +250,7 @@ function App() {
         />
       ) : null}
       {commandOpen ? <CommandPalette onClose={() => setCommandOpen(false)} /> : null}
-      {settingsOpen ? <SettingsModal /> : null}
+      {settingsOpen ? <SettingsModal syncStatus={syncStatus} /> : null}
       {recurringTasksOpen ? <RecurringTasksModal onClose={() => setRecurringTasksOpen(false)} /> : null}
       <Toaster 
         position="top-center" 

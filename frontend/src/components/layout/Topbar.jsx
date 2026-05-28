@@ -7,9 +7,8 @@ import {
 import { useAppStore } from "../../store/useAppStore";
 import { viewTitle } from "../../utils/helpers";
 import { HeaderButton } from "../ui";
-import { SyncStatusIndicator } from "../sync/SyncStatusIndicator";
 
-export function Topbar({ onCommandOpen, onMenuToggle, activePage, view, syncStatus }) {
+export function Topbar({ onCommandOpen, onMenuToggle, activePage, view }) {
 
   const {
     undoLastChange,
@@ -43,7 +42,6 @@ export function Topbar({ onCommandOpen, onMenuToggle, activePage, view, syncStat
         </div>
       </div>
       <div className="topbar-actions flex flex-wrap items-center gap-2">
-        <SyncStatusIndicator status={syncStatus} onSync={() => void syncStatus?.syncNow?.()} />
         <HeaderButton
           icon={Repeat}
           label="Recurring Tasks"

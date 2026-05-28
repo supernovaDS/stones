@@ -143,23 +143,7 @@ export const useAppStore = create((set, get) => ({
       blocks = seed.blocks;
     }
 
-    if (sections.length === 0 && workspaces[0]) {
-      const createdAt = nowIso();
-      const section = {
-        id: createId("section"),
-        workspaceId: workspaces[0].id,
-        title: "General",
-        order: 1,
-        createdAt,
-        updatedAt: createdAt
-      };
-      pages = pages.map((page) => ({ ...page, sectionId: section.id }));
-      await db.transaction("rw", db.sections, db.pages, async () => {
-        await db.sections.add(section);
-        await db.pages.bulkPut(pages);
-      });
-      sections = [section];
-    }
+    // Removed forced section migration since sections are now optional.
 
     set({
       workspaces,
@@ -319,7 +303,7 @@ export const useAppStore = create((set, get) => ({
       recentlyDeleted: state.recentlyDeleted.filter((entry) => entry.id !== itemId)
     })),
 
-  createSection: async () => {
+  createSection: async (title = "New section") => {
     const workspaceId = get().workspaces[0]?.id;
     if (!workspaceId) return;
 
@@ -328,7 +312,7 @@ export const useAppStore = create((set, get) => ({
     const section = {
       id: createId("section"),
       workspaceId,
-      title: "New section",
+      title,
       order: get().sections.length + 1,
       createdAt,
       updatedAt: createdAt
@@ -340,17 +324,17 @@ export const useAppStore = create((set, get) => ({
 
   renameSection: async (sectionId, title) => {
     const updatedAt = nowIso();
-    await db.sections.update(sectionId, { title, updatedAt });
-    const updated = get().sections.find((s) => s.id === sectionId);
-    if (updated) await enqueueMutation("section", sectionId, "upsert", { ...updated, title, updatedAt });
     set((state) => ({
       sections: state.sections.map((section) =>
         section.id === sectionId ? { ...section, title, updatedAt } : section
       )
     }));
+    await db.sections.update(sectionId, { title, updatedAt });
+    const updated = get().sections.find((s) => s.id === sectionId);
+    if (updated) await enqueueMutation("section", sectionId, "upsert", { ...updated, title, updatedAt });
   },
 
-  createPage: async (sectionId = get().sections[0]?.id, title = "Untitled page") => {
+  createPage: async (sectionId = null, title = "Untitled page") => {
     const workspaceId = get().workspaces[0]?.id;
     if (!workspaceId) return;
 
@@ -405,7 +389,7 @@ export const useAppStore = create((set, get) => ({
     const page = {
       id: createId("page"),
       workspaceId,
-      sectionId: state.sections[0]?.id,
+      sectionId: null,
       title,
       createdAt,
       updatedAt: createdAt
@@ -435,14 +419,14 @@ export const useAppStore = create((set, get) => ({
   renamePage: async (pageId, title) => {
     const updatedAt = nowIso();
     const uniqueTitle = getUniquePageTitle(title, get().pages, pageId);
-    await db.pages.update(pageId, { title: uniqueTitle, updatedAt });
-    const page = get().pages.find((p) => p.id === pageId);
-    if (page) await enqueueMutation("page", pageId, "upsert", { ...page, title: uniqueTitle, updatedAt });
     set((state) => ({
       pages: state.pages.map((page) =>
         page.id === pageId ? { ...page, title: uniqueTitle, updatedAt } : page
       )
     }));
+    await db.pages.update(pageId, { title: uniqueTitle, updatedAt });
+    const page = get().pages.find((p) => p.id === pageId);
+    if (page) await enqueueMutation("page", pageId, "upsert", { ...page, title: uniqueTitle, updatedAt });
   },
 
   addTitleBlock: async (pageId = get().activePageId) =>
@@ -506,13 +490,13 @@ export const useAppStore = create((set, get) => ({
       content: { ...block.content, ...patch },
       metadata: { ...block.metadata, updatedAt }
     };
-    await db.blocks.put(updatedBlock);
-    await enqueueMutation("block", updatedBlock.id, "upsert", updatedBlock);
     set((state) => ({
       blocks: state.blocks.map((item) =>
         item.id === blockId ? updatedBlock : item
       )
     }));
+    await db.blocks.put(updatedBlock);
+    await enqueueMutation("block", updatedBlock.id, "upsert", updatedBlock);
   },
 
   updateNote: async (blockId, text) => get().updateBlockContent(blockId, { text }),
@@ -532,6 +516,7 @@ export const useAppStore = create((set, get) => ({
       "priority",
       "recurrence",
       "deadline",
+      "endDate",
       "scheduledDate",
       "scheduledStart",
       "scheduledEnd",
@@ -562,8 +547,6 @@ export const useAppStore = create((set, get) => ({
       }
     };
 
-    await db.blocks.put(updatedBlock);
-    await enqueueMutation("block", updatedBlock.id, "upsert", updatedBlock);
     set((state) => ({
       blocks: sortBlocks(
         state.blocks.map((item) =>
@@ -571,6 +554,8 @@ export const useAppStore = create((set, get) => ({
         )
       )
     }));
+    await db.blocks.put(updatedBlock);
+    await enqueueMutation("block", updatedBlock.id, "upsert", updatedBlock);
   },
 
   addSubtask: async (taskId) => {
@@ -619,9 +604,10 @@ export const useAppStore = create((set, get) => ({
 
   toggleTask: async (blockId) => {
     if (blockId.startsWith("virtual_")) {
-      const parts = blockId.split("_");
-      const templateId = parts[1];
-      const dateStr = parts[2];
+      const cleaned = blockId.substring("virtual_".length);
+      const lastUnderscore = cleaned.lastIndexOf("_");
+      const templateId = cleaned.substring(0, lastUnderscore);
+      const dateStr = cleaned.substring(lastUnderscore + 1);
       await get().toggleRepeatedTaskInstance(templateId, dateStr);
       return;
     }
@@ -665,6 +651,9 @@ export const useAppStore = create((set, get) => ({
           recurrence,
           block.metadata.customRecurrenceInterval
         );
+        const endDate = block.metadata.endDate;
+        const isAfterEnd = endDate && nextDeadline && nextDeadline.slice(0, 10) > endDate.slice(0, 10);
+        
         const alreadyExists = nextDeadline && get().blocks.some(
           (b) =>
             b.type === "task" &&
@@ -675,7 +664,7 @@ export const useAppStore = create((set, get) => ({
             !b.metadata.completed &&
             b.metadata.deadline === nextDeadline
         );
-        if (!alreadyExists) {
+        if (!alreadyExists && !isAfterEnd) {
           nextTask = makeNextRecurringTask(block, updatedAt, get);
         }
       }
@@ -698,6 +687,14 @@ export const useAppStore = create((set, get) => ({
   },
 
   toggleFailTask: async (blockId) => {
+    if (blockId.startsWith("virtual_")) {
+      const cleaned = blockId.substring("virtual_".length);
+      const lastUnderscore = cleaned.lastIndexOf("_");
+      const templateId = cleaned.substring(0, lastUnderscore);
+      const dateStr = cleaned.substring(lastUnderscore + 1);
+      await get().toggleRepeatedTaskInstanceFail(templateId, dateStr);
+      return;
+    }
     const updatedAt = nowIso();
     const block = get().blocks.find((item) => item.id === blockId);
     if (!block || block.type !== "task") return;
@@ -761,7 +758,8 @@ export const useAppStore = create((set, get) => ({
       order: 0,
       content: {
         title: taskData.title,
-        notes: taskData.notes || ""
+        notes: taskData.notes || "",
+        subtasks: taskData.subtasks || []
       },
       metadata: {
         priority: taskData.priority || "medium",
@@ -769,6 +767,7 @@ export const useAppStore = create((set, get) => ({
         customInterval: taskData.customInterval ? Number(taskData.customInterval) : undefined,
         customUnit: taskData.customUnit || undefined,
         startDate: taskData.startDate || todayIso(),
+        endDate: taskData.endDate || undefined,
         deadlineTime: taskData.deadlineTime || undefined,
         createdAt,
         updatedAt: createdAt
@@ -790,7 +789,8 @@ export const useAppStore = create((set, get) => ({
       content: {
         ...template.content,
         title: taskData.title,
-        notes: taskData.notes || ""
+        notes: taskData.notes || "",
+        subtasks: taskData.subtasks || []
       },
       metadata: {
         ...template.metadata,
@@ -799,6 +799,7 @@ export const useAppStore = create((set, get) => ({
         customInterval: taskData.customInterval ? Number(taskData.customInterval) : undefined,
         customUnit: taskData.customUnit || undefined,
         startDate: taskData.startDate || template.metadata.startDate,
+        endDate: taskData.endDate || undefined,
         deadlineTime: taskData.deadlineTime || undefined,
         updatedAt
       }
@@ -842,7 +843,9 @@ export const useAppStore = create((set, get) => ({
 
   toggleRepeatedTaskInstance: async (templateId, dateStr) => {
     const compId = `comp_${templateId}_${dateStr}`;
+    const failId = `fail_${templateId}_${dateStr}`;
     const existing = get().blocks.find(b => b.id === compId);
+    const existingFail = get().blocks.find(b => b.id === failId);
     
     pushUndoSnapshot(get, set, "toggle repeated task instance");
     
@@ -869,12 +872,84 @@ export const useAppStore = create((set, get) => ({
           updatedAt: createdAt
         }
       };
-      await db.blocks.add(newCompletion);
+      
+      await db.transaction("rw", db.blocks, async () => {
+        await db.blocks.add(newCompletion);
+        if (existingFail) {
+          await db.blocks.delete(failId);
+        }
+      });
       await enqueueMutation("block", compId, "upsert", newCompletion);
-      set((current) => ({
-        blocks: sortBlocks([...current.blocks, newCompletion])
-      }));
+      if (existingFail) {
+        await enqueueMutation("block", failId, "delete", existingFail);
+      }
+      
+      set((current) => {
+        let nextBlocks = [...current.blocks, newCompletion];
+        if (existingFail) {
+          nextBlocks = nextBlocks.filter(b => b.id !== failId);
+        }
+        return { blocks: sortBlocks(nextBlocks) };
+      });
     }
+  },
+
+  toggleRepeatedTaskInstanceFail: async (templateId, dateStr) => {
+    const failId = `fail_${templateId}_${dateStr}`;
+    const compId = `comp_${templateId}_${dateStr}`;
+    
+    const existingFail = get().blocks.find(b => b.id === failId);
+    const existingComp = get().blocks.find(b => b.id === compId);
+    
+    pushUndoSnapshot(get, set, "toggle repeated task instance fail");
+    
+    let newFailure;
+    await db.transaction("rw", db.blocks, async () => {
+      if (existingFail) {
+        await db.blocks.delete(failId);
+      } else {
+        const createdAt = nowIso();
+        newFailure = {
+          id: failId,
+          pageId: "system-recurring-failures",
+          type: "failed_repeat",
+          order: 0,
+          content: {
+            templateId
+          },
+          metadata: {
+            failedDate: dateStr,
+            failedAt: createdAt,
+            createdAt,
+            updatedAt: createdAt
+          }
+        };
+        await db.blocks.add(newFailure);
+        if (existingComp) {
+          await db.blocks.delete(compId);
+        }
+      }
+    });
+    
+    if (existingFail) {
+      await enqueueMutation("block", failId, "delete", existingFail);
+    } else {
+      await enqueueMutation("block", failId, "upsert", newFailure);
+      if (existingComp) {
+        await enqueueMutation("block", compId, "delete", existingComp);
+      }
+    }
+    
+    set((current) => {
+      let nextBlocks = current.blocks;
+      if (existingFail) {
+        nextBlocks = nextBlocks.filter(b => b.id !== failId);
+      } else {
+        nextBlocks = nextBlocks.filter(b => b.id !== compId);
+        nextBlocks = [...nextBlocks, newFailure];
+      }
+      return { blocks: sortBlocks(nextBlocks) };
+    });
   },
 
   moveBlock: async (blockId, direction) => {

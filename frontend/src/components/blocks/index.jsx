@@ -31,6 +31,45 @@ import { getEmbedUrl } from "../../utils/helpers";
 import { useIsBlocked } from "../../hooks/useIsBlocked";
 import { IconButton, Badge, Checkbox } from "../ui";
 
+// ── Auto-resizing Textarea for vertical expansion ───────────────
+
+function AutoResizingTextarea({ value, onChange, className, placeholder, disabled, ...props }) {
+  const textareaRef = useRef(null);
+
+  const adjustHeight = () => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  };
+
+  useEffect(() => {
+    adjustHeight();
+  }, [value]);
+
+  return (
+    <textarea
+      ref={textareaRef}
+      value={value ?? ""}
+      onChange={(e) => {
+        onChange(e);
+        adjustHeight();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          e.currentTarget.blur();
+        }
+      }}
+      className={clsx("resize-none overflow-hidden bg-transparent outline-none w-full", className)}
+      placeholder={placeholder}
+      disabled={disabled}
+      rows={1}
+      {...props}
+    />
+  );
+}
+
 // ── Block dispatcher ────────────────────────────────────────────
 
 export function BlockCard({ block }) {
@@ -329,7 +368,7 @@ function TitleBlock({ block }) {
   const { updateBlockContent } = useAppStore();
   return (
     <BlockShell block={block} label="Heading">
-      <input
+      <AutoResizingTextarea
         className="w-full bg-transparent text-3xl font-black tracking-tight text-black outline-none dark:text-[#c8c3ba]"
         onChange={(event) => void updateBlockContent(block.id, { text: event.target.value })}
         placeholder="Header / Section Title..."
@@ -350,7 +389,7 @@ function TaskBlock({ block }) {
       <div className="grid gap-3">
         <div className="task-block-header flex items-start gap-3">
           <Checkbox checked={block.metadata.completed} onChange={() => void toggleTask(block.id)} className="mt-1" />
-          <input
+          <AutoResizingTextarea
             className={clsx("min-w-0 flex-1 bg-transparent text-xl font-black outline-none", block.metadata.completed && "text-stone-400 line-through dark:text-[#5a5650]", block.metadata.failed && "text-red-500 line-through dark:text-red-400")}
             onChange={(event) => void updateTask(block.id, { title: event.target.value })}
             placeholder="Task title"
@@ -382,27 +421,7 @@ function TaskBlock({ block }) {
             <option value="low">Low</option>
           </select>
           <input className="nb-input h-10 px-2 text-sm" onChange={(event) => void updateTask(block.id, { deadline: event.target.value })} type="date" value={toDateInput(block.metadata.deadline)} />
-          <select className="nb-select h-10 px-2 text-sm" onChange={(event) => void updateTask(block.id, { recurrence: event.target.value })} value={block.metadata.recurrence ?? "none"}>
-            <option value="none">No repeat</option>
-            <option value="daily">Daily</option>
-            <option value="weekdays">Weekdays</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-            <option value="custom">Custom</option>
-          </select>
-          {block.metadata.recurrence === "custom" ? (
-            <label className="nb-input inline-flex h-10 items-center gap-2 px-2 text-sm">
-              Every
-              <input
-                className="w-12 bg-transparent text-center outline-none"
-                min="1"
-                onChange={(event) => void updateTask(block.id, { customRecurrenceInterval: event.target.value })}
-                type="number"
-                value={block.metadata.customRecurrenceInterval ?? 1}
-              />
-              days
-            </label>
-          ) : null}
+
           <button
             className="nb-button h-10 px-3 text-xs font-black bg-white hover:bg-stone-50 text-stone-700 dark:bg-[#12151a] dark:text-[#7a7670]"
             onClick={() => void addSubtask(block.id)}
@@ -429,7 +448,7 @@ function TaskBlock({ block }) {
                     checked={subtask.completed} 
                     onChange={(event) => void updateSubtask(block.id, subtask.id, { completed: event.target.checked })} 
                   />
-                  <input 
+                  <AutoResizingTextarea 
                     className={clsx(
                       "min-w-0 flex-1 bg-transparent text-sm font-bold outline-none", 
                       subtask.completed && "text-stone-400 line-through dark:text-[#5a5650]"
@@ -474,7 +493,7 @@ function ChecklistBlock({ block }) {
         <span className="text-xs font-black text-stone-500 dark:text-[#5a5650]">{progress}%</span>
       </div>
       <div className="grid gap-2">
-        {items.map((item) => (
+        {items.map((item, index) => (
           <div 
             className={clsx(
               "flex items-center gap-3 rounded-lg border-[3px] p-2 transition-all duration-150",
@@ -485,7 +504,8 @@ function ChecklistBlock({ block }) {
             key={item.id}
           >
             <Checkbox checked={item.completed} onChange={(event) => updateItems(items.map((entry) => entry.id === item.id ? { ...entry, completed: event.target.checked } : entry))} />
-            <input 
+            <span className="text-sm font-black text-stone-500 dark:text-[#7a7670] shrink-0 select-none">{index + 1}.</span>
+            <AutoResizingTextarea 
               className={clsx(
                 "min-w-0 flex-1 bg-transparent font-bold outline-none transition-all duration-150",
                 item.completed ? "text-stone-500 line-through dark:text-stone-600 font-medium" : "text-black dark:text-[#c8c3ba]"

@@ -2,7 +2,6 @@ import { Activity, CalendarDays, ListChecks, Workflow } from "lucide-react";
 
 export const navItems = [
   { id: "workspace", label: "Workspace", icon: Workflow },
-  { id: "tasks", label: "Tasks", icon: ListChecks },
   { id: "calendar", label: "Calendar", icon: CalendarDays },
   { id: "insights", label: "Insights", icon: Activity }
 ];

@@ -2,6 +2,7 @@ import { X, Check, LogOut, User, Moon, Sun } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useAppStore } from "../../store/useAppStore";
 import { clsx } from "clsx";
+import { SyncStatusIndicator } from "../sync/SyncStatusIndicator";
 
 const PROFILES = [
   {
@@ -28,7 +29,7 @@ const PROFILES = [
   },
 ];
 
-export function SettingsModal() {
+export function SettingsModal({ syncStatus }) {
   const { colorProfile, setColorProfile, theme, setTheme, setSettingsOpen } = useAppStore();
   const { user, signOut } = useAuth();
 
@@ -62,13 +63,16 @@ export function SettingsModal() {
                   <p className="text-sm font-black">{user.email}</p>
                 </div>
               </div>
-              <button
-                className="nb-button danger"
-                onClick={() => void signOut()}
-                type="button"
-              >
-                <LogOut size={16} /> Logout
-              </button>
+              <div className="flex items-center gap-2">
+                <SyncStatusIndicator status={syncStatus} onSync={() => void syncStatus?.syncNow?.()} />
+                <button
+                  className="nb-button danger"
+                  onClick={() => void signOut()}
+                  type="button"
+                >
+                  <LogOut size={16} /> Logout
+                </button>
+              </div>
             </div>
           </div>
         )}
