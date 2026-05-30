@@ -11,19 +11,35 @@ import {
   Plus,
   Workflow,
   X,
-  XCircle
+  XCircle,
+  Book
 } from "lucide-react";
 import { useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
 import { formatShortDate, toInputDate } from "../../utils/date";
 import { slugify, downloadText } from "../../utils/helpers";
 import { IconButton, Checkbox } from "../ui";
+import { getVirtualTasksForDate } from "../../utils/recurrence";
 
 // ── Task detail panel ───────────────────────────────────────────
 
 export function TaskDetailPanel() {
   const { addSubtask, blocks, deleteSubtask, pages, selectedTaskId, setActivePage, setSelectedTask, setTaskDependencies, toggleTask, toggleFailTask, updateSubtask, updateTask } = useAppStore();
-  const task = blocks.find((block) => block.id === selectedTaskId);
+  
+  let task;
+  let isVirtual = false;
+  if (selectedTaskId && selectedTaskId.startsWith("virtual_")) {
+    isVirtual = true;
+    const cleaned = selectedTaskId.substring("virtual_".length);
+    const lastUnderscore = cleaned.lastIndexOf("_");
+    const templateId = cleaned.substring(0, lastUnderscore);
+    const dateStr = cleaned.substring(lastUnderscore + 1);
+    const virtualTasks = getVirtualTasksForDate(dateStr, blocks);
+    task = virtualTasks.find((t) => t.id === selectedTaskId);
+  } else {
+    task = blocks.find((block) => block.id === selectedTaskId);
+  }
+
   if (!task || task.type !== "task") return null;
   const page = pages.find((item) => item.id === task.pageId);
   const source = blocks.find((block) => block.id === task.sourceBlockId);
@@ -33,27 +49,74 @@ export function TaskDetailPanel() {
   return (
     <aside className="task-detail-panel fixed inset-y-0 right-0 z-30 w-[430px] max-w-full overflow-auto border-l-[3px] border-black bg-[#fff7e8] p-5 shadow-[-4px_0_0_#111] dark:border-[#1e232a] dark:bg-[#0c0e11] dark:shadow-[-3px_0_0_#000]">
       <div className="mb-5 flex items-center justify-between gap-3">
-        <div className="min-w-0"><p className="text-xs font-black uppercase tracking-wide text-stone-600 dark:text-[#7a7670]">Task details</p><h3 className="truncate text-xl font-black">{page?.title ?? "Workspace"}</h3></div>
+        <div className="min-w-0">
+          <p className="text-xs font-black uppercase tracking-wide text-stone-600 dark:text-[#7a7670]">
+            {isVirtual ? "Repeating Task Details" : "Task details"}
+          </p>
+          <h3 className="truncate text-xl font-black">{page?.title ?? (isVirtual ? "Repeating Schedule" : "Workspace")}</h3>
+        </div>
         <IconButton icon={X} title="Close details" onClick={() => setSelectedTask(undefined)} />
       </div>
       <div className="grid gap-4">
-        <label className="grid gap-1 text-sm font-black">Title<input className="nb-input w-full px-3 py-2 font-bold" onChange={(event) => void updateTask(task.id, { title: event.target.value })} value={task.content.title} /></label>
-        <label className="grid gap-1 text-sm font-black">Notes<textarea className="nb-textarea w-full min-h-24 px-3 py-2 font-bold" onChange={(event) => void updateTask(task.id, { notes: event.target.value })} value={task.content.notes ?? ""} /></label>
+        <label className="grid gap-1 text-sm font-black">
+          Title
+          <input 
+            disabled={isVirtual} 
+            className="nb-input w-full px-3 py-2 font-bold disabled:opacity-85" 
+            onChange={(event) => void updateTask(task.id, { title: event.target.value })} 
+            value={task.content.title} 
+          />
+        </label>
+        <label className="grid gap-1 text-sm font-black">
+          Notes
+          <textarea 
+            disabled={isVirtual} 
+            className="nb-textarea w-full min-h-24 px-3 py-2 font-bold disabled:opacity-85" 
+            onChange={(event) => void updateTask(task.id, { notes: event.target.value })} 
+            value={task.content.notes ?? ""} 
+          />
+        </label>
         <label className="grid gap-1 text-sm font-black">
           Priority
-          <select className="nb-select w-full px-3 py-2 font-bold" onChange={(event) => void updateTask(task.id, { priority: event.target.value })} value={task.metadata.priority ?? "medium"}><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+          <select 
+            disabled={isVirtual} 
+            className="nb-select w-full px-3 py-2 font-bold disabled:opacity-85" 
+            onChange={(event) => void updateTask(task.id, { priority: event.target.value })} 
+            value={task.metadata.priority ?? "medium"}
+          >
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
         </label>
         <label className="grid gap-1 text-sm font-black">
           Deadline
-          <input className="nb-input w-full px-3 py-2 font-bold" onChange={(event) => void updateTask(task.id, { deadline: event.target.value })} type="datetime-local" value={toInputDate(task.metadata.deadline)} />
+          <input 
+            disabled={isVirtual} 
+            className="nb-input w-full px-3 py-2 font-bold disabled:opacity-85" 
+            onChange={(event) => void updateTask(task.id, { deadline: event.target.value })} 
+            type="datetime-local" 
+            value={toInputDate(task.metadata.deadline)} 
+          />
         </label>
 
-        <label className="grid gap-1 text-sm font-black">
-          Reminder
-          <input className="nb-input w-full px-3 py-2 font-bold" onChange={(event) => void updateTask(task.id, { reminderAt: event.target.value })} type="datetime-local" value={toInputDate(task.metadata.reminderAt)} />
-        </label>
+        {!isVirtual && (
+          <label className="grid gap-1 text-sm font-black">
+            Reminder
+            <input 
+              className="nb-input w-full px-3 py-2 font-bold" 
+              onChange={(event) => void updateTask(task.id, { reminderAt: event.target.value })} 
+              type="datetime-local" 
+              value={toInputDate(task.metadata.reminderAt)} 
+            />
+          </label>
+        )}
+        
         <section className="grid gap-2">
-          <div className="flex items-center justify-between"><h4 className="text-sm font-black">Subtasks</h4><button className="nb-button min-h-0 px-3 py-1 text-xs" onClick={() => void addSubtask(task.id)} type="button">Add</button></div>
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-black">Subtasks</h4>
+            <button className="nb-button min-h-0 px-3 py-1 text-xs" onClick={() => void addSubtask(task.id)} type="button">Add</button>
+          </div>
           {(task.content.subtasks ?? []).map((subtask) => (
             <div className="flex items-center gap-2" key={subtask.id}>
               <Checkbox checked={subtask.completed} onChange={(event) => void updateSubtask(task.id, subtask.id, { completed: event.target.checked })} />
@@ -62,26 +125,30 @@ export function TaskDetailPanel() {
             </div>
           ))}
         </section>
-        <section className="grid gap-2">
-          <h4 className="text-sm font-black">Dependencies</h4>
-          <div className="max-h-36 overflow-auto rounded-lg border-[3px] border-black bg-white p-2 shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[3px_3px_0_#000]">
-            {otherTasks.map((candidate) => (
-              <label className="flex items-center gap-2 py-1 text-sm" key={candidate.id}>
-                <Checkbox checked={dependencies.includes(candidate.id)} onChange={(event) => {
-                  const next = event.target.checked ? [...dependencies, candidate.id] : dependencies.filter((id) => id !== candidate.id);
-                  void setTaskDependencies(task.id, next);
-                }} />
-                {candidate.content.title}
-              </label>
-            ))}
-          </div>
-        </section>
+
+        {!isVirtual && (
+          <section className="grid gap-2">
+            <h4 className="text-sm font-black">Dependencies</h4>
+            <div className="max-h-36 overflow-auto rounded-lg border-[3px] border-black bg-white p-2 shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[3px_3px_0_#000]">
+              {otherTasks.map((candidate) => (
+                <label className="flex items-center gap-2 py-1 text-sm" key={candidate.id}>
+                  <Checkbox checked={dependencies.includes(candidate.id)} onChange={(event) => {
+                    const next = event.target.checked ? [...dependencies, candidate.id] : dependencies.filter((id) => id !== candidate.id);
+                    void setTaskDependencies(task.id, next);
+                  }} />
+                  {candidate.content.title}
+                </label>
+              ))}
+            </div>
+          </section>
+        )}
+        
         <div className="flex gap-2">
           <button className="nb-button action flex-1" onClick={() => void toggleTask(task.id)} type="button"><Check size={16} />{task.metadata.completed ? "Mark Open" : "Mark Complete"}</button>
           <button className="nb-button flex-1" onClick={() => void toggleFailTask(task.id)} type="button"><XCircle size={16} />{task.metadata.failed ? "Unfail Task" : "Fail Task"}</button>
         </div>
         {source?.type === "note" ? <div className="rounded-lg border-[3px] border-black bg-[#fff1b8] p-3 shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[3px_3px_0_#000]"><p className="mb-1 text-xs font-black uppercase tracking-wide text-stone-600 dark:text-[#7a7670]">Source note</p><p className="line-clamp-4 text-sm font-bold text-stone-700 dark:text-[#7a7670]">{source.content.text}</p></div> : null}
-        {task.pageId !== "system-calendar" && (
+        {!isVirtual && task.pageId !== "system-calendar" && (
           <button className="nb-button" onClick={() => { setActivePage(task.pageId); setSelectedTask(undefined); }} type="button"><Workflow size={16} />Open Page</button>
         )}
       </div>
@@ -175,12 +242,14 @@ export function CommandPalette({ onClose }) {
       }]
     ] : []),
     ["/today", "Open today page", CalendarPlus, () => void openTodayPage()],
-    ["/calendar", "Go to calendar", CalendarDays, () => setView("calendar")]
+    ["/calendar", "Go to calendar", CalendarDays, () => setView("calendar")],
+    ["/diary", "Open Diary", Book, () => setView("diary")]
   ].filter(([shortcut, label]) => {
     if (!normalized) return true;
     return shortcut.includes(normalized) || label.toLowerCase().includes(normalized);
   });
   const pageResults = pages
+    .filter((page) => page.workspaceId !== "diary")
     .filter((page) => !normalized || page.title.toLowerCase().includes(normalized))
     .slice(0, 6);
   const taskResults = blocks

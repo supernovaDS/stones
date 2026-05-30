@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { X, Repeat, Pencil, Trash2, Plus, ArrowLeft, Clock, Calendar, ListChecks } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { todayIso, formatShortDate } from "../../utils/date";
+import { Checkbox } from "../ui";
 
 export function RecurringTasksModal({ onClose }) {
   const {
@@ -13,7 +14,7 @@ export function RecurringTasksModal({ onClose }) {
     setEditingRepeatedTaskId
   } = useAppStore();
 
-  const templates = blocks.filter((b) => b.type === "recurring_template" && !b.deleted);
+  const templates = blocks.filter((b) => b.type === "recurring_template" && !b.deleted && !b.metadata?.isArchived);
 
   // Form states
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -27,6 +28,10 @@ export function RecurringTasksModal({ onClose }) {
   const [endDate, setEndDate] = useState("");
   const [deadlineTime, setDeadlineTime] = useState("");
   const [subtasks, setSubtasks] = useState([]);
+
+  // Delete modal states
+  const [deletingTemplateId, setDeletingTemplateId] = useState(null);
+  const [deleteMode, setDeleteMode] = useState("future_only");
 
   // Handle opening form for edit or create
   useEffect(() => {
@@ -107,10 +112,9 @@ export function RecurringTasksModal({ onClose }) {
     handleCloseForm();
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this repeating task template? This will also delete all of its past completion records.")) {
-      await deleteRepeatedTask(id);
-    }
+  const handleDelete = (id) => {
+    setDeleteMode("future_only");
+    setDeletingTemplateId(id);
   };
 
   // Helper to format nice recurrence schedule labels
@@ -289,7 +293,7 @@ export function RecurringTasksModal({ onClose }) {
                     Add Subtask
                   </button>
                 </div>
-                <div className="grid gap-2 max-h-[160px] overflow-y-auto overflow-x-hidden pr-1">
+                <div className="grid gap-2 max-h-[160px] overflow-y-auto overflow-x-hidden pb-3 pr-2">
                   {subtasks.map((sub, idx) => (
                     <div className="flex items-center gap-2" key={sub.id}>
                       <span className="text-xs font-black text-stone-500 dark:text-[#7a7670]">{idx + 1}.</span>
@@ -331,6 +335,7 @@ export function RecurringTasksModal({ onClose }) {
               <button
                 className="nb-button action w-full py-3 flex items-center justify-center gap-2 font-black"
                 onClick={handleOpenCreate}
+                style={{ animation: "none" }}
                 type="button"
               >
                 <Plus size={18} /> Create New Repeating Task
@@ -379,14 +384,6 @@ export function RecurringTasksModal({ onClose }) {
 
                       <div className="flex gap-2 shrink-0">
                         <button
-                          className="icon-button"
-                          onClick={() => setEditingRepeatedTaskId(template.id)}
-                          title="Edit template"
-                          type="button"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
                           className="icon-button danger"
                           onClick={() => void handleDelete(template.id)}
                           title="Delete template"
@@ -406,6 +403,72 @@ export function RecurringTasksModal({ onClose }) {
             </div>
           )}
       </div>
+
+      {deletingTemplateId && (
+        <div className="modal-backdrop z-40 bg-black/60 backdrop-blur-sm flex items-center justify-center animate-in fade-in duration-200" onClick={() => setDeletingTemplateId(null)}>
+          <div className="modal-card max-w-md p-6 border-[3px] border-black bg-[#fff7e8] dark:bg-[#0c0e11] dark:border-[#1e232a] shadow-[6px_6px_0_#111] dark:shadow-[4px_4px_0_#000] animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-xl font-black text-red-500 dark:text-red-400 mb-2">Delete Repeating Task?</h3>
+            <p className="text-sm font-bold mb-4 text-stone-700 dark:text-[#7a7670]">
+              Are you sure you want to delete this repeating task template?
+            </p>
+            <div className="rounded-lg border-2 border-black dark:border-[#1e232a] bg-stone-50 dark:bg-[#12151a] p-4 grid gap-3 mb-5">
+              <label className="flex items-start gap-3 text-sm font-bold cursor-pointer">
+                <input 
+                  type="radio"
+                  name="deleteMode"
+                  className="mt-1"
+                  checked={deleteMode === "all"} 
+                  onChange={() => setDeleteMode("all")} 
+                />
+                <span className="flex-1">
+                  <span className="block text-black dark:text-[#c8c3ba]">Delete everything</span>
+                  <span className="block text-xs text-stone-500 dark:text-[#7a7670] mt-0.5">This will delete all tasks past, future and present.</span>
+                </span>
+              </label>
+              
+              <hr className="border-stone-300 dark:border-stone-850" />
+              
+              <label className="flex items-start gap-3 text-sm font-bold cursor-pointer">
+                <input 
+                  type="radio"
+                  name="deleteMode"
+                  className="mt-1"
+                  checked={deleteMode === "future_only"} 
+                  onChange={() => setDeleteMode("future_only")} 
+                />
+                <span className="flex-1">
+                  <span className="block text-black dark:text-[#c8c3ba]">Delete only future tasks</span>
+                  <span className="block text-xs text-stone-500 dark:text-[#7a7670] mt-0.5">This will delete only future tasks and will not delete past and present.</span>
+                </span>
+              </label>
+            </div>
+            <div className="flex gap-2 font-black">
+              <button 
+                type="button" 
+                className="nb-button flex-1"
+                onClick={() => setDeletingTemplateId(null)}
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                className="nb-button danger flex-1"
+                onClick={async () => {
+                  const isAll = deleteMode === "all";
+                  await deleteRepeatedTask(deletingTemplateId, {
+                    completed: isAll,
+                    failed: isAll,
+                    due: isAll
+                  });
+                  setDeletingTemplateId(null);
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

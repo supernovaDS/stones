@@ -130,12 +130,7 @@ export function CalendarView() {
                   <button 
                     className="min-w-0 flex-1 text-left" 
                     onClick={() => {
-                      if (task.isVirtual) {
-                        setEditingRepeatedTaskId(task.templateId);
-                        setRecurringTasksOpen(true);
-                      } else {
-                        setSelectedTask(task.id);
-                      }
+                      setSelectedTask(task.id);
                     }} 
                     type="button"
                   >

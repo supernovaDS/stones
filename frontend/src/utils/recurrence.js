@@ -101,12 +101,17 @@ export function getVirtualTasksForDate(dateStr, blocks) {
   const failures = blocks.filter(
     (b) => b.type === "failed_repeat" && b.metadata?.failedDate === dateStr && !b.deleted
   );
+  const instances = blocks.filter(
+    (b) => b.type === "recurring_instance" && b.content?.dateStr === dateStr && !b.deleted
+  );
 
   return templates
     .filter((template) => isOccurringOnDate(template, dateStr))
     .map((template) => {
       const isCompleted = completions.some((c) => c.content?.templateId === template.id);
       const isFailed = failures.some((f) => f.content?.templateId === template.id);
+      const instance = instances.find((inst) => inst.content?.templateId === template.id);
+      const subtasks = instance ? (instance.content?.subtasks || []) : (template.content?.subtasks || []);
       return {
         id: `virtual_${template.id}_${dateStr}`,
         isVirtual: true,
@@ -115,7 +120,7 @@ export function getVirtualTasksForDate(dateStr, blocks) {
         content: {
           title: template.content?.title || "Untitled task",
           notes: template.content?.notes || "",
-          subtasks: template.content?.subtasks || []
+          subtasks: subtasks
         },
         metadata: {
           deadline: dateStr + (template.metadata?.deadlineTime ? `T${template.metadata.deadlineTime}` : ""),
@@ -171,6 +176,10 @@ export function getVirtualTasksForFilter(filter, blocks) {
     return completions.map((c) => {
       const template = templates.find((t) => t.id === c.content?.templateId);
       const dateStr = c.metadata?.completedDate;
+      const instance = blocks.find(
+        (b) => b.type === "recurring_instance" && b.content?.templateId === c.content?.templateId && b.content?.dateStr === dateStr && !b.deleted
+      );
+      const subtasks = instance ? (instance.content?.subtasks || []) : (template?.content?.subtasks || []);
       return {
         id: `virtual_${c.content?.templateId}_${dateStr}`,
         isVirtual: true,
@@ -179,7 +188,7 @@ export function getVirtualTasksForFilter(filter, blocks) {
         content: {
           title: template?.content?.title || "Recurring Task",
           notes: template?.content?.notes || "",
-          subtasks: template?.content?.subtasks || []
+          subtasks: subtasks
         },
         metadata: {
           deadline: dateStr + (template?.metadata?.deadlineTime ? `T${template.metadata.deadlineTime}` : ""),
@@ -198,6 +207,10 @@ export function getVirtualTasksForFilter(filter, blocks) {
     return failures.map((f) => {
       const template = templates.find((t) => t.id === f.content?.templateId);
       const dateStr = f.metadata?.failedDate;
+      const instance = blocks.find(
+        (b) => b.type === "recurring_instance" && b.content?.templateId === f.content?.templateId && b.content?.dateStr === dateStr && !b.deleted
+      );
+      const subtasks = instance ? (instance.content?.subtasks || []) : (template?.content?.subtasks || []);
       return {
         id: `virtual_${f.content?.templateId}_${dateStr}`,
         isVirtual: true,
@@ -206,7 +219,7 @@ export function getVirtualTasksForFilter(filter, blocks) {
         content: {
           title: template?.content?.title || "Recurring Task",
           notes: template?.content?.notes || "",
-          subtasks: template?.content?.subtasks || []
+          subtasks: subtasks
         },
         metadata: {
           deadline: dateStr + (template?.metadata?.deadlineTime ? `T${template.metadata.deadlineTime}` : ""),
@@ -271,6 +284,10 @@ export function getHistoryVirtualTasks(blocks, limitDays = 30) {
         const fail = failures.find(
           (f) => f.content?.templateId === template.id && f.metadata?.failedDate === dateStr
         );
+        const instance = blocks.find(
+          (b) => b.type === "recurring_instance" && b.content?.templateId === template.id && b.content?.dateStr === dateStr && !b.deleted
+        );
+        const subtasks = instance ? (instance.content?.subtasks || []) : (template.content?.subtasks || []);
         list.push({
           id: `virtual_${template.id}_${dateStr}`,
           isVirtual: true,
@@ -278,7 +295,7 @@ export function getHistoryVirtualTasks(blocks, limitDays = 30) {
           content: {
             title: template.content?.title || "Untitled task",
             notes: template.content?.notes || "",
-            subtasks: template.content?.subtasks || []
+            subtasks: subtasks
           },
           metadata: {
             deadline: dateStr + (template.metadata?.deadlineTime ? `T${template.metadata.deadlineTime}` : ""),

@@ -29,7 +29,9 @@ export function Sidebar({ isOpen, onClose }) {
     onClose?.();
   };
 
-  const sortedPages = [...pages].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const sortedPages = [...pages]
+    .filter(p => p.workspaceId !== "diary")
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   return (
     <aside aria-label="Workspace navigation" className={clsx("sidebar-shell", isOpen && "sidebar-open")}>

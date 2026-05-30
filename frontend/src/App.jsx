@@ -10,7 +10,7 @@ import { Toaster, toast } from "sonner";
 import { AuthPage } from "./components/auth/AuthPage";
 import { Sidebar } from "./components/layout/Sidebar";
 import { Topbar } from "./components/layout/Topbar";
-import { WorkspaceView, TaskListView, CalendarView, InsightsView } from "./components/views";
+import { WorkspaceView, TaskListView, CalendarView, InsightsView, DiaryView } from "./components/views";
 import { TaskDetailPanel, TaskModal, CommandPalette, SettingsModal, RecurringTasksModal } from "./components/modals";
 
 function App() {
@@ -213,31 +213,35 @@ function App() {
   // ── Main render ─────────────────────────────────────────────
   return (
     <main className="app-shell">
-      <div className="layout-grid">
-        <div
-          className={`sidebar-backdrop${sidebarOpen ? " sidebar-backdrop-visible" : ""}`}
-          onClick={() => setSidebarOpen(false)}
-        />
-        <Sidebar
-          isOpen={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-        />
-
-        <section className="content-shell">
-          <Topbar
-            onCommandOpen={() => setCommandOpen(true)}
-            onMenuToggle={() => setSidebarOpen((prev) => !prev)}
-            activePage={activePage}
-            view={view}
+      {view === "diary" ? (
+        <DiaryView />
+      ) : (
+        <div className="layout-grid">
+          <div
+            className={`sidebar-backdrop${sidebarOpen ? " sidebar-backdrop-visible" : ""}`}
+            onClick={() => setSidebarOpen(false)}
           />
-          {view === "workspace" && activePage ? (
-            <WorkspaceView pageId={activePage.id} />
-          ) : null}
-          {view === "tasks" ? <TaskListView /> : null}
-          {view === "calendar" ? <CalendarView /> : null}
-          {view === "insights" ? <InsightsView /> : null}
-        </section>
-      </div>
+          <Sidebar
+            isOpen={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
+          />
+
+          <section className="content-shell">
+            <Topbar
+              onCommandOpen={() => setCommandOpen(true)}
+              onMenuToggle={() => setSidebarOpen((prev) => !prev)}
+              activePage={activePage}
+              view={view}
+            />
+            {view === "workspace" && activePage ? (
+              <WorkspaceView pageId={activePage.id} />
+            ) : null}
+            {view === "tasks" ? <TaskListView /> : null}
+            {view === "calendar" ? <CalendarView /> : null}
+            {view === "insights" ? <InsightsView /> : null}
+          </section>
+        </div>
+      )}
 
       {selectedTaskId ? <TaskDetailPanel /> : null}
       {taskModalParams ? (

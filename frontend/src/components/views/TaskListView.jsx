@@ -77,15 +77,10 @@ export function TaskListView() {
 }
 
 function TaskListCard({ task }) {
-  const { deleteBlock, setSelectedTask, toggleTask, toggleFailTask, setRecurringTasksOpen, setEditingRepeatedTaskId } = useAppStore();
+  const { deleteBlock, setSelectedTask, toggleTask, toggleFailTask } = useAppStore();
   
   const handleTitleClick = () => {
-    if (task.isVirtual) {
-      setEditingRepeatedTaskId(task.templateId);
-      setRecurringTasksOpen(true);
-    } else {
-      setSelectedTask(task.id);
-    }
+    setSelectedTask(task.id);
   };
 
   return (

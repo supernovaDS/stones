@@ -168,5 +168,16 @@ export function viewTitle(view) {
   if (view === "tasks") return "Task list";
   if (view === "calendar") return "Calendar";
   if (view === "insights") return "Insights";
+  if (view === "diary") return "Diary";
   return "Workspace";
+}
+
+// ── Security helpers ─────────────────────────────────────────────
+
+export async function hashPassword(password) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }

@@ -8,6 +8,7 @@ import {
   todayIso,
   todayPageTitle
 } from "../utils/date";
+import { getVirtualTasksForDate } from "../utils/recurrence";
 
 const createId = (prefix) =>
   `${prefix}_${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
@@ -110,6 +111,32 @@ export const useAppStore = create((set, get) => ({
   editingRepeatedTaskId: null,
   setRecurringTasksOpen: (recurringTasksOpen) => set({ recurringTasksOpen }),
   setEditingRepeatedTaskId: (editingRepeatedTaskId) => set({ editingRepeatedTaskId }),
+
+  // ── Diary Feature ───────────────────────────────────────────────
+  diaryPasswordHash: localStorage.getItem("stones-diary-password") || null,
+  diaryAuthenticated: false,
+  activeDiaryPageId: null,
+
+  setDiaryPassword: async (password) => {
+    // Dynamically import hashPassword to avoid circular dependency issues if any
+    const { hashPassword } = await import("../utils/helpers");
+    const hash = await hashPassword(password);
+    localStorage.setItem("stones-diary-password", hash);
+    set({ diaryPasswordHash: hash, diaryAuthenticated: true });
+  },
+
+  authenticateDiary: async (password) => {
+    const { hashPassword } = await import("../utils/helpers");
+    const hash = await hashPassword(password);
+    const { diaryPasswordHash } = get();
+    if (hash === diaryPasswordHash) {
+      set({ diaryAuthenticated: true });
+      return true;
+    }
+    return false;
+  },
+
+  setActiveDiaryPage: (pageId) => set({ activeDiaryPageId: pageId }),
 
   initialize: async ({ skipSeed = false } = {}) => {
     set({ loading: true, error: undefined });
@@ -215,7 +242,13 @@ export const useAppStore = create((set, get) => ({
     });
   },
 
-  setView: (view) => set({ view }),
+  setView: (view) => {
+    if (view !== "diary") {
+      set({ view, diaryAuthenticated: false });
+    } else {
+      set({ view });
+    }
+  },
   setActivePage: (pageId) => set({ activePageId: pageId, view: "workspace" }),
   setSelectedTask: (taskId) => set({ selectedTaskId: taskId }),
   openTaskModal: (params = {}) => set({ taskModalParams: params }),
@@ -358,6 +391,28 @@ export const useAppStore = create((set, get) => ({
       view: "workspace"
     }));
     get().setNotification(`Page "${title}" created`);
+  },
+
+  addDiaryPage: async (title) => {
+    const createdAt = nowIso();
+    const uniqueTitle = getUniquePageTitle(title, get().pages);
+    const page = {
+      id: createId("page"),
+      workspaceId: "diary",
+      sectionId: null,
+      title: uniqueTitle,
+      createdAt,
+      updatedAt: createdAt
+    };
+
+    await db.pages.add(page);
+    // Sync logic might not apply to local-only diary, but adding it just in case
+    await enqueueMutation("page", page.id, "upsert", page);
+    set((state) => ({
+      pages: [...state.pages, page],
+      activeDiaryPageId: page.id
+    }));
+    get().setNotification(`Diary page "${title}" created`);
   },
 
   movePageToSection: async (pageId, sectionId) => {
@@ -559,44 +614,246 @@ export const useAppStore = create((set, get) => ({
   },
 
   addSubtask: async (taskId) => {
-    const task = get().blocks.find((block) => block.id === taskId);
+    let task;
+    let isVirtual = false;
+    let templateId, dateStr;
+    if (taskId.startsWith("virtual_")) {
+      isVirtual = true;
+      const cleaned = taskId.substring("virtual_".length);
+      const lastUnderscore = cleaned.lastIndexOf("_");
+      templateId = cleaned.substring(0, lastUnderscore);
+      dateStr = cleaned.substring(lastUnderscore + 1);
+      
+      const virtualTasks = getVirtualTasksForDate(dateStr, get().blocks);
+      task = virtualTasks.find(t => t.id === taskId);
+    } else {
+      task = get().blocks.find((block) => block.id === taskId);
+    }
+    
     if (!task || task.type !== "task") return;
-    await get().updateTask(taskId, {
-      subtasks: [
-        ...(task.content.subtasks ?? []),
-        { id: createId("subtask"), text: "New subtask", completed: false }
-      ]
-    });
+    
+    const nextSubtasks = [
+      ...(task.content.subtasks ?? []),
+      { id: createId("subtask"), text: "New subtask", completed: false }
+    ];
+
+    if (isVirtual) {
+      const instanceId = `instance_${templateId}_${dateStr}`;
+      let instance = get().blocks.find(b => b.id === instanceId);
+      const createdAt = nowIso();
+      const updatedAt = createdAt;
+      
+      if (!instance) {
+        instance = {
+          id: instanceId,
+          pageId: "system-recurring-instances",
+          type: "recurring_instance",
+          order: 0,
+          content: {
+            templateId,
+            dateStr,
+            subtasks: nextSubtasks
+          },
+          metadata: {
+            createdAt,
+            updatedAt
+          }
+        };
+        await db.blocks.add(instance);
+      } else {
+        instance = {
+          ...instance,
+          content: {
+            ...instance.content,
+            subtasks: nextSubtasks
+          },
+          metadata: {
+            ...instance.metadata,
+            updatedAt
+          }
+        };
+        await db.blocks.put(instance);
+      }
+      await enqueueMutation("block", instanceId, "upsert", instance);
+      
+      set((state) => ({
+        blocks: sortBlocks(
+          state.blocks.map((item) => item.id === instanceId ? instance : item).concat(
+            state.blocks.some(b => b.id === instanceId) ? [] : [instance]
+          )
+        )
+      }));
+    } else {
+      await get().updateTask(taskId, {
+        subtasks: nextSubtasks
+      });
+    }
   },
 
   updateSubtask: async (taskId, subtaskId, patch) => {
-    const task = get().blocks.find((block) => block.id === taskId);
+    let task;
+    let isVirtual = false;
+    let templateId, dateStr;
+    if (taskId.startsWith("virtual_")) {
+      isVirtual = true;
+      const cleaned = taskId.substring("virtual_".length);
+      const lastUnderscore = cleaned.lastIndexOf("_");
+      templateId = cleaned.substring(0, lastUnderscore);
+      dateStr = cleaned.substring(lastUnderscore + 1);
+      
+      const virtualTasks = getVirtualTasksForDate(dateStr, get().blocks);
+      task = virtualTasks.find(t => t.id === taskId);
+    } else {
+      task = get().blocks.find((block) => block.id === taskId);
+    }
+    
     if (!task || task.type !== "task") return;
     
     const nextSubtasks = (task.content.subtasks ?? []).map((subtask) =>
       subtask.id === subtaskId ? { ...subtask, ...patch } : subtask
     );
 
-    await get().updateTask(taskId, {
-      subtasks: nextSubtasks
-    });
+    if (isVirtual) {
+      const instanceId = `instance_${templateId}_${dateStr}`;
+      let instance = get().blocks.find(b => b.id === instanceId);
+      const createdAt = nowIso();
+      const updatedAt = createdAt;
+      
+      if (!instance) {
+        instance = {
+          id: instanceId,
+          pageId: "system-recurring-instances",
+          type: "recurring_instance",
+          order: 0,
+          content: {
+            templateId,
+            dateStr,
+            subtasks: nextSubtasks
+          },
+          metadata: {
+            createdAt,
+            updatedAt
+          }
+        };
+        await db.blocks.add(instance);
+      } else {
+        instance = {
+          ...instance,
+          content: {
+            ...instance.content,
+            subtasks: nextSubtasks
+          },
+          metadata: {
+            ...instance.metadata,
+            updatedAt
+          }
+        };
+        await db.blocks.put(instance);
+      }
+      await enqueueMutation("block", instanceId, "upsert", instance);
+      
+      set((state) => ({
+        blocks: sortBlocks(
+          state.blocks.map((item) => item.id === instanceId ? instance : item).concat(
+            state.blocks.some(b => b.id === instanceId) ? [] : [instance]
+          )
+        )
+      }));
 
-    const hasIncompleteSubtasks = nextSubtasks.some((s) => !s.completed);
-    if (hasIncompleteSubtasks && task.metadata.completed) {
-      await get().toggleTask(taskId);
-    } else if (!hasIncompleteSubtasks && !task.metadata.completed && nextSubtasks.length > 0) {
-      await get().toggleTask(taskId);
+      const hasIncompleteSubtasks = nextSubtasks.some((s) => !s.completed);
+      if (hasIncompleteSubtasks && task.metadata.completed) {
+        await get().toggleTask(taskId);
+      } else if (!hasIncompleteSubtasks && !task.metadata.completed && nextSubtasks.length > 0) {
+        await get().toggleTask(taskId);
+      }
+    } else {
+      await get().updateTask(taskId, {
+        subtasks: nextSubtasks
+      });
+
+      const hasIncompleteSubtasks = nextSubtasks.some((s) => !s.completed);
+      if (hasIncompleteSubtasks && task.metadata.completed) {
+        await get().toggleTask(taskId);
+      } else if (!hasIncompleteSubtasks && !task.metadata.completed && nextSubtasks.length > 0) {
+        await get().toggleTask(taskId);
+      }
     }
   },
 
   deleteSubtask: async (taskId, subtaskId) => {
-    const task = get().blocks.find((block) => block.id === taskId);
+    let task;
+    let isVirtual = false;
+    let templateId, dateStr;
+    if (taskId.startsWith("virtual_")) {
+      isVirtual = true;
+      const cleaned = taskId.substring("virtual_".length);
+      const lastUnderscore = cleaned.lastIndexOf("_");
+      templateId = cleaned.substring(0, lastUnderscore);
+      dateStr = cleaned.substring(lastUnderscore + 1);
+      
+      const virtualTasks = getVirtualTasksForDate(dateStr, get().blocks);
+      task = virtualTasks.find(t => t.id === taskId);
+    } else {
+      task = get().blocks.find((block) => block.id === taskId);
+    }
+    
     if (!task || task.type !== "task") return;
-    await get().updateTask(taskId, {
-      subtasks: (task.content.subtasks ?? []).filter(
-        (subtask) => subtask.id !== subtaskId
-      )
-    });
+    
+    const nextSubtasks = (task.content.subtasks ?? []).filter(
+      (subtask) => subtask.id !== subtaskId
+    );
+
+    if (isVirtual) {
+      const instanceId = `instance_${templateId}_${dateStr}`;
+      let instance = get().blocks.find(b => b.id === instanceId);
+      const createdAt = nowIso();
+      const updatedAt = createdAt;
+      
+      if (!instance) {
+        instance = {
+          id: instanceId,
+          pageId: "system-recurring-instances",
+          type: "recurring_instance",
+          order: 0,
+          content: {
+            templateId,
+            dateStr,
+            subtasks: nextSubtasks
+          },
+          metadata: {
+            createdAt,
+            updatedAt
+          }
+        };
+        await db.blocks.add(instance);
+      } else {
+        instance = {
+          ...instance,
+          content: {
+            ...instance.content,
+            subtasks: nextSubtasks
+          },
+          metadata: {
+            ...instance.metadata,
+            updatedAt
+          }
+        };
+        await db.blocks.put(instance);
+      }
+      await enqueueMutation("block", instanceId, "upsert", instance);
+      
+      set((state) => ({
+        blocks: sortBlocks(
+          state.blocks.map((item) => item.id === instanceId ? instance : item).concat(
+            state.blocks.some(b => b.id === instanceId) ? [] : [instance]
+          )
+        )
+      }));
+    } else {
+      await get().updateTask(taskId, {
+        subtasks: nextSubtasks
+      });
+    }
   },
 
   setTaskDependencies: async (taskId, dependencyIds) =>
@@ -626,6 +883,13 @@ export const useAppStore = create((set, get) => ({
     });
     if (!block.metadata.completed && blocked) {
       set({ error: "Complete dependent tasks before closing this task." });
+      return;
+    }
+
+    const subtasks = block.content.subtasks ?? [];
+    const hasIncompleteSubtasks = subtasks.some((s) => !s.completed);
+    if (!block.metadata.completed && hasIncompleteSubtasks) {
+      set({ error: "Complete all subtasks before closing this task." });
       return;
     }
 
@@ -812,20 +1076,68 @@ export const useAppStore = create((set, get) => ({
     get().setNotification("Repeating task updated");
   },
 
-  deleteRepeatedTask: async (id) => {
+  deleteRepeatedTask: async (id, deleteOptions = { completed: false, failed: false, due: false }) => {
     const template = get().blocks.find(b => b.id === id);
     if (!template) return;
     pushUndoSnapshot(get, set, "delete repeated task");
+
+    // If only deleting future tasks, archive the template and stop it today
+    if (!deleteOptions.completed && !deleteOptions.failed && !deleteOptions.due) {
+      const updatedTemplate = {
+        ...template,
+        metadata: {
+          ...template.metadata,
+          isArchived: true,
+          endDate: todayIso(),
+        }
+      };
+
+      await db.transaction("rw", db.blocks, async () => {
+        await db.blocks.put(updatedTemplate);
+      });
+      await enqueueMutation("block", updatedTemplate.id, "update", updatedTemplate);
+
+      set((current) => ({
+        blocks: current.blocks.map(b => b.id === updatedTemplate.id ? updatedTemplate : b)
+      }));
+      get().setNotification("Repeating task deleted from future");
+      return;
+    }
     
-    // Find all completions associated with this template
-    const completionsToDelete = get().blocks.filter(
-      b => b.type === "completed_repeat" && b.content.templateId === id
-    );
+    // Find all completions/failures associated with this template if selected
+    const completionsToDelete = deleteOptions.completed 
+      ? get().blocks.filter(b => b.type === "completed_repeat" && b.content.templateId === id)
+      : [];
+      
+    const failuresToDelete = deleteOptions.failed 
+      ? get().blocks.filter(b => b.type === "failed_repeat" && b.content.templateId === id)
+      : [];
+      
+    // Filter instance subtask lists based on selected options
+    const instancesToDelete = get().blocks.filter(b => {
+      if (b.type !== "recurring_instance" || b.content.templateId !== id) return false;
+      const dateStr = b.content.dateStr;
+      
+      const isCompleted = get().blocks.some(comp => comp.type === "completed_repeat" && comp.content.templateId === id && comp.metadata.completedDate === dateStr);
+      const isFailed = get().blocks.some(fail => fail.type === "failed_repeat" && fail.content.templateId === id && fail.metadata.failedDate === dateStr);
+      
+      if (isCompleted && deleteOptions.completed) return true;
+      if (isFailed && deleteOptions.failed) return true;
+      if (!isCompleted && !isFailed && deleteOptions.due) return true;
+      
+      return false;
+    });
     
     await db.transaction("rw", db.blocks, async () => {
       await db.blocks.delete(id);
       for (const comp of completionsToDelete) {
         await db.blocks.delete(comp.id);
+      }
+      for (const fail of failuresToDelete) {
+        await db.blocks.delete(fail.id);
+      }
+      for (const inst of instancesToDelete) {
+        await db.blocks.delete(inst.id);
       }
     });
 
@@ -833,10 +1145,22 @@ export const useAppStore = create((set, get) => ({
     for (const comp of completionsToDelete) {
       await enqueueMutation("block", comp.id, "delete", comp);
     }
+    for (const fail of failuresToDelete) {
+      await enqueueMutation("block", fail.id, "delete", fail);
+    }
+    for (const inst of instancesToDelete) {
+      await enqueueMutation("block", inst.id, "delete", inst);
+    }
 
-    const completionIds = new Set(completionsToDelete.map(c => c.id));
+    const idsToDelete = new Set([
+      id,
+      ...completionsToDelete.map(c => c.id),
+      ...failuresToDelete.map(f => f.id),
+      ...instancesToDelete.map(i => i.id)
+    ]);
+    
     set((current) => ({
-      blocks: sortBlocks(current.blocks.filter(b => b.id !== id && !completionIds.has(b.id)))
+      blocks: sortBlocks(current.blocks.filter(b => !idsToDelete.has(b.id)))
     }));
     get().setNotification("Repeating task deleted");
   },
@@ -847,12 +1171,31 @@ export const useAppStore = create((set, get) => ({
     const existing = get().blocks.find(b => b.id === compId);
     const existingFail = get().blocks.find(b => b.id === failId);
     
+    // Resolve the virtual task to check its subtasks
+    const virtualTasks = getVirtualTasksForDate(dateStr, get().blocks);
+    const task = virtualTasks.find(t => t.id === `virtual_${templateId}_${dateStr}`);
+    
+    if (task && task.metadata.failed) {
+      set({ error: "Cannot complete a failed task. Unfail it first." });
+      return;
+    }
+
+    if (!existing && task) {
+      // Trying to complete the task
+      const hasIncompleteSubtasks = task.content.subtasks?.some(s => !s.completed);
+      if (hasIncompleteSubtasks) {
+        set({ error: "Complete all subtasks before closing this task." });
+        return;
+      }
+    }
+
     pushUndoSnapshot(get, set, "toggle repeated task instance");
     
     if (existing) {
       await db.blocks.delete(compId);
       await enqueueMutation("block", compId, "delete", existing);
       set((current) => ({
+        error: undefined,
         blocks: sortBlocks(current.blocks.filter(b => b.id !== compId))
       }));
     } else {
@@ -889,7 +1232,7 @@ export const useAppStore = create((set, get) => ({
         if (existingFail) {
           nextBlocks = nextBlocks.filter(b => b.id !== failId);
         }
-        return { blocks: sortBlocks(nextBlocks) };
+        return { error: undefined, blocks: sortBlocks(nextBlocks) };
       });
     }
   },
