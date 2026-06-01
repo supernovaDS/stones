@@ -254,26 +254,37 @@ function NoteBlock({ block }) {
   const [activeLink, setActiveLink] = useState(null);
   const linkedTasks = blocks.filter((task) => task.type === "task" && task.sourceBlockId === block.id);
   const isInitializing = useRef(false);
+  // Track the last html/text we sent to the store from user input,
+  // so we can detect external changes (e.g. undo) and re-sync the DOM.
+  const lastPushedHtml = useRef(null);
 
-  // Initialize editor content from stored HTML or plain text
+  // Sync editor DOM whenever the store content changes externally
+  // (undo, sync, block switch, etc.)
   useEffect(() => {
     if (!editorRef.current) return;
+    const storeHtml = block.content.html ?? "";
+    const storeText = block.content.text ?? "";
+
+    // If the store content matches what we last pushed from user input,
+    // the change originated here — skip to avoid cursor jumps.
+    if (lastPushedHtml.current !== null && storeHtml === lastPushedHtml.current) {
+      return;
+    }
+
     isInitializing.current = true;
-    const html = block.content.html ?? "";
-    const text = block.content.text ?? "";
-    // Prefer stored HTML; fall back to plain text (wrap lines in <p> tags)
-    if (html) {
-      editorRef.current.innerHTML = html;
-    } else if (text) {
-      editorRef.current.innerHTML = text
+    if (storeHtml) {
+      editorRef.current.innerHTML = storeHtml;
+    } else if (storeText) {
+      editorRef.current.innerHTML = storeText
         .split("\n")
         .map((line) => `<p>${line || "<br>"}</p>`)
         .join("");
     } else {
       editorRef.current.innerHTML = "";
     }
+    lastPushedHtml.current = null;
     isInitializing.current = false;
-  }, [block.id]); // only re-init when block changes
+  }, [block.id, block.content.html, block.content.text]);
 
   const handleInput = () => {
     if (isInitializing.current) return;
@@ -281,6 +292,9 @@ function NoteBlock({ block }) {
     if (!editor) return;
     const html = editor.innerHTML;
     const text = editor.innerText;
+    // Remember what we're pushing so the sync effect can skip
+    // re-writing the DOM for our own changes (avoids cursor jumps).
+    lastPushedHtml.current = html;
     void updateBlockContent(block.id, { html, text });
   };
 

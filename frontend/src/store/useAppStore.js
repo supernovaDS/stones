@@ -244,7 +244,13 @@ export const useAppStore = create((set, get) => ({
 
   setView: (view) => {
     if (view !== "diary") {
-      set({ view, diaryAuthenticated: false });
+      // When leaving the diary, purge any undo snapshots that were captured
+      // while in the diary view so workspace Ctrl+Z never undoes diary changes.
+      const wasDiary = get().view === "diary";
+      const undoStack = wasDiary
+        ? get().undoStack.filter((s) => s.data.view !== "diary")
+        : get().undoStack;
+      set({ view, diaryAuthenticated: false, undoStack });
     } else {
       set({ view });
     }
@@ -282,6 +288,9 @@ export const useAppStore = create((set, get) => ({
       undoStack: rest,
       selectedTaskId: undefined
     });
+    // Reset debounce so the next edit after undo creates a fresh snapshot
+    _lastUndoLabel = null;
+    _lastUndoTime = 0;
     get().setNotification(`Undid ${snapshot.label}`);
   },
 
@@ -1829,7 +1838,25 @@ const makeDeletedItem = (type, label, payload) => ({
   deletedAt: nowIso()
 });
 
+// Debounce state for coalescing rapid edits into a single undo entry.
+// If the same label fires again within the window, we skip pushing a new
+// snapshot so the existing one captures the state before the first keystroke.
+let _lastUndoLabel = null;
+let _lastUndoTime = 0;
+const UNDO_DEBOUNCE_MS = 1000;
+
 const pushUndoSnapshot = (get, set, label) => {
+  const now = Date.now();
+  // Coalesce rapid identical operations (e.g. typing in a note)
+  if (label === _lastUndoLabel && now - _lastUndoTime < UNDO_DEBOUNCE_MS) {
+    // Keep the existing snapshot (which has the pre-edit state) — just
+    // bump the timestamp so the window extends while the user keeps typing.
+    _lastUndoTime = now;
+    return;
+  }
+  _lastUndoLabel = label;
+  _lastUndoTime = now;
+
   const state = get();
   const snapshot = {
     id: createId("undo"),
