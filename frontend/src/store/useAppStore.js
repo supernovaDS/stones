@@ -972,6 +972,11 @@ export const useAppStore = create((set, get) => ({
     const block = get().blocks.find((item) => item.id === blockId);
     if (!block || block.type !== "task") return;
 
+    if (block.metadata.completed && !block.metadata.failed) {
+      set({ error: "Cannot fail a completed task. Incomplete it first." });
+      return;
+    }
+
     pushUndoSnapshot(get, set, "fail task");
     const failed = !block.metadata.failed;
     const updatedBlock = {
@@ -1253,6 +1258,11 @@ export const useAppStore = create((set, get) => ({
     const existingFail = get().blocks.find(b => b.id === failId);
     const existingComp = get().blocks.find(b => b.id === compId);
     
+    if (existingComp && !existingFail) {
+      set({ error: "Cannot fail a completed task. Incomplete it first." });
+      return;
+    }
+
     pushUndoSnapshot(get, set, "toggle repeated task instance fail");
     
     let newFailure;

@@ -412,16 +412,18 @@ function TaskBlock({ block }) {
           <div className="task-block-actions flex shrink-0 flex-wrap gap-2">
             <IconButton icon={ArrowUp} title="Move up" onClick={() => void moveBlock(block.id, "up")} />
             <IconButton icon={ArrowDown} title="Move down" onClick={() => void moveBlock(block.id, "down")} />
-            <IconButton 
-              icon={XCircle} 
-              title={block.metadata.failed ? "Unfail task" : "Fail task"} 
-              onClick={() => void toggleFailTask(block.id)} 
-              className={clsx(
-                block.metadata.failed 
-                  ? "!bg-[#ff5a5f] !text-black border-black dark:!bg-[#5c1a1d] dark:!text-[#e8a0a2] dark:border-[#1e232a]" 
-                  : "bg-white text-stone-600 dark:bg-[#12151a] dark:text-[#7a7670]"
-              )}
-            />
+            {(!block.metadata.completed || block.metadata.failed) && (
+              <IconButton 
+                icon={XCircle} 
+                title={block.metadata.failed ? "Unfail task" : "Fail task"} 
+                onClick={() => void toggleFailTask(block.id)} 
+                className={clsx(
+                  block.metadata.failed 
+                    ? "!bg-[#ff5a5f] !text-black border-black dark:!bg-[#5c1a1d] dark:!text-[#e8a0a2] dark:border-[#1e232a]" 
+                    : "bg-white text-stone-600 dark:bg-[#12151a] dark:text-[#7a7670]"
+                )}
+              />
+            )}
             <IconButton icon={PanelRight} title="Open details" onClick={() => setSelectedTask(block.id)} />
             <IconButton icon={Scissors} title="Cut task" onClick={() => cutBlock(block.id)} />
             <IconButton icon={block.metadata.archived ? ArchiveRestore : Archive} title={block.metadata.archived ? "Unarchive task" : "Archive task"} onClick={() => void toggleArchiveBlock(block.id)} />

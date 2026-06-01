@@ -145,7 +145,9 @@ export function TaskDetailPanel() {
         
         <div className="flex gap-2">
           <button className="nb-button action flex-1" onClick={() => void toggleTask(task.id)} type="button"><Check size={16} />{task.metadata.completed ? "Mark Open" : "Mark Complete"}</button>
-          <button className="nb-button flex-1" onClick={() => void toggleFailTask(task.id)} type="button"><XCircle size={16} />{task.metadata.failed ? "Unfail Task" : "Fail Task"}</button>
+          {(!task.metadata.completed || task.metadata.failed) && (
+            <button className="nb-button flex-1" onClick={() => void toggleFailTask(task.id)} type="button"><XCircle size={16} />{task.metadata.failed ? "Unfail Task" : "Fail Task"}</button>
+          )}
         </div>
         {source?.type === "note" ? <div className="rounded-lg border-[3px] border-black bg-[#fff1b8] p-3 shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[3px_3px_0_#000]"><p className="mb-1 text-xs font-black uppercase tracking-wide text-stone-600 dark:text-[#7a7670]">Source note</p><p className="line-clamp-4 text-sm font-bold text-stone-700 dark:text-[#7a7670]">{source.content.text}</p></div> : null}
         {!isVirtual && task.pageId !== "system-calendar" && (

@@ -95,19 +95,21 @@ function TaskListCard({ task }) {
       </button>
       <span className={clsx("rounded-md border px-2 py-1 text-xs font-semibold", priorityClasses[task.metadata.priority ?? "medium"])}>{task.metadata.priority ?? "medium"}</span>
       <div className="flex gap-1 max-sm:col-start-3">
-        <button 
-          className={clsx(
-            "icon-button", 
-            task.metadata.failed 
-              ? "!bg-[#ff5a5f] !text-black border-black dark:!bg-[#5c1a1d] dark:!text-[#e8a0a2] dark:border-[#1e232a]" 
-              : "bg-white text-stone-600 dark:bg-[#12151a] dark:text-[#7a7670]"
-          )} 
-          onClick={() => void toggleFailTask(task.id)} 
-          title={task.metadata.failed ? "Unfail task" : "Fail task"} 
-          type="button"
-        >
-          <XCircle size={15} />
-        </button>
+        {(!task.metadata.completed || task.metadata.failed) && (
+          <button 
+            className={clsx(
+              "icon-button", 
+              task.metadata.failed 
+                ? "!bg-[#ff5a5f] !text-black border-black dark:!bg-[#5c1a1d] dark:!text-[#e8a0a2] dark:border-[#1e232a]" 
+                : "bg-white text-stone-600 dark:bg-[#12151a] dark:text-[#7a7670]"
+            )} 
+            onClick={() => void toggleFailTask(task.id)} 
+            title={task.metadata.failed ? "Unfail task" : "Fail task"} 
+            type="button"
+          >
+            <XCircle size={15} />
+          </button>
+        )}
         {!task.isVirtual && (
           <button className="icon-button danger" onClick={() => void deleteBlock(task.id)} title="Delete task" type="button"><Trash2 size={15} /></button>
         )}
