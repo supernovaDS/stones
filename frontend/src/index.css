@@ -1544,6 +1544,18 @@
     0 8px 24px rgba(0, 0, 0, 0.2);
 }
 
+.profile-minimal .task-detail-panel {
+  border-left: 1px solid rgba(0, 0, 0, 0.15) !important;
+  background: rgba(255, 255, 255, 0.98) !important;
+  box-shadow: -8px 0 24px rgba(87, 83, 78, 0.06) !important;
+}
+
+.profile-minimal.dark .task-detail-panel {
+  border-left-color: #1e293b !important;
+  background: rgba(15, 23, 42, 0.98) !important;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.3) !important;
+}
+
 /* ── Color-Coded Borders for Blocks ────────────────────────── */
 .profile-minimal .bento-card[class*="border-l-[#21caff]"] {
   border-color: rgba(33, 202, 255, 0.25) !important;
