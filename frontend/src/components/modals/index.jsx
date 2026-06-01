@@ -47,8 +47,8 @@ export function TaskDetailPanel() {
   const dependencies = task.content.dependencyIds ?? [];
 
   return (
-    <aside className="task-detail-panel fixed inset-y-0 right-0 z-30 w-[430px] max-w-full overflow-auto border-l-[3px] border-black bg-[#fff7e8] p-5 shadow-[-4px_0_0_#111] dark:border-[#1e232a] dark:bg-[#0c0e11] dark:shadow-[-3px_0_0_#000]">
-      <div className="mb-5 flex items-center justify-between gap-3">
+    <aside className="task-detail-panel flex flex-col fixed inset-y-0 right-0 z-30 w-[430px] max-w-full border-l-[3px] border-black bg-[#fff7e8] shadow-[-4px_0_0_#111] dark:border-[#1e232a] dark:bg-[#0c0e11] dark:shadow-[-3px_0_0_#000]">
+      <div className="flex shrink-0 items-center justify-between gap-3 p-5 pb-2">
         <div className="min-w-0">
           <p className="text-xs font-black uppercase tracking-wide text-stone-600 dark:text-[#7a7670]">
             {isVirtual ? "Repeating Task Details" : "Task details"}
@@ -57,7 +57,7 @@ export function TaskDetailPanel() {
         </div>
         <IconButton icon={X} title="Close details" onClick={() => setSelectedTask(undefined)} />
       </div>
-      <div className="grid gap-4">
+      <div className="grid flex-1 gap-4 overflow-auto p-5 pt-2">
         <label className="grid gap-1 text-sm font-black">
           Title
           <input 
@@ -126,7 +126,7 @@ export function TaskDetailPanel() {
           ))}
         </section>
 
-        {!isVirtual && (
+        {!isVirtual && otherTasks.length > 0 && (
           <section className="grid gap-2">
             <h4 className="text-sm font-black">Dependencies</h4>
             <div className="max-h-36 overflow-auto rounded-lg border-[3px] border-black bg-white p-2 shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[3px_3px_0_#000]">

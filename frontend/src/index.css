@@ -2895,3 +2895,23 @@
 .profile-minimal.dark .bento-card.hover-static:hover {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 18px 46px rgba(0, 0, 0, 0.22) !important;
 }
+
+/* Task Detail Panel Minimal Profile Typography & Fixes */
+.profile-minimal .task-detail-panel .font-black {
+  font-weight: 600 !important;
+}
+.profile-minimal .task-detail-panel h3.font-black {
+  font-weight: 700 !important;
+}
+.profile-minimal .task-detail-panel .uppercase.tracking-wide {
+  letter-spacing: 0.05em !important;
+  opacity: 0.8;
+}
+.profile-minimal .task-detail-panel div[class*="border-[3px]"] {
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+}
+.profile-minimal.dark .task-detail-panel div[class*="border-[3px]"] {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
+}
