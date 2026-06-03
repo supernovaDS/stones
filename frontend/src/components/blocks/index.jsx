@@ -258,6 +258,32 @@ function NoteBlock({ block }) {
   // so we can detect external changes (e.g. undo) and re-sync the DOM.
   const lastPushedHtml = useRef(null);
 
+  const popoverTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (popoverTimeoutRef.current) {
+        clearTimeout(popoverTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const showPopover = (url, top, left) => {
+    if (popoverTimeoutRef.current) {
+      clearTimeout(popoverTimeoutRef.current);
+      popoverTimeoutRef.current = null;
+    }
+    setActiveLink({ url, top, left });
+  };
+
+  const hidePopover = () => {
+    if (popoverTimeoutRef.current) clearTimeout(popoverTimeoutRef.current);
+    popoverTimeoutRef.current = setTimeout(() => {
+      setActiveLink(null);
+      popoverTimeoutRef.current = null;
+    }, 200);
+  };
+
   // Sync editor DOM whenever the store content changes externally
   // (undo, sync, block switch, etc.)
   useEffect(() => {
@@ -313,24 +339,29 @@ function NoteBlock({ block }) {
             if (e.target.tagName === "A") {
               const editorRect = editorRef.current.getBoundingClientRect();
               const linkRect = e.target.getBoundingClientRect();
-              setActiveLink({
-                url: e.target.href,
-                top: linkRect.bottom - editorRect.top + 8,
-                left: Math.max(0, linkRect.left - editorRect.left),
-              });
+              showPopover(
+                e.target.href,
+                linkRect.bottom - editorRect.top + 8,
+                Math.max(0, linkRect.left - editorRect.left)
+              );
             } else {
-              setActiveLink(null);
+              hidePopover();
             }
           }}
           onMouseOver={(e) => {
             if (e.target.tagName === "A") {
               const editorRect = editorRef.current.getBoundingClientRect();
               const linkRect = e.target.getBoundingClientRect();
-              setActiveLink({
-                url: e.target.href,
-                top: linkRect.bottom - editorRect.top + 8,
-                left: Math.max(0, linkRect.left - editorRect.left),
-              });
+              showPopover(
+                e.target.href,
+                linkRect.bottom - editorRect.top + 8,
+                Math.max(0, linkRect.left - editorRect.left)
+              );
+            }
+          }}
+          onMouseOut={(e) => {
+            if (e.target.tagName === "A") {
+              hidePopover();
             }
           }}
           ref={editorRef}
@@ -341,6 +372,13 @@ function NoteBlock({ block }) {
           <div
             className="absolute z-10 flex items-center gap-3 rounded-md border-[2px] border-black bg-white px-3 py-2 shadow-[3px_3px_0_#111] dark:border-[#1e232a] dark:bg-[#0c0e11] dark:shadow-[2px_2px_0_#000]"
             style={{ top: activeLink.top, left: activeLink.left }}
+            onMouseEnter={() => {
+              if (popoverTimeoutRef.current) {
+                clearTimeout(popoverTimeoutRef.current);
+                popoverTimeoutRef.current = null;
+              }
+            }}
+            onMouseLeave={hidePopover}
           >
             <span className="max-w-[200px] truncate text-xs text-stone-500 dark:text-[#7a7670]">{activeLink.url}</span>
             <a
@@ -364,6 +402,7 @@ function NoteBlock({ block }) {
                 className="nb-button justify-between bg-white text-left dark:bg-[#12151a]"
                 key={task.id}
                 onClick={() => setSelectedTask(task.id)}
+                data-prevent-outside-close="true"
                 type="button"
               >
                 <span className={clsx("truncate", task.metadata.completed && "text-stone-400 line-through dark:text-[#5a5650]")}>{task.content.title}</span>
@@ -424,7 +463,7 @@ function TaskBlock({ block }) {
                 )}
               />
             )}
-            <IconButton icon={PanelRight} title="Open details" onClick={() => setSelectedTask(block.id)} />
+            <IconButton icon={PanelRight} title="Open details" onClick={() => setSelectedTask(block.id)} className="prevent-outside-close" />
             <IconButton icon={Scissors} title="Cut task" onClick={() => cutBlock(block.id)} />
             <IconButton icon={block.metadata.archived ? ArchiveRestore : Archive} title={block.metadata.archived ? "Unarchive task" : "Archive task"} onClick={() => void toggleArchiveBlock(block.id)} />
             <IconButton danger icon={Trash2} title="Delete task" onClick={() => void deleteBlock(block.id)} />

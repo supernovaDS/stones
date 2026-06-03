@@ -127,27 +127,45 @@ export function CalendarView() {
                     checked={isCompleted} 
                     onChange={() => void toggleTask(task.id)} 
                   />
-                  <button 
-                    className="min-w-0 flex-1 text-left" 
-                    onClick={() => {
-                      setSelectedTask(task.id);
-                    }} 
-                    type="button"
-                  >
-                    <span 
-                      className={clsx(
-                        "block truncate font-black text-sm text-black dark:text-[#c8c3ba]",
-                        isCompleted && "text-stone-400 line-through dark:text-[#5a5650]",
-                        isFailed && "text-red-500 line-through dark:text-red-400"
-                      )}
+                  {task.isVirtual ? (
+                    <div className="min-w-0 flex-1 text-left select-none">
+                      <span 
+                        className={clsx(
+                          "block truncate font-black text-sm text-black dark:text-[#c8c3ba]",
+                          isCompleted && "text-stone-400 line-through dark:text-[#5a5650]",
+                          isFailed && "text-red-500 line-through dark:text-red-400"
+                        )}
+                      >
+                        {task.content.title || "Untitled task"}
+                        {" (Repeating)"}
+                      </span>
+                      <span className="text-xs text-stone-500 dark:text-[#7a7670] capitalize">
+                        {task.metadata.priority ?? "medium"} Priority
+                      </span>
+                    </div>
+                  ) : (
+                    <button 
+                      className="min-w-0 flex-1 text-left" 
+                      onClick={() => {
+                        setSelectedTask(task.id);
+                      }} 
+                      data-prevent-outside-close="true"
+                      type="button"
                     >
-                      {task.content.title || "Untitled task"}
-                      {task.isVirtual && " (Repeating)"}
-                    </span>
-                    <span className="text-xs text-stone-500 dark:text-[#7a7670] capitalize">
-                      {task.metadata.priority ?? "medium"} Priority
-                    </span>
-                  </button>
+                      <span 
+                        className={clsx(
+                          "block truncate font-black text-sm text-black dark:text-[#c8c3ba]",
+                          isCompleted && "text-stone-400 line-through dark:text-[#5a5650]",
+                          isFailed && "text-red-500 line-through dark:text-red-400"
+                        )}
+                      >
+                        {task.content.title || "Untitled task"}
+                      </span>
+                      <span className="text-xs text-stone-500 dark:text-[#7a7670] capitalize">
+                        {task.metadata.priority ?? "medium"} Priority
+                      </span>
+                    </button>
+                  )}
                 </div>
                 <div className="flex flex-shrink-0 items-center gap-1">
                   {(!isCompleted || isFailed) && (

@@ -86,13 +86,28 @@ function TaskListCard({ task }) {
   return (
     <article className={clsx("bento-card grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 border-l-[10px] p-3 max-sm:grid-cols-[auto_1fr_auto]", priorityRail[task.metadata.priority ?? "medium"])}>
       <Checkbox checked={task.metadata.completed} onChange={() => void toggleTask(task.id)} />
-      <button className="min-w-0 text-left" onClick={handleTitleClick} type="button">
-        <span className={clsx("block truncate font-semibold", task.metadata.completed && "text-stone-400 line-through dark:text-[#5a5650]", task.metadata.failed && "text-red-500 line-through dark:text-red-400")}>{task.content.title || "Untitled task"}</span>
-        <span className="text-xs text-stone-500 dark:text-[#5a5650]">
-          {task.metadata.priority ?? "medium"} priority - {formatShortDate(task.metadata.deadline)}
-          {task.isVirtual && " (Repeating)"}
-        </span>
-      </button>
+      {task.isVirtual ? (
+        <div className="min-w-0 text-left select-none">
+          <span className={clsx("block truncate font-semibold", task.metadata.completed && "text-stone-400 line-through dark:text-[#5a5650]", task.metadata.failed && "text-red-500 line-through dark:text-red-400")}>{task.content.title || "Untitled task"}</span>
+          <span className="text-xs text-stone-500 dark:text-[#5a5650]">
+            {task.metadata.priority ?? "medium"} priority - {formatShortDate(task.metadata.deadline)}
+            {task.metadata.completed && task.metadata.completedAt && (
+              ` - Completed: ${new Date(task.metadata.completedAt).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}`
+            )}
+            {" (Repeating)"}
+          </span>
+        </div>
+      ) : (
+        <button className="min-w-0 text-left" onClick={handleTitleClick} data-prevent-outside-close="true" type="button">
+          <span className={clsx("block truncate font-semibold", task.metadata.completed && "text-stone-400 line-through dark:text-[#5a5650]", task.metadata.failed && "text-red-500 line-through dark:text-red-400")}>{task.content.title || "Untitled task"}</span>
+          <span className="text-xs text-stone-500 dark:text-[#5a5650]">
+            {task.metadata.priority ?? "medium"} priority - {formatShortDate(task.metadata.deadline)}
+            {task.metadata.completed && task.metadata.completedAt && (
+              ` - Completed: ${new Date(task.metadata.completedAt).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}`
+            )}
+          </span>
+        </button>
+      )}
       <span className={clsx("rounded-md border px-2 py-1 text-xs font-semibold", priorityClasses[task.metadata.priority ?? "medium"])}>{task.metadata.priority ?? "medium"}</span>
       <div className="flex gap-1 max-sm:col-start-3">
         {(!task.metadata.completed || task.metadata.failed) && (

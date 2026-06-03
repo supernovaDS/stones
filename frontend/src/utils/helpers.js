@@ -63,9 +63,9 @@ export function shiftMonth(date, amount) {
 }
 
 export function priorityDot(priority) {
-  if (priority === "high") return "bg-[#ff9f43]";
-  if (priority === "low") return "bg-[#6c63ff]";
-  return "bg-[#6fbe44]";
+  if (priority === "high") return "bg-[#ff5a5f]";
+  if (priority === "low") return "bg-[#2ef2a6]";
+  return "bg-[#ffb84d]";
 }
 
 // ── Insights helpers ────────────────────────────────────────────

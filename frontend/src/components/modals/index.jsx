@@ -14,7 +14,7 @@ import {
   XCircle,
   Book
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAppStore } from "../../store/useAppStore";
 import { formatShortDate, toInputDate } from "../../utils/date";
 import { slugify, downloadText } from "../../utils/helpers";
@@ -25,6 +25,27 @@ import { getVirtualTasksForDate } from "../../utils/recurrence";
 
 export function TaskDetailPanel() {
   const { addSubtask, blocks, deleteSubtask, pages, selectedTaskId, setActivePage, setSelectedTask, setTaskDependencies, toggleTask, toggleFailTask, updateSubtask, updateTask } = useAppStore();
+  const panelRef = useRef(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (panelRef.current && panelRef.current.contains(event.target)) {
+        return;
+      }
+      if (
+        event.target.closest('[data-prevent-outside-close="true"]') ||
+        event.target.closest('.prevent-outside-close')
+      ) {
+        return;
+      }
+      setSelectedTask(undefined);
+    };
+
+    document.addEventListener("click", handleOutsideClick);
+    return () => {
+      document.removeEventListener("click", handleOutsideClick);
+    };
+  }, [setSelectedTask]);
   
   let task;
   let isVirtual = false;
@@ -47,7 +68,7 @@ export function TaskDetailPanel() {
   const dependencies = task.content.dependencyIds ?? [];
 
   return (
-    <aside className="task-detail-panel flex flex-col fixed inset-y-0 right-0 z-30 w-[430px] max-w-full border-l-[3px] border-black bg-[#fff7e8] shadow-[-4px_0_0_#111] dark:border-[#1e232a] dark:bg-[#0c0e11] dark:shadow-[-3px_0_0_#000]">
+    <aside ref={panelRef} className="task-detail-panel flex flex-col fixed inset-y-0 right-0 z-30 w-[430px] max-w-full border-l-[3px] border-black bg-[#fff7e8] shadow-[-4px_0_0_#111] dark:border-[#1e232a] dark:bg-[#0c0e11] dark:shadow-[-3px_0_0_#000]">
       <div className="flex shrink-0 items-center justify-between gap-3 p-5 pb-2">
         <div className="min-w-0">
           <p className="text-xs font-black uppercase tracking-wide text-stone-600 dark:text-[#7a7670]">
@@ -110,6 +131,18 @@ export function TaskDetailPanel() {
               value={toInputDate(task.metadata.reminderAt)} 
             />
           </label>
+        )}
+
+        {task.metadata.completed && task.metadata.completedAt && (
+          <div className="grid gap-1 text-sm font-black bg-emerald-100/50 dark:bg-emerald-950/20 border-2 border-emerald-500 rounded-lg p-3">
+            <span className="text-xs text-emerald-800 dark:text-[#6fd09a] uppercase">Completed On</span>
+            <span className="text-sm font-bold text-stone-800 dark:text-[#c8c3ba]">
+              {new Date(task.metadata.completedAt).toLocaleString(undefined, {
+                dateStyle: "medium",
+                timeStyle: "short"
+              })}
+            </span>
+          </div>
         )}
         
         <section className="grid gap-2">
@@ -183,8 +216,8 @@ export function TaskModal({ initialParams, onClose, onSubmit }) {
   };
 
   return (
-    <div className="modal-backdrop">
-      <div className="modal-card p-6">
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-card p-6" onClick={(e) => e.stopPropagation()}>
         <h3 className="mb-4 text-3xl font-black">New Task</h3>
         <form onSubmit={handleSubmit} className="grid gap-4">
           <label className="grid gap-1 text-sm font-black">
@@ -259,8 +292,8 @@ export function CommandPalette({ onClose }) {
     .filter((task) => !normalized || task.content.title.toLowerCase().includes(normalized))
     .slice(0, 6);
   return (
-    <div className="modal-backdrop place-items-start pt-24">
-      <section className="modal-card mx-auto max-w-xl p-2">
+    <div className="modal-backdrop place-items-start pt-24" onClick={onClose}>
+      <section className="modal-card mx-auto max-w-xl p-2" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2 border-b-[4px] border-black px-3 py-3 text-stone-600 dark:border-[#1e232a] dark:text-[#7a7670]"><Command size={18} /><input autoFocus className="min-w-0 flex-1 bg-transparent text-sm font-black text-stone-900 outline-none dark:text-[#c8c3ba]" onChange={(event) => setQuery(event.target.value)} placeholder="Type /note, or search pages..." value={query} /><button className="icon-button" onClick={onClose} type="button"><X size={16} /></button></div>
         <div className="max-h-[60vh] overflow-auto p-2">
           <CommandGroup label="Commands">

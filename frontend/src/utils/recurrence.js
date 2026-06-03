@@ -108,7 +108,8 @@ export function getVirtualTasksForDate(dateStr, blocks) {
   return templates
     .filter((template) => isOccurringOnDate(template, dateStr))
     .map((template) => {
-      const isCompleted = completions.some((c) => c.content?.templateId === template.id);
+      const comp = completions.find((c) => c.content?.templateId === template.id);
+      const isCompleted = !!comp;
       const isFailed = failures.some((f) => f.content?.templateId === template.id);
       const instance = instances.find((inst) => inst.content?.templateId === template.id);
       const subtasks = instance ? (instance.content?.subtasks || []) : (template.content?.subtasks || []);
@@ -125,6 +126,7 @@ export function getVirtualTasksForDate(dateStr, blocks) {
         metadata: {
           deadline: dateStr + (template.metadata?.deadlineTime ? `T${template.metadata.deadlineTime}` : ""),
           completed: isCompleted,
+          completedAt: comp ? comp.metadata?.completedAt : undefined,
           failed: isFailed,
           priority: template.metadata?.priority || "medium",
           isRepeated: true
