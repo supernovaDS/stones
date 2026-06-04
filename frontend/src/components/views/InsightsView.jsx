@@ -2,7 +2,7 @@ import { Bell, History, RotateCcw, X, ChevronLeft, ChevronRight } from "lucide-r
 import { clsx } from "clsx";
 import { useMemo, useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
-import { formatShortDate, toLocalDateString } from "../../utils/date";
+import { formatShortDate, toLocalDateString, isOverdue, todayIso } from "../../utils/date";
 import { calculateStreak, heatColor, getCalendarDays, shiftMonth } from "../../utils/helpers";
 import { HeaderButton, IconButton, Metric } from "../ui";
 import { getHistoryVirtualTasks } from "../../utils/recurrence";
@@ -25,10 +25,28 @@ export function InsightsView() {
     return [...realTasks, ...historyVirtualTasks];
   }, [blocks, historyVirtualTasks]);
 
-  const completed = useMemo(() => tasks.filter((task) => task.metadata.completed), [tasks]);
-  const failed = tasks.filter((task) => task.metadata.failed);
-  const streak = useMemo(() => calculateStreak(tasks), [tasks]);
-  const completionRate = tasks.length ? Math.round((completed.length / tasks.length) * 100) : 0;
+  const todayStr = useMemo(() => todayIso(), []);
+
+  // Filter tasks to exclude future tasks (upcoming tasks that are not completed or failed)
+  const currentAndPastTasks = useMemo(() => {
+    return tasks.filter((task) => {
+      const isFuture =
+        task.metadata.deadline &&
+        task.metadata.deadline.slice(0, 10) > todayStr &&
+        !task.metadata.completed &&
+        !task.metadata.failed;
+      return !isFuture;
+    });
+  }, [tasks, todayStr]);
+
+  const completed = useMemo(() => currentAndPastTasks.filter((task) => task.metadata.completed), [currentAndPastTasks]);
+  const completedCount = completed.length;
+  const failedCount = useMemo(() => currentAndPastTasks.filter((task) => task.metadata.failed).length, [currentAndPastTasks]);
+  const overdueCount = useMemo(() => currentAndPastTasks.filter((task) => !task.metadata.completed && !task.metadata.failed && isOverdue(task.metadata.deadline)).length, [currentAndPastTasks]);
+
+  const streak = useMemo(() => calculateStreak(currentAndPastTasks), [currentAndPastTasks]);
+  const completionRate = currentAndPastTasks.length ? Math.round((completedCount / currentAndPastTasks.length) * 100) : 0;
+  const failRate = currentAndPastTasks.length ? Math.round((failedCount / currentAndPastTasks.length) * 100) : 0;
 
   const [heatmapCursor, setHeatmapCursor] = useState(new Date());
   const heatmapDays = useMemo(() => getCalendarDays(heatmapCursor), [heatmapCursor]);
@@ -40,13 +58,6 @@ export function InsightsView() {
 
   return (
     <div className="bento-grid">
-      <div className="span-12 grid grid-cols-5 gap-4 max-xl:grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
-        <Metric label="Tasks" value={tasks.length.toString()} color="blue" />
-        <Metric label="Completed" value={completed.length.toString()} color="green" />
-        <Metric label="Failed" value={failed.length.toString()} color="red" />
-        <Metric label="Rate" value={`${completionRate}%`} color="purple" />
-        <Metric label="Streak" value={`${streak}d`} color="orange" />
-      </div>
       <section className="bento-card span-5 bg-white border-l-[10px] border-l-[#ffdc4a] p-4 text-black dark:bg-[#12151a] dark:border-l-[#1a1500] dark:text-[#c8c3ba]">
         <h3 className="mb-3 text-xl font-black">Workspace Settings</h3>
         <div className="flex flex-wrap gap-2">
@@ -88,6 +99,23 @@ export function InsightsView() {
             const inMonth = day.getMonth() === heatmapCursor.getMonth();
             return <div className={clsx("h-8 rounded border-2 border-black dark:border-[#1e232a] transition-colors duration-200", heatColor(count), !inMonth && "opacity-30")} key={key} title={`${key}: ${count} completed`} />;
           })}
+        </div>
+      </section>
+      <section className="bento-card span-12 bg-white border-l-[10px] border-l-[#21caff] p-6 text-black dark:bg-[#12151a] dark:border-l-[#002535] dark:text-[#c8c3ba]">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-xl font-black">Performance Statistics</h3>
+          <span className="text-xs font-bold text-stone-500 dark:text-[#7a7670]">
+            * Excludes future tasks to keep rates accurate
+          </span>
+        </div>
+        <div className="grid grid-cols-7 gap-4 max-2xl:grid-cols-4 max-lg:grid-cols-3 max-md:grid-cols-2 max-sm:grid-cols-1">
+          <Metric label="Tasks" value={currentAndPastTasks.length.toString()} color="blue" />
+          <Metric label="Completed" value={completedCount.toString()} color="green" />
+          <Metric label="Failed" value={failedCount.toString()} color="red" />
+          <Metric label="Completion Rate" value={`${completionRate}%`} color="purple" />
+          <Metric label="Fail Rate" value={`${failRate}%`} color="pink" />
+          <Metric label="Overdue" value={overdueCount.toString()} color="teal" />
+          <Metric label="Streak" value={`${streak}d`} color="orange" />
         </div>
       </section>
     </div>

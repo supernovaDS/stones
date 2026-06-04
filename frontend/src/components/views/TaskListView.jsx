@@ -1,75 +1,103 @@
 import { Trash2, XCircle } from "lucide-react";
 import { clsx } from "clsx";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useAppStore } from "../../store/useAppStore";
-import { formatShortDate, isOverdue, isToday } from "../../utils/date";
+import { formatShortDate } from "../../utils/date";
 import { priorityRail, priorityClasses } from "../../utils/constants";
-import { taskMatchesFilter, compareTasksByDate, groupTasks } from "../../utils/helpers";
-import { InsightCard, Checkbox } from "../ui";
-import { getVirtualTasksForFilter, getHistoryVirtualTasks } from "../../utils/recurrence";
+import { taskMatchesFilter } from "../../utils/helpers";
+import { Checkbox } from "../ui";
+import { getVirtualTasksForFilter } from "../../utils/recurrence";
 
 export function TaskListView() {
   const { blocks, setRecurringTasksOpen, setEditingRepeatedTaskId } = useAppStore();
   const [filter, setFilter] = useState("open");
-  const [groupMode, setGroupMode] = useState("none");
-  const allTasks = blocks.filter((b) => b.type === "task");
+  const [sortBy, setSortBy] = useState("date");
+  const [sortOrder, setSortOrder] = useState("asc");
 
-  const virtualTasks = getVirtualTasksForFilter(filter, blocks);
-  const tasks = [
-    ...allTasks.filter((t) => taskMatchesFilter(t, filter)),
-    ...virtualTasks
-  ].sort(compareTasksByDate);
+  const allTasks = useMemo(() => blocks.filter((b) => b.type === "task"), [blocks]);
+  const virtualTasks = useMemo(() => getVirtualTasksForFilter(filter, blocks), [filter, blocks]);
 
-  const groups = groupTasks(tasks, groupMode);
+  const tasks = useMemo(() => {
+    const list = [
+      ...allTasks.filter((t) => taskMatchesFilter(t, filter)),
+      ...virtualTasks
+    ];
 
-  const historyVirtual = getHistoryVirtualTasks(blocks, 30);
-  const virtualHigh = getVirtualTasksForFilter("high", blocks);
-  const virtualToday = getVirtualTasksForFilter("today", blocks).filter((t) => !t.metadata.completed && !t.metadata.failed);
-  const virtualOverdue = getVirtualTasksForFilter("overdue", blocks);
+    return list.sort((a, b) => {
+      let comparison = 0;
 
-  const totalTasksCount = allTasks.length + historyVirtual.length;
-  const totalCompletedCount =
-    allTasks.filter((t) => t.metadata.completed).length +
-    historyVirtual.filter((t) => t.metadata.completed).length;
-  const completionPercent = totalTasksCount ? Math.round((totalCompletedCount / totalTasksCount) * 100) : 0;
+      if (sortBy === "date") {
+        const aDate = a.metadata.deadline;
+        const bDate = b.metadata.deadline;
+        if (!aDate && !bDate) {
+          comparison = 0;
+        } else if (!aDate) {
+          comparison = 1;
+        } else if (!bDate) {
+          comparison = -1;
+        } else {
+          comparison = aDate.localeCompare(bDate);
+        }
 
-  const highCount =
-    allTasks.filter((t) => t.metadata.priority === "high" && !t.metadata.completed && !t.metadata.failed).length +
-    virtualHigh.length;
-  const overdueCount =
-    allTasks.filter((t) => !t.metadata.completed && !t.metadata.failed && isOverdue(t.metadata.deadline)).length +
-    virtualOverdue.length;
-  const todayCount =
-    allTasks.filter((t) => !t.metadata.completed && !t.metadata.failed && isToday(t.metadata.deadline)).length +
-    virtualToday.length;
+        // Secondary sort: Priority descending (high -> medium -> low)
+        if (comparison === 0) {
+          const priorityWeights = { high: 3, medium: 2, low: 1 };
+          const aWeight = priorityWeights[a.metadata.priority] ?? 2;
+          const bWeight = priorityWeights[b.metadata.priority] ?? 2;
+          comparison = bWeight - aWeight;
+        }
+      } else if (sortBy === "priority") {
+        const priorityWeights = { high: 3, medium: 2, low: 1 };
+        const aWeight = priorityWeights[a.metadata.priority] ?? 2;
+        const bWeight = priorityWeights[b.metadata.priority] ?? 2;
+        comparison = aWeight - bWeight;
+
+        // Secondary sort: Date ascending (earliest first)
+        if (comparison === 0) {
+          const aDate = a.metadata.deadline;
+          const bDate = b.metadata.deadline;
+          if (!aDate && !bDate) {
+            comparison = 0;
+          } else if (!aDate) {
+            comparison = 1;
+          } else if (!bDate) {
+            comparison = -1;
+          } else {
+            comparison = aDate.localeCompare(bDate);
+          }
+        }
+      }
+
+      return sortOrder === "asc" ? comparison : -comparison;
+    });
+  }, [allTasks, virtualTasks, filter, sortBy, sortOrder]);
 
   return (
     <div className="bento-grid">
-      <section className="span-12 grid grid-cols-4 gap-4 max-lg:grid-cols-2">
-        <InsightCard color="green" label="Completion" value={`${completionPercent}%`} />
-        <InsightCard color="orange" label="High Priority" value={highCount.toString()} />
-        <InsightCard color="blue" label="Today" value={todayCount.toString()} />
-        <InsightCard color="purple" label="Overdue" value={overdueCount.toString()} />
-      </section>
       <section className="bento-card span-12 bg-white border-l-[10px] border-l-[#21caff] p-4 text-black dark:bg-[#12151a] dark:border-l-[#002535] dark:text-[#c8c3ba]">
         <div className="mb-4 flex flex-wrap items-center gap-2">
           {["open","today","overdue","upcoming","failed","done","all"].map((item) => (
             <button className={clsx("nb-button min-h-0 px-3 py-2 text-sm capitalize", filter === item ? "primary" : "bg-white dark:bg-[#12151a]")} key={item} onClick={() => setFilter(item)} type="button">{item}</button>
           ))}
-          <select className="nb-select ml-auto h-11 px-3 text-sm font-black" onChange={(e) => setGroupMode(e.target.value)} value={groupMode}>
-            <option value="none">Sort by date</option>
-            <option value="day">Group by day</option>
-            <option value="week">Group by week</option>
-            <option value="month">Group by month</option>
-          </select>
+          <div className="ml-auto flex items-center gap-2 max-sm:w-full max-sm:mt-2">
+            <select className="nb-select h-11 px-3 text-sm font-black max-sm:flex-1" onChange={(e) => setSortBy(e.target.value)} value={sortBy}>
+              <option value="date">Sort by date</option>
+              <option value="priority">Sort by priority</option>
+            </select>
+            <select className="nb-select h-11 px-3 text-sm font-black max-sm:flex-1" onChange={(e) => setSortOrder(e.target.value)} value={sortOrder}>
+              <option value="asc">Ascending</option>
+              <option value="desc">Descending</option>
+            </select>
+          </div>
         </div>
-        <div className="grid gap-4">
-          {groups.map((group) => (
-            <section key={group.label}>
-              {groupMode !== "none" ? <h3 className="mb-2 text-sm font-semibold text-stone-500 dark:text-[#5a5650]">{group.label}</h3> : null}
-              <div className="grid gap-3">{group.tasks.map((task) => <TaskListCard key={task.id} task={task} />)}</div>
-            </section>
-          ))}
+        <div className="grid gap-3">
+          {tasks.length ? (
+            tasks.map((task) => <TaskListCard key={task.id} task={task} />)
+          ) : (
+            <p className="rounded-lg border-[3px] border-dashed border-black px-3 py-8 text-center text-sm font-black text-stone-600 dark:border-[#1e232a] dark:text-[#5a5650]">
+              No tasks found.
+            </p>
+          )}
         </div>
       </section>
     </div>

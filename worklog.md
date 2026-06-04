@@ -149,3 +149,15 @@
 - **Calendar Priority Colors**: Updated the color mapping for task priority indicator dots inside the Calendar view cells. High priority maps to red (`#ff5a5f`), medium priority to orange (`#ffb84d`), and low priority to green (`#2ef2a6`).
 - **Completed Task Timestamp Tracking**: Implemented date and time storage and display for task completions. When standard or recurring tasks are checked, their completion timestamp (`completedAt`) is recorded and rendered on the task details sidebar. Unchecking a task clears this timestamp.
 - **Tasks Page Completion Timestamp**: Rendered the completed date and time under the task title for completed tasks (both standard and recurring) in the tasks list page view.
+
+### June 5, 2026
+- **Insights Page Redesign**:
+  - Restructured the page layout by removing the top bento statistics block.
+  - Added a new **Performance Statistics** section at the bottom of the page displaying: Tasks (filtered to exclude future open tasks), Completed, Failed, Completion Rate, Fail Rate, Overdue, and Streak.
+  - Updated the metrics calculation logic to only include previous and today's tasks (excluding upcoming open tasks with future deadlines) to keep completion rate statistics accurate and meaningful.
+  - Custom styled the 7 cards using the application's full 7-color palette (blue, green, red, purple, pink, teal, and orange).
+- **Tasks Page Polish & Sorting Upgrades**:
+  - Removed the top header blocks from the Tasks view layout to streamline page content.
+  - Replaced the group by day/week/month selector with Sort Field (Date, Priority) and Sort Order (Ascending, Descending) controls.
+  - Implemented sorting logic with secondary fallbacks: sorting by date defaults to priority descending for matching dates, and sorting by priority defaults to date ascending for matching priorities.
+  - Cleaned up unused variables, metrics helper functions, and imports in the component to prevent React lint/build warnings.
