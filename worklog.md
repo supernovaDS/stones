@@ -161,3 +161,5 @@
   - Replaced the group by day/week/month selector with Sort Field (Date, Priority) and Sort Order (Ascending, Descending) controls.
   - Implemented sorting logic with secondary fallbacks: sorting by date defaults to priority descending for matching dates, and sorting by priority defaults to date ascending for matching priorities.
   - Cleaned up unused variables, metrics helper functions, and imports in the component to prevent React lint/build warnings.
+- **Task Sidebar Layout Polish**:
+  - Added the `content-start` alignment class to the scrollable grid wrapper inside the `TaskDetailPanel` sidebar component. This corrects the issue where the action buttons (Mark Complete, Fail Task) and inputs would stretch vertically ("look fat") when the "Open Page" action button was hidden or general content was sparse.

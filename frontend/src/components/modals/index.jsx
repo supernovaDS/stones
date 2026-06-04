@@ -78,7 +78,7 @@ export function TaskDetailPanel() {
         </div>
         <IconButton icon={X} title="Close details" onClick={() => setSelectedTask(undefined)} />
       </div>
-      <div className="grid flex-1 gap-4 overflow-auto p-5 pt-2">
+      <div className="grid content-start flex-1 gap-4 overflow-auto p-5 pt-2">
         <label className="grid gap-1 text-sm font-black">
           Title
           <input 
