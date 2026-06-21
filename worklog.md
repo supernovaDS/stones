@@ -171,3 +171,14 @@
   - Split the monolithic `components/modals/index.jsx` file into discrete, focused files (`TaskModal.jsx`, `TaskDetailPanel.jsx`, and `CommandPalette.jsx`), converting `index.jsx` to purely act as a module exporter.
   - Successfully split the massive ~3,000 line `index.css` file into 5 clean, modular files inside a new `styles/` directory (`base.css`, `components.css`, `utilities.css`, `animations.css`, and `minimal.css`), preserving complete visual fidelity while massively improving stylesheet maintainability.
   - Implemented a persistent **Desktop Sidebar Collapse** feature. Added a collapse toggle button (`PanelLeftClose`) to the sidebar header and rewired the main topbar hamburger button (`Menu`) to dynamically act as a sidebar toggle when in desktop mode, persisting the user's preference globally via the Zustand store.
+- **End-to-End Encryption & Sync:**
+  - Upgraded Diary Mode to use true **Client-Side End-to-End Encryption (E2EE)** powered by the Web Crypto API (AES-GCM 256-bit).
+  - Implemented deterministic salt generation keyed by the Supabase User ID, allowing seamless decryption of Diary pages across multiple devices without prompt issues.
+  - Intercepted the backend `syncDbUpdates` loop to transparently decrypt incoming synchronized Diary blocks.
+- **UI Adjustments:**
+  - Removed "Recovery" and "Workspace Settings" from the Insights dashboard to declutter the analytics layout.
+  - Created a dedicated `RecoveryModal.jsx` popup containing the deleted items list.
+  - Linked the new Recovery popup directly into the global `CommandPalette` ("Menu") for quick access.
+  - Cleaned up the `CommandPalette` by removing contextual "add block" commands and unnecessary "Go to" links.
+- **Documentation:**
+  - Completely rewrote the `README.md` to a professional standard, highlighting the new E2EE architecture and Supabase synchronization, removing obsolete local backend setup instructions, and adding the hosted live demo link and logo.
