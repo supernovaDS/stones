@@ -1,12 +1,11 @@
 import { Trash2, XCircle } from "lucide-react";
 import { clsx } from "clsx";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
 import { formatShortDate } from "../../utils/date";
 import { priorityRail, priorityClasses } from "../../utils/constants";
-import { taskMatchesFilter } from "../../utils/helpers";
 import { Checkbox } from "../ui";
-import { getVirtualTasksForFilter } from "../../utils/recurrence";
+import { useFilteredTasks } from "../../hooks/useFilteredTasks";
 
 export function TaskListView() {
   const { blocks, setRecurringTasksOpen, setEditingRepeatedTaskId } = useAppStore();
@@ -14,63 +13,7 @@ export function TaskListView() {
   const [sortBy, setSortBy] = useState("date");
   const [sortOrder, setSortOrder] = useState("asc");
 
-  const allTasks = useMemo(() => blocks.filter((b) => b.type === "task"), [blocks]);
-  const virtualTasks = useMemo(() => getVirtualTasksForFilter(filter, blocks), [filter, blocks]);
-
-  const tasks = useMemo(() => {
-    const list = [
-      ...allTasks.filter((t) => taskMatchesFilter(t, filter)),
-      ...virtualTasks
-    ];
-
-    return list.sort((a, b) => {
-      let comparison = 0;
-
-      if (sortBy === "date") {
-        const aDate = a.metadata.deadline;
-        const bDate = b.metadata.deadline;
-        if (!aDate && !bDate) {
-          comparison = 0;
-        } else if (!aDate) {
-          comparison = 1;
-        } else if (!bDate) {
-          comparison = -1;
-        } else {
-          comparison = aDate.localeCompare(bDate);
-        }
-
-        // Secondary sort: Priority descending (high -> medium -> low)
-        if (comparison === 0) {
-          const priorityWeights = { high: 3, medium: 2, low: 1 };
-          const aWeight = priorityWeights[a.metadata.priority] ?? 2;
-          const bWeight = priorityWeights[b.metadata.priority] ?? 2;
-          comparison = bWeight - aWeight;
-        }
-      } else if (sortBy === "priority") {
-        const priorityWeights = { high: 3, medium: 2, low: 1 };
-        const aWeight = priorityWeights[a.metadata.priority] ?? 2;
-        const bWeight = priorityWeights[b.metadata.priority] ?? 2;
-        comparison = aWeight - bWeight;
-
-        // Secondary sort: Date ascending (earliest first)
-        if (comparison === 0) {
-          const aDate = a.metadata.deadline;
-          const bDate = b.metadata.deadline;
-          if (!aDate && !bDate) {
-            comparison = 0;
-          } else if (!aDate) {
-            comparison = 1;
-          } else if (!bDate) {
-            comparison = -1;
-          } else {
-            comparison = aDate.localeCompare(bDate);
-          }
-        }
-      }
-
-      return sortOrder === "asc" ? comparison : -comparison;
-    });
-  }, [allTasks, virtualTasks, filter, sortBy, sortOrder]);
+  const tasks = useFilteredTasks(blocks, filter, sortBy, sortOrder);
 
   return (
     <div className="bento-grid">

@@ -1,0 +1,603 @@
+@layer utilities {
+  .span-12 {
+    grid-column: span 12 / span 12;
+  }
+
+  .span-8 {
+    grid-column: span 8 / span 8;
+  }
+
+  .span-7 {
+    grid-column: span 7 / span 7;
+  }
+
+  .span-5 {
+    grid-column: span 5 / span 5;
+  }
+
+  .span-4 {
+    grid-column: span 4 / span 4;
+  }
+
+  /* ── Hamburger button (hidden on desktop) ──────────────────── */
+  .menu-toggle {
+    display: none;
+  }
+
+  /* ── Sidebar backdrop (mobile only) ──────────────────────── */
+  .sidebar-backdrop {
+    display: none;
+  }
+
+  /* ── Sidebar Desktop Collapse ──────────────────────────── */
+  .layout-grid-collapsed {
+    grid-template-columns: 1fr !important;
+  }
+
+  .sidebar-desktop-hidden {
+    display: none !important;
+  }
+
+  /* ── Desktop: header buttons show label ──────────────────── */
+  .header-btn-label {
+    display: inline;
+  }
+
+  /* Weather & clock default desktop styling to prevent overflow */
+  .weather-time {
+    font-size: 2.75rem !important;
+  }
+
+  .weather-temp {
+    font-size: 2.25rem !important;
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     BREAKPOINT: ≤ 1100px  (tablet / small desktop)
+     ═══════════════════════════════════════════════════════════ */
+  @media (max-width: 1440px) {
+    .header-btn-label:not(.sync-status-label) {
+      display: none;
+    }
+
+    .topbar-actions .nb-button:not(.sync-btn) {
+      width: 2.35rem;
+      min-height: 2.35rem;
+      padding: 0;
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     BREAKPOINT: ≤ 1600px  (laptop / tablet landscape)
+     ═══════════════════════════════════════════════════════════ */
+  @media (max-width: 1600px) {
+    /* Weather & clock smaller and stacked on standard laptops & small screens to prevent overflow */
+    .weather-time {
+      font-size: 2.25rem !important;
+    }
+
+    .weather-temp {
+      font-size: 2rem !important;
+    }
+
+    .weather-layout {
+      align-items: flex-start !important;
+      flex-direction: column !important;
+      gap: 0.5rem !important;
+    }
+
+    .weather-meta {
+      width: 100% !important;
+      justify-content: space-between !important;
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     BREAKPOINT: ≤ 1024px  (tablet / small desktop)
+     ═══════════════════════════════════════════════════════════ */
+  @media (max-width: 1024px) {
+    /* Show hamburger menu */
+    .menu-toggle {
+      display: inline-grid;
+    }
+
+    .layout-grid {
+      grid-template-columns: 1fr;
+      padding: 0.75rem;
+    }
+
+    /* Sidebar becomes a fixed off-canvas drawer */
+    .sidebar-desktop-hidden {
+      display: flex !important;
+    }
+
+    .sidebar-shell {
+      position: fixed;
+      inset: 0;
+      top: 0;
+      z-index: 50;
+      width: min(320px, 85vw);
+      height: 100vh;
+      max-height: 100vh;
+      border-radius: 0;
+      transform: translateX(-100%);
+      transition: transform 280ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .sidebar-shell.sidebar-open {
+      transform: translateX(0);
+    }
+
+    .sidebar-shell .sidebar-close-btn {
+      display: inline-grid !important;
+    }
+
+    /* Backdrop behind sidebar */
+    .sidebar-backdrop {
+      display: block;
+      position: fixed;
+      inset: 0;
+      right: auto;
+      z-index: 49;
+      width: 100vw;
+      max-width: 100vw;
+      background: rgba(17, 17, 17, 0.5);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 250ms ease;
+    }
+
+    .dark .sidebar-backdrop {
+      background: rgba(0, 0, 0, 0.7);
+    }
+
+    .sidebar-backdrop.sidebar-backdrop-visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .content-shell {
+      padding: 0;
+    }
+
+    .topbar {
+      top: 0.75rem;
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     BREAKPOINT: ≤ 768px  (large phone / small tablet)
+     ═══════════════════════════════════════════════════════════ */
+  @media (max-width: 768px) {
+    .bento-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .span-12,
+    .span-8,
+    .span-7,
+    .span-6,
+    .span-5,
+    .span-4,
+    .span-3 {
+      grid-column: 1 / -1;
+    }
+
+    .topbar {
+      gap: 0.65rem;
+      padding: 0.7rem;
+    }
+
+    .topbar-main {
+      flex: 1 1 14rem;
+    }
+
+    .topbar-actions {
+      flex: 1 1 auto;
+      justify-content: flex-end;
+    }
+
+    .topbar h2 {
+      font-size: 1.4rem;
+    }
+
+    .header-btn-label {
+      display: none;
+    }
+
+    .topbar-actions .nb-button {
+      width: 2.35rem;
+      min-height: 2.35rem;
+      padding: 0;
+    }
+
+    .sync-refresh-icon {
+      display: none;
+    }
+
+    /* Heatmap: shrink to 7 cols */
+    .heatmap-grid {
+      grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+    }
+
+    .heatmap-header {
+      flex-wrap: wrap;
+    }
+
+    .calendar-cell {
+      min-height: 4.75rem !important;
+      padding: 0.45rem !important;
+    }
+
+    /* Task detail panel: full width */
+    .task-detail-panel {
+      width: 100% !important;
+    }
+
+    /* Weather widget compact layout on mobile */
+    .weather-layout {
+      flex-direction: row !important;
+      justify-content: space-between !important;
+      align-items: center !important;
+      gap: 1rem !important;
+    }
+
+    .weather-time {
+      font-size: 1.75rem !important;
+    }
+
+    .weather-temp {
+      font-size: 1.75rem !important;
+    }
+
+    .weather-meta {
+      width: auto !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      gap: 0.5rem !important;
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     BREAKPOINT: ≤ 640px  (phone)
+     ═══════════════════════════════════════════════════════════ */
+  @media (max-width: 640px) {
+    .layout-grid {
+      gap: 0.5rem;
+      padding: 0.45rem;
+    }
+
+    .bento-grid {
+      gap: 0.5rem !important;
+    }
+
+    /* Reduce vertical gaps between blocks on mobile workspace view */
+    .span-12.flex.flex-col.gap-8 {
+      gap: 0.75rem !important;
+    }
+
+    .bento-card, .app-card, article[class*="bento-card"], .block-shell {
+      padding: 0.75rem !important;
+      border-width: 2px !important;
+      box-shadow: 3px 3px 0 #111111 !important;
+    }
+
+    /* Thinner left accent rail on all blocks on mobile */
+    article[class*="bento-card"], .block-shell {
+      border-left-width: 5px !important;
+    }
+
+    .dark .bento-card, .dark .app-card {
+      box-shadow: 2px 2px 0 var(--dark-shadow) !important;
+    }
+
+    /* Thinner borders and smaller shadows on all buttons to feel cleaner and less chunky on mobile */
+    .nb-button,
+    .rich-button,
+    .icon-button {
+      border-width: 2px !important;
+      box-shadow: 2px 2px 0 #111111 !important;
+    }
+
+    .dark .nb-button,
+    .dark .rich-button,
+    .dark .icon-button {
+      box-shadow: 1.5px 1.5px 0 var(--dark-shadow) !important;
+    }
+
+    /* Let minimal theme retain its 1px borders on mobile */
+    .profile-minimal .nb-button,
+    .profile-minimal .rich-button,
+    .profile-minimal .icon-button {
+      border-width: 1px !important;
+      box-shadow: none !important;
+    }
+
+    .topbar {
+      border-width: 2px !important;
+      padding: 0.5rem 0.65rem !important;
+      box-shadow: 3px 3px 0 #111111 !important;
+      flex-wrap: nowrap !important;
+      justify-content: space-between !important;
+      align-items: center !important;
+      gap: 0.5rem !important;
+      top: 0.45rem !important;
+    }
+
+    .topbar-main {
+      flex-basis: auto !important;
+      flex: 1 1 auto !important;
+      min-width: 0 !important;
+    }
+
+    .topbar-actions {
+      flex-basis: auto !important;
+      flex: 0 0 auto !important;
+      justify-content: flex-end !important;
+      gap: 0.35rem !important;
+    }
+
+    .dark .topbar {
+      box-shadow: 2px 2px 0 var(--dark-shadow) !important;
+    }
+
+    .topbar h2 {
+      font-size: 1.25rem !important;
+    }
+
+    .topbar .date-label {
+      display: none !important;
+    }
+
+    /* Hero title responsive */
+    .hero-title {
+      font-size: clamp(1.4rem, 4.5vw, 2rem) !important;
+    }
+
+    /* Calendar monthly cells */
+    .calendar-cell {
+      min-height: 3rem !important;
+      padding: 0.25rem !important;
+      border-width: 2px !important;
+      box-shadow: 2px 2px 0 #111111 !important;
+      border-radius: 0.375rem !important;
+    }
+
+    .dark .calendar-cell {
+      box-shadow: 2px 2px 0 var(--dark-shadow) !important;
+    }
+
+    .profile-minimal .calendar-cell {
+      border-width: 1px !important;
+      box-shadow: none !important;
+    }
+
+    .calendar-cell .calendar-dots {
+      margin-top: 0.125rem !important;
+      gap: 2px !important;
+    }
+
+    .calendar-cell .calendar-dots span {
+      height: 6px !important;
+      width: 6px !important;
+      border-radius: 50% !important;
+      flex-shrink: 0 !important;
+    }
+
+    /* Modal: tighter padding, full width */
+    .modal-card {
+      width: min(100%, 42rem) !important;
+      padding: 1.25rem !important;
+    }
+
+    /* Block shell action buttons */
+    .block-actions {
+      gap: 0.25rem;
+    }
+
+    .block-actions .icon-button {
+      height: 1.8rem;
+      width: 1.8rem;
+    }
+
+    /* Compact BlockShell header */
+    .block-shell > div:first-of-type {
+      margin-bottom: 0.5rem !important;
+    }
+
+    .task-block-header {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .task-block-actions {
+      grid-column: 1 / -1;
+      padding-left: 2rem;
+    }
+
+    /* Hide reordering arrows in all block cards on mobile to reduce clutter */
+    .block-actions > button:nth-child(1),
+    .block-actions > button:nth-child(2),
+    .task-block-actions > button:nth-child(1),
+    .task-block-actions > button:nth-child(2) {
+      display: none !important;
+    }
+
+    /* Keep task block controls on a single scrollable row instead of wrapping */
+    .task-block-controls {
+      display: flex !important;
+      flex-direction: row !important;
+      flex-wrap: nowrap !important;
+      overflow-x: auto !important;
+      -webkit-overflow-scrolling: touch !important;
+      padding-left: 0.75rem !important;
+      padding-bottom: 0.35rem !important;
+      gap: 0.35rem !important;
+      scrollbar-width: none !important;
+      width: 100% !important;
+    }
+    .task-block-controls::-webkit-scrollbar {
+      display: none !important;
+    }
+    .task-block-controls > * {
+      flex-shrink: 0 !important;
+    }
+
+    /* Keep image block toolbar on a single scrollable row instead of wrapping */
+    .image-block-toolbar {
+      display: flex !important;
+      flex-direction: row !important;
+      flex-wrap: nowrap !important;
+      overflow-x: auto !important;
+      -webkit-overflow-scrolling: touch !important;
+      padding-bottom: 0.35rem !important;
+      gap: 0.35rem !important;
+      scrollbar-width: none !important;
+      width: 100% !important;
+    }
+    .image-block-toolbar::-webkit-scrollbar {
+      display: none !important;
+    }
+    .image-block-toolbar > * {
+      flex-shrink: 0 !important;
+    }
+
+    /* Compact Checklist block items */
+    .block-type-checklist div[class*="border-[3px]"] {
+      border-width: 1.5px !important;
+      padding: 0.375rem 0.5rem !important;
+      gap: 0.5rem !important;
+    }
+    .profile-minimal .block-type-checklist div[class*="border-[3px]"] {
+      border-width: 1px !important;
+    }
+
+    /* Compact Link block items */
+    .link-block-item {
+      padding: 0.5rem !important;
+      gap: 0.25rem !important;
+      border-width: 1.5px !important;
+    }
+    .profile-minimal .link-block-item {
+      border-width: 1px !important;
+    }
+    .link-block-item input {
+      height: 1.85rem !important;
+      font-size: 0.75rem !important;
+    }
+
+    /* Downscale Title block heading input text sizes */
+    .block-type-title input {
+      font-size: 1.5rem !important;
+    }
+
+    /* Downscale Note block editor padding and heights */
+    .rte-editor {
+      min-height: 6rem !important;
+      padding: 0.5rem 0.75rem !important;
+      font-size: 0.875rem !important;
+      line-height: 1.5rem !important;
+    }
+
+    .task-block-subtasks {
+      padding-left: 0.75rem !important;
+      padding-right: 0 !important;
+      padding-top: 0.5rem !important;
+    }
+
+    /* Make block action icons smaller and tighter */
+    .block-actions, .task-block-actions {
+      gap: 0.2rem !important;
+    }
+
+    .block-actions button, .task-block-actions button {
+      height: 1.75rem !important;
+      width: 1.75rem !important;
+      min-height: 0 !important;
+      padding: 0 !important;
+    }
+
+    .block-actions button svg, .task-block-actions button svg {
+      width: 12px !important;
+      height: 12px !important;
+    }
+
+    /* Make selects, buttons, and date inputs inside block controls smaller on mobile */
+    .task-block-controls select,
+    .task-block-controls input,
+    .task-block-controls label,
+    .task-block-controls button {
+      height: 1.85rem !important;
+      font-size: 0.75rem !important;
+      padding-left: 0.35rem !important;
+      padding-right: 0.35rem !important;
+      min-height: 0 !important;
+      line-height: normal !important;
+    }
+
+    .task-block-controls button {
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+    }
+
+    /* Note block rich formats horizontal scroll bar */
+    .rte-toolbar {
+      flex-wrap: nowrap !important;
+      overflow-x: auto !important;
+      -webkit-overflow-scrolling: touch !important;
+      padding-bottom: 0.25rem !important;
+    }
+    .rte-toolbar::-webkit-scrollbar {
+      display: none !important;
+    }
+
+    /* TaskListView card grid restructuring for mobile screen */
+    article[class*="grid-cols-[auto_1fr_auto_auto]"] {
+      grid-template-columns: auto 1fr !important;
+      grid-template-rows: auto auto !important;
+      gap: 0.25rem 0.5rem !important;
+      padding: 0.75rem !important;
+    }
+    article[class*="grid-cols-[auto_1fr_auto_auto]"] > :nth-child(1) { /* Checkbox */
+      grid-row: span 2 !important;
+      align-self: center !important;
+    }
+    article[class*="grid-cols-[auto_1fr_auto_auto]"] > :nth-child(2) { /* Title button */
+      grid-column: 2 !important;
+      grid-row: 1 !important;
+    }
+    article[class*="grid-cols-[auto_1fr_auto_auto]"] > :nth-child(3) { /* Priority Badge */
+      display: none !important;
+    }
+    article[class*="grid-cols-[auto_1fr_auto_auto]"] > :nth-child(4) { /* Actions div */
+      grid-column: 2 !important;
+      grid-row: 2 !important;
+      justify-self: end !important;
+      margin-top: 0.25rem !important;
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     BREAKPOINT: ≤ 400px  (very small phone)
+     ═══════════════════════════════════════════════════════════ */
+  @media (max-width: 400px) {
+    .layout-grid {
+      padding: 0.35rem;
+    }
+
+    .topbar {
+      padding: 0.5rem;
+    }
+
+    .nb-button {
+      min-height: 2.25rem;
+      padding: 0.4rem 0.65rem;
+      font-size: 0.8rem;
+    }
+
+    .icon-button {
+      height: 2rem;
+      width: 2rem;
+    }
+  }
+}

@@ -9,7 +9,7 @@ function parseLocalDate(dateStr) {
 /**
  * Checks if a repeating template is scheduled to occur on a given date.
  */
-export function isOccurringOnDate(template, dateStr) {
+function isOccurringOnDate(template, dateStr) {
   const startStr = template.metadata?.startDate;
   if (!startStr || dateStr < startStr) return false;
 

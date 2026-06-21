@@ -8,7 +8,7 @@ import { useAppStore } from "../../store/useAppStore";
 import { viewTitle } from "../../utils/helpers";
 import { HeaderButton } from "../ui";
 
-export function Topbar({ onCommandOpen, onMenuToggle, activePage, view }) {
+export function Topbar({ onCommandOpen, onMenuToggle, activePage, view, sidebarHidden }) {
 
   const {
     undoLastChange,
@@ -21,7 +21,7 @@ export function Topbar({ onCommandOpen, onMenuToggle, activePage, view }) {
       <div className="topbar-main min-w-0 flex-1 flex items-center gap-3">
         <button
           aria-label="Toggle sidebar"
-          className="menu-toggle icon-button"
+          className="icon-button"
           onClick={onMenuToggle}
           title="Toggle sidebar"
           type="button"
@@ -47,9 +47,7 @@ export function Topbar({ onCommandOpen, onMenuToggle, activePage, view }) {
           label="Recurring Tasks"
           onClick={() => setRecurringTasksOpen(true)}
         />
-        {!(view === "tasks" || view === "calendar" || view === "insights") && (
-          <HeaderButton icon={Command} label="Menu" onClick={onCommandOpen} />
-        )}
+        <HeaderButton icon={Command} label="Menu" onClick={onCommandOpen} />
         <HeaderButton
           disabled={!undoStack.length}
           icon={RotateCcw}

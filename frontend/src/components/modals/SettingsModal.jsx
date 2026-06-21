@@ -30,7 +30,7 @@ const PROFILES = [
 ];
 
 export function SettingsModal({ syncStatus }) {
-  const { colorProfile, setColorProfile, theme, setTheme, setSettingsOpen } = useAppStore();
+  const { colorProfile, setColorProfile, theme, setTheme, setSettingsOpen, hideActivePageBlock, setHideActivePageBlock, hideWeatherBlock, setHideWeatherBlock } = useAppStore();
   const { user, signOut } = useAuth();
 
   return (
@@ -129,6 +129,43 @@ export function SettingsModal({ syncStatus }) {
               {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
               {theme === "dark" ? "Light Mode" : "Dark Mode"}
             </button>
+          </div>
+        </div>
+
+        <div className="mt-8 mb-8">
+          <p className="mb-4 text-sm font-black uppercase tracking-wide text-stone-700 dark:text-[#7a7670]">
+            Workspace Layout
+          </p>
+          <div className="flex flex-col gap-4 rounded-xl border-[3px] border-[#111111] bg-white p-4 shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[3px_3px_0_#000]">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-base font-black">Active Page Title</p>
+                <p className="text-xs font-bold text-stone-500 dark:text-[#7a7670]">Show the title block in workspace</p>
+              </div>
+              <button
+                className={clsx("nb-button px-4 py-2", hideActivePageBlock ? "border-stone-400 text-stone-500 shadow-none dark:border-stone-700 dark:text-stone-600" : "")}
+                onClick={() => setHideActivePageBlock(!hideActivePageBlock)}
+                type="button"
+              >
+                {hideActivePageBlock ? "Hidden" : "Visible"}
+              </button>
+            </div>
+            
+            <div className="h-[3px] w-full bg-black/10 dark:bg-white/10" />
+            
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-base font-black">Weather Widget</p>
+                <p className="text-xs font-bold text-stone-500 dark:text-[#7a7670]">Show local weather condition</p>
+              </div>
+              <button
+                className={clsx("nb-button px-4 py-2", hideWeatherBlock ? "border-stone-400 text-stone-500 shadow-none dark:border-stone-700 dark:text-stone-600" : "")}
+                onClick={() => setHideWeatherBlock(!hideWeatherBlock)}
+                type="button"
+              >
+                {hideWeatherBlock ? "Hidden" : "Visible"}
+              </button>
+            </div>
           </div>
         </div>
       </div>

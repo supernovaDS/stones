@@ -163,3 +163,11 @@
   - Cleaned up unused variables, metrics helper functions, and imports in the component to prevent React lint/build warnings.
 - **Task Sidebar Layout Polish**:
   - Added the `content-start` alignment class to the scrollable grid wrapper inside the `TaskDetailPanel` sidebar component. This corrects the issue where the action buttons (Mark Complete, Fail Task) and inputs would stretch vertically ("look fat") when the "Open Page" action button was hidden or general content was sparse.
+
+### June 21, 2026
+- **Codebase Refactoring & UI Cleanup**:
+  - Extracted the inline `DiaryAddBlockMenu` component from `DiaryView.jsx` to significantly declutter the diary layout file.
+  - Extracted the complex sorting and filtering logic from `TaskListView.jsx` into a reusable custom hook (`useFilteredTasks`), vastly reducing the component size and improving maintainability.
+  - Split the monolithic `components/modals/index.jsx` file into discrete, focused files (`TaskModal.jsx`, `TaskDetailPanel.jsx`, and `CommandPalette.jsx`), converting `index.jsx` to purely act as a module exporter.
+  - Successfully split the massive ~3,000 line `index.css` file into 5 clean, modular files inside a new `styles/` directory (`base.css`, `components.css`, `utilities.css`, `animations.css`, and `minimal.css`), preserving complete visual fidelity while massively improving stylesheet maintainability.
+  - Implemented a persistent **Desktop Sidebar Collapse** feature. Added a collapse toggle button (`PanelLeftClose`) to the sidebar header and rewired the main topbar hamburger button (`Menu`) to dynamically act as a sidebar toggle when in desktop mode, persisting the user's preference globally via the Zustand store.

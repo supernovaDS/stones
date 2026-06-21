@@ -11,7 +11,7 @@ import { AuthPage } from "./components/auth/AuthPage";
 import { Sidebar } from "./components/layout/Sidebar";
 import { Topbar } from "./components/layout/Topbar";
 import { WorkspaceView, TaskListView, CalendarView, InsightsView, DiaryView } from "./components/views";
-import { TaskDetailPanel, TaskModal, CommandPalette, SettingsModal, RecurringTasksModal } from "./components/modals";
+import { TaskDetailPanel, TaskModal, CommandPalette, SettingsModal, RecurringTasksModal, RecoveryModal } from "./components/modals";
 
 function App() {
   const auth = useAuth();
@@ -33,6 +33,9 @@ function App() {
     settingsOpen,
     recurringTasksOpen,
     setRecurringTasksOpen,
+    recoveryOpen,
+    sidebarHidden,
+    setSidebarHidden,
     theme,
     undoLastChange,
     view
@@ -210,13 +213,21 @@ function App() {
     );
   }
 
+  const handleMenuToggle = () => {
+    if (window.innerWidth <= 1024) {
+      setSidebarOpen((prev) => !prev);
+    } else {
+      setSidebarHidden(!sidebarHidden);
+    }
+  };
+
   // ── Main render ─────────────────────────────────────────────
   return (
     <main className="app-shell">
       {view === "diary" ? (
         <DiaryView />
       ) : (
-        <div className="layout-grid">
+        <div className={`layout-grid ${sidebarHidden ? 'layout-grid-collapsed' : ''}`}>
           <div
             className={`sidebar-backdrop${sidebarOpen ? " sidebar-backdrop-visible" : ""}`}
             onClick={() => setSidebarOpen(false)}
@@ -224,14 +235,16 @@ function App() {
           <Sidebar
             isOpen={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
+            isHiddenDesktop={sidebarHidden}
           />
 
           <section className="content-shell">
             <Topbar
               onCommandOpen={() => setCommandOpen(true)}
-              onMenuToggle={() => setSidebarOpen((prev) => !prev)}
+              onMenuToggle={handleMenuToggle}
               activePage={activePage}
               view={view}
+              sidebarHidden={sidebarHidden}
             />
             {view === "workspace" && activePage ? (
               <WorkspaceView pageId={activePage.id} />
@@ -256,6 +269,7 @@ function App() {
       {commandOpen ? <CommandPalette onClose={() => setCommandOpen(false)} /> : null}
       {settingsOpen ? <SettingsModal syncStatus={syncStatus} /> : null}
       {recurringTasksOpen ? <RecurringTasksModal onClose={() => setRecurringTasksOpen(false)} /> : null}
+      {recoveryOpen ? <RecoveryModal /> : null}
       <Toaster 
         position="top-center" 
         toastOptions={{

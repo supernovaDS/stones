@@ -34,22 +34,6 @@ export function Metric({ label, value, color }) {
   );
 }
 
-export function InsightCard({ color, label, value }) {
-  const colorClasses = {
-    green: "bg-white border-l-[10px] border-l-[#2ef2a6] dark:bg-[#12151a] dark:border-l-[#0a3d28]",
-    orange: "bg-white border-l-[10px] border-l-[#ffb84d] dark:bg-[#12151a] dark:border-l-[#3d2800]",
-    purple: "bg-white border-l-[10px] border-l-[#c4a8ff] dark:bg-[#12151a] dark:border-l-[#1a1040]",
-    blue: "bg-white border-l-[10px] border-l-[#21caff] dark:bg-[#12151a] dark:border-l-[#002535]",
-    red: "bg-white border-l-[10px] border-l-[#ff5a5f] dark:bg-[#12151a] dark:border-l-[#3d1215]",
-    pink: "bg-white border-l-[10px] border-l-[#ff5ec4] dark:bg-[#12151a] dark:border-l-[#3d0030]"
-  };
-  return (
-    <div className={clsx("bento-card p-4 text-black dark:text-[#c8c3ba]", colorClasses[color] ?? "bg-white dark:bg-[#12151a]")}>
-      <p className="text-sm font-black uppercase tracking-wide text-black/65 dark:text-[#7a7670]">{label}</p>
-      <p className="mt-3 text-4xl font-black">{value}</p>
-    </div>
-  );
-}
 
 export function Badge({ children, tone }) {
   return (

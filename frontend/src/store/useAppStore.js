@@ -46,46 +46,7 @@ const seedData = () => {
     createdAt,
     updatedAt: createdAt
   };
-  const page = {
-    id: createId("page"),
-    workspaceId: workspace.id,
-    sectionId: section.id,
-    title: "Today",
-    createdAt,
-    updatedAt: createdAt
-  };
-  const note = {
-    id: createId("block"),
-    pageId: page.id,
-    type: "note",
-    order: 1,
-    content: {
-      text: "Capture rough thoughts here, then turn them into tasks when they become actionable."
-    },
-    metadata: { createdAt, updatedAt: createdAt }
-  };
-  const task = {
-    id: createId("block"),
-    pageId: page.id,
-    type: "task",
-    order: 2,
-    content: {
-      title: "Build the first offline workspace flow",
-      notes: "",
-      subtasks: [],
-      dependencyIds: []
-    },
-    metadata: {
-      priority: "high",
-      deadline: todayIso(),
-      completed: false,
-      recurrence: "none",
-      createdAt,
-      updatedAt: createdAt
-    }
-  };
-
-  return { workspace, section, page, blocks: [] };
+  return { workspace, section };
 };
 
 export const useAppStore = create((set, get) => ({
@@ -108,29 +69,96 @@ export const useAppStore = create((set, get) => ({
 
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   recurringTasksOpen: false,
-  editingRepeatedTaskId: null,
   setRecurringTasksOpen: (recurringTasksOpen) => set({ recurringTasksOpen }),
+  recoveryOpen: false,
+  setRecoveryOpen: (recoveryOpen) => set({ recoveryOpen }),
+  sidebarHidden: false,
+  setSidebarHidden: (sidebarHidden) => set({ sidebarHidden }),
+  hideActivePageBlock: false,
+  setHideActivePageBlock: (hideActivePageBlock) => set({ hideActivePageBlock }),
+  hideWeatherBlock: false,
+  setHideWeatherBlock: (hideWeatherBlock) => set({ hideWeatherBlock }),
+  editingRepeatedTaskId: null,
   setEditingRepeatedTaskId: (editingRepeatedTaskId) => set({ editingRepeatedTaskId }),
 
   // ── Diary Feature ───────────────────────────────────────────────
-  diaryPasswordHash: localStorage.getItem("stones-diary-password") || null,
+  diaryPasswordHash: null,
+  diaryKey: null,
   diaryAuthenticated: false,
   activeDiaryPageId: null,
 
   setDiaryPassword: async (password) => {
-    // Dynamically import hashPassword to avoid circular dependency issues if any
     const { hashPassword } = await import("../utils/helpers");
+    const { getDeterministicSalt, deriveKey } = await import("../utils/crypto");
+    const { setActiveDiaryKey } = await import("../db/schema");
+    const { supabase } = await import("../lib/supabaseClient");
+    
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user?.id || "local";
+    
     const hash = await hashPassword(password);
-    localStorage.setItem("stones-diary-password", hash);
-    set({ diaryPasswordHash: hash, diaryAuthenticated: true });
+    const salt = getDeterministicSalt(userId);
+    const key = await deriveKey(password, salt);
+    
+    await db.settings.put({ key: "diaryPasswordHash", value: hash });
+    await db.settings.put({ key: "diarySalt", value: salt });
+    
+    setActiveDiaryKey(key);
+
+    // Encrypt any existing data by reading and writing it back
+    // (the monkey-patched db.put automatically encrypts if activeDiaryKey is set)
+    const diaryPages = await db.pages.filter(p => p.workspaceId === "diary").toArray();
+    for (const p of diaryPages) {
+       await db.pages.put(p);
+    }
+    const diaryPageIds = new Set(diaryPages.map(p => p.id));
+    const diaryBlocks = await db.blocks.filter(b => diaryPageIds.has(b.pageId)).toArray();
+    for (const b of diaryBlocks) {
+       await db.blocks.put(b);
+    }
+
+    set({ diaryPasswordHash: hash, diaryKey: key, diaryAuthenticated: true });
   },
 
   authenticateDiary: async (password) => {
     const { hashPassword } = await import("../utils/helpers");
+    const { deriveKey, decryptString, decryptObject, isEncryptedObject, isEncryptedString } = await import("../utils/crypto");
+    const { setActiveDiaryKey } = await import("../db/schema");
+    
     const hash = await hashPassword(password);
     const { diaryPasswordHash } = get();
     if (hash === diaryPasswordHash) {
-      set({ diaryAuthenticated: true });
+      let saltRecord = await db.settings.get("diarySalt");
+      let salt = saltRecord?.value;
+      if (!salt) {
+        const { supabase } = await import("../lib/supabaseClient");
+        const { data: { session } } = await supabase.auth.getSession();
+        const userId = session?.user?.id || "local";
+        const { getDeterministicSalt } = await import("../utils/crypto");
+        salt = getDeterministicSalt(userId);
+      }
+      
+      const key = await deriveKey(password, salt);
+      setActiveDiaryKey(key);
+      
+      const { pages, blocks } = get();
+      
+      const newPages = await Promise.all(pages.map(async (p) => {
+        if (p.workspaceId === "diary" && isEncryptedString(p.title)) {
+          return { ...p, title: await decryptString(p.title, key) };
+        }
+        return p;
+      }));
+      
+      const diaryPageIds = new Set(newPages.filter(p => p.workspaceId === "diary").map(p => p.id));
+      const newBlocks = await Promise.all(blocks.map(async (b) => {
+        if (diaryPageIds.has(b.pageId) && isEncryptedObject(b.content)) {
+          return { ...b, content: await decryptObject(b.content, key) };
+        }
+        return b;
+      }));
+      
+      set({ diaryAuthenticated: true, diaryKey: key, pages: newPages, blocks: newBlocks });
       return true;
     }
     return false;
@@ -154,23 +182,28 @@ export const useAppStore = create((set, get) => ({
         "rw",
         db.workspaces,
         db.sections,
-        db.pages,
-        db.blocks,
         async () => {
           await db.workspaces.add(seed.workspace);
           await db.sections.add(seed.section);
-          await db.pages.add(seed.page);
-          await db.blocks.bulkAdd(seed.blocks);
         }
       );
 
       workspaces = [seed.workspace];
       sections = [seed.section];
-      pages = [seed.page];
-      blocks = seed.blocks;
+      pages = [];
+      blocks = [];
     }
 
     // Removed forced section migration since sections are now optional.
+    
+    // Load diary settings
+    let diaryHash = null;
+    try {
+      const hashRecord = await db.settings?.get("diaryPasswordHash");
+      if (hashRecord) diaryHash = hashRecord.value;
+    } catch (err) {
+      console.warn("Failed to load diary settings:", err);
+    }
 
     set({
       workspaces,
@@ -178,17 +211,38 @@ export const useAppStore = create((set, get) => ({
       pages,
       blocks: sortBlocks(blocks.map(normalizeBlock)),
       activePageId: pages[0]?.id,
-      loading: false
+      loading: false,
+      diaryPasswordHash: diaryHash
     });
   },
 
   syncDbUpdates: async () => {
-    const [dbWorkspaces, dbSections, dbPages, dbBlocks] = await Promise.all([
+    let [dbWorkspaces, dbSections, dbPages, dbBlocks] = await Promise.all([
       db.workspaces.toArray(),
       db.sections.toArray(),
       db.pages.toArray(),
       db.blocks.toArray()
     ]);
+
+    const { diaryKey } = get();
+    if (diaryKey) {
+      const { decryptString, decryptObject, isEncryptedObject, isEncryptedString } = await import("../utils/crypto");
+      
+      dbPages = await Promise.all(dbPages.map(async (p) => {
+        if (p.workspaceId === "diary" && isEncryptedString(p.title)) {
+          return { ...p, title: await decryptString(p.title, diaryKey) };
+        }
+        return p;
+      }));
+      
+      const diaryPageIds = new Set(dbPages.filter(p => p.workspaceId === "diary").map(p => p.id));
+      dbBlocks = await Promise.all(dbBlocks.map(async (b) => {
+        if (diaryPageIds.has(b.pageId) && isEncryptedObject(b.content)) {
+          return { ...b, content: await decryptObject(b.content, diaryKey) };
+        }
+        return b;
+      }));
+    }
 
     set((state) => {
       // Build lookup maps from current in-memory state
@@ -436,49 +490,6 @@ export const useAppStore = create((set, get) => ({
     }));
   },
 
-  openTodayPage: async () => {
-    const state = get();
-    const workspaceId = state.workspaces[0]?.id;
-    if (!workspaceId) return;
-
-    const title = todayPageTitle();
-    const existing = state.pages.find((page) => page.title === title);
-    if (existing) {
-      set({ activePageId: existing.id, view: "workspace" });
-      return;
-    }
-
-    pushUndoSnapshot(get, set, "create daily page");
-    const createdAt = nowIso();
-    const page = {
-      id: createId("page"),
-      workspaceId,
-      sectionId: null,
-      title,
-      createdAt,
-      updatedAt: createdAt
-    };
-    const note = {
-      id: createId("block"),
-      pageId: page.id,
-      type: "note",
-      order: 1,
-      content: { text: "Plan the day here." },
-      metadata: { createdAt, updatedAt: createdAt }
-    };
-
-    await db.transaction("rw", db.pages, async () => {
-      await db.pages.add(page);
-    });
-    await enqueueMutation("page", page.id, "upsert", page);
-
-    set((current) => ({
-      pages: [...current.pages, page],
-      blocks: current.blocks,
-      activePageId: page.id,
-      view: "workspace"
-    }));
-  },
 
   renamePage: async (pageId, title) => {
     const updatedAt = nowIso();
@@ -1511,105 +1522,7 @@ export const useAppStore = create((set, get) => ({
     });
   },
 
-  exportBackup: () => ({
-    version: 2,
-    exportedAt: nowIso(),
-    workspaces: get().workspaces,
-    sections: get().sections,
-    pages: get().pages,
-    blocks: get().blocks
-  }),
 
-  exportPageMarkdown: (pageId = get().activePageId) => {
-    const state = get();
-    const page = state.pages.find((item) => item.id === pageId);
-    if (!page) return "";
-
-    const lines = [`# ${page.title}`, ""];
-    const pageBlocks = sortBlocks(
-      state.blocks.filter((block) => block.pageId === page.id)
-    );
-
-    for (const block of pageBlocks) {
-      if (block.type === "note") lines.push(block.content.text || "", "");
-      if (block.type === "task") {
-        const checked = block.metadata.completed ? "x" : " ";
-        const meta = [
-          block.metadata.priority,
-          block.metadata.deadline,
-          block.metadata.recurrence && block.metadata.recurrence !== "none"
-            ? `repeats ${block.metadata.recurrence}`
-            : undefined
-        ]
-          .filter(Boolean)
-          .join(", ");
-        lines.push(
-          `- [${checked}] ${block.content.title}${meta ? ` (${meta})` : ""}`
-        );
-        for (const subtask of block.content.subtasks ?? []) {
-          lines.push(`  - [${subtask.completed ? "x" : " "}] ${subtask.text}`);
-        }
-      }
-      if (block.type === "checklist") {
-        for (const item of block.content.items ?? []) {
-          lines.push(`- [${item.completed ? "x" : " "}] ${item.text}`);
-        }
-      }
-      if (block.type === "code") {
-        lines.push(
-          `\`\`\`${block.content.language ?? ""}`,
-          block.content.code ?? "",
-          "```",
-          ""
-        );
-      }
-      if (block.type === "link") {
-        const links = block.content.links || [{ title: block.content.title || "Useful link", url: block.content.url || "" }];
-        for (const l of links) {
-          lines.push(`[${l.title || "Link"}](${l.url || ""})`);
-        }
-        lines.push("");
-      }
-      if (block.type === "image") {
-        lines.push(`![${block.content.caption ?? block.content.name ?? "image"}]()`, "");
-      }
-    }
-
-    return lines.join("\n");
-  },
-
-  importBackup: async (payload) => {
-    pushUndoSnapshot(get, set, "import backup");
-    await db.transaction(
-      "rw",
-      db.workspaces,
-      db.sections,
-      db.pages,
-      db.blocks,
-      async () => {
-        await db.workspaces.clear();
-        await db.sections.clear();
-        await db.pages.clear();
-        await db.blocks.clear();
-        await db.workspaces.bulkAdd(payload.workspaces ?? []);
-        await db.sections.bulkAdd(payload.sections ?? []);
-        await db.pages.bulkAdd(payload.pages ?? []);
-        await db.blocks.bulkAdd(payload.blocks ?? []);
-      }
-    );
-
-    set({
-      workspaces: payload.workspaces ?? [],
-      sections: sortSections(payload.sections ?? []),
-      pages: payload.pages ?? [],
-      blocks: sortBlocks((payload.blocks ?? []).map(normalizeBlock)),
-      activePageId: payload.pages?.[0]?.id,
-      view: "workspace",
-      recentlyDeleted: [],
-      selectedTaskId: undefined,
-      aiReview: undefined
-    });
-  },
 
   uploadTaskAttachment: async (taskId, file, userId) => {
     const block = get().blocks.find((item) => item.id === taskId);

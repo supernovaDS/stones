@@ -4,7 +4,7 @@ import { Moon, Sun, Trash2, Settings, X, Plus, ChevronDown, ChevronRight, Edit2 
 import { useAppStore } from "../../store/useAppStore";
 import { navItems } from "../../utils/constants";
 
-export function Sidebar({ isOpen, onClose }) {
+export function Sidebar({ isOpen, onClose, isHiddenDesktop }) {
   const {
     activePageId,
     createPage,
@@ -18,6 +18,7 @@ export function Sidebar({ isOpen, onClose }) {
     setTheme,
     setView,
     setSettingsOpen,
+    setSidebarHidden,
     theme,
     view
   } = useAppStore();
@@ -34,7 +35,7 @@ export function Sidebar({ isOpen, onClose }) {
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   return (
-    <aside aria-label="Workspace navigation" className={clsx("sidebar-shell", isOpen && "sidebar-open")}>
+    <aside aria-label="Workspace navigation" className={clsx("sidebar-shell", isOpen && "sidebar-open", isHiddenDesktop && "sidebar-desktop-hidden")}>
       <div className="border-b-4 border-black bg-[#ffdc4a] p-4 dark:border-[#1e232a] dark:bg-[#0c0e11]">
         <div className="flex items-center gap-3">
           <div className="grid h-14 w-14 place-items-center overflow-hidden rounded-lg border-[3px] border-black bg-white shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[3px_3px_0_#000]">
@@ -42,7 +43,6 @@ export function Sidebar({ isOpen, onClose }) {
           </div>
           <div className="min-w-0">
             <h1 className="brand-word leading-tight">Stones</h1>
-            <p className="text-xs font-black uppercase tracking-wide text-black/70 dark:text-[#7a7670]">Task + workspace</p>
           </div>
           <button
               className="icon-button ml-auto"

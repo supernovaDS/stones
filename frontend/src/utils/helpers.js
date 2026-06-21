@@ -1,4 +1,4 @@
-import { formatShortDate, isOverdue, isToday, todayIso, toLocalDateString } from "./date";
+import { formatShortDate, isOverdue, isToday, todayIso, toLocalDateString, toLocalDateFromIso } from "./date";
 
 // ── Task filtering ──────────────────────────────────────────────
 
@@ -14,37 +14,6 @@ export function taskMatchesFilter(task, filter) {
   return true;
 }
 
-export function compareTasksByDate(a, b) {
-  if (!a.metadata.deadline && !b.metadata.deadline) return 0;
-  if (!a.metadata.deadline) return 1;
-  if (!b.metadata.deadline) return -1;
-  return a.metadata.deadline.localeCompare(b.metadata.deadline);
-}
-
-// ── Task grouping ───────────────────────────────────────────────
-
-export function groupTasks(tasks, mode) {
-  if (mode === "none") return [{ label: "Tasks", tasks }];
-  const groups = new Map();
-  for (const task of tasks) {
-    const label = groupLabel(task.metadata.deadline, mode);
-    groups.set(label, [...(groups.get(label) ?? []), task]);
-  }
-  return [...groups.entries()].map(([label, groupTasksValue]) => ({ label, tasks: groupTasksValue }));
-}
-
-function groupLabel(deadline, mode) {
-  if (!deadline) return "No date";
-  const date = new Date(`${deadline}T00:00:00`);
-  if (mode === "day") return date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-  if (mode === "week") {
-    const start = new Date(date);
-    start.setDate(date.getDate() - date.getDay());
-    return `Week of ${formatShortDate(toLocalDateString(start))}`;
-  }
-  return date.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-}
-
 // ── Calendar helpers ────────────────────────────────────────────
 
 export function getCalendarDays(cursor) {
@@ -79,7 +48,11 @@ export function heatColor(count) {
 }
 
 export function calculateStreak(tasks) {
-  const completedDays = new Set(tasks.map((task) => task.metadata.completedAt?.slice(0, 10)).filter(Boolean));
+  const completedDays = new Set(
+    tasks
+      .map((task) => toLocalDateFromIso(task.metadata.completedAt))
+      .filter(Boolean)
+  );
   let streak = 0;
   const cursor = new Date();
   while (completedDays.has(toLocalDateString(cursor))) {

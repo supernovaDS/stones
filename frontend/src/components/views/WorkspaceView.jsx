@@ -4,7 +4,7 @@ import { BlockCard } from "../blocks";
 import { clsx } from "clsx";
 import { Archive, ChevronDown, ChevronUp, ClipboardPaste, Plus, FileText, CheckSquare, List, Code2, Link, Image, Heading, X } from "lucide-react";
 
-function WeatherWidget() {
+function WeatherWidget({ isFullWidth }) {
 // ... keeping weather widget ...
 
   const [time, setTime] = useState(new Date());
@@ -66,7 +66,7 @@ function WeatherWidget() {
   }, []);
 
   return (
-    <section className="bento-card span-4 bg-[#21caff] p-5 dark:bg-[#001a25] flex flex-col justify-center">
+    <section className={clsx("bento-card bg-[#21caff] p-5 dark:bg-[#001a25] flex flex-col justify-center", isFullWidth ? "span-12" : "span-4")}>
       <div className="weather-layout flex h-full items-center justify-between gap-4">
         <div className="min-w-0">
           <h2 className="weather-time text-5xl font-black tracking-tight">{time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</h2>
@@ -217,7 +217,7 @@ function AddBlockMenu({ pageId }) {
 }
 
 export function WorkspaceView({ pageId }) {
-  const { blocks, pages, renamePage, clipboard, pasteBlock, clearClipboard } = useAppStore();
+  const { blocks, pages, renamePage, clipboard, pasteBlock, clearClipboard, hideActivePageBlock, hideWeatherBlock } = useAppStore();
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
 
   const page = pages.find((item) => item.id === pageId);
@@ -230,15 +230,17 @@ export function WorkspaceView({ pageId }) {
 
   return (
     <div className="bento-grid">
-      <section className="bento-card span-8 bg-[#ffdc4a] p-5 dark:bg-[#1a1500]">
-        <p className="mb-2 text-xs font-black uppercase tracking-wide text-black/70 dark:text-[#7a7670]">Active page</p>
-        <input
-          className="hero-title w-full bg-transparent outline-none"
-          onChange={(event) => page && void renamePage(page.id, event.target.value)}
-          value={page?.title ?? ""}
-        />
-      </section>
-      <WeatherWidget />
+      {!hideActivePageBlock && (
+        <section className={clsx("bento-card bg-[#ffdc4a] p-5 dark:bg-[#1a1500]", hideWeatherBlock ? "span-12" : "span-8")}>
+          <p className="mb-2 text-xs font-black uppercase tracking-wide text-black/70 dark:text-[#7a7670]">Active page</p>
+          <input
+            className="hero-title w-full bg-transparent outline-none"
+            onChange={(event) => page && void renamePage(page.id, event.target.value)}
+            value={page?.title ?? ""}
+          />
+        </section>
+      )}
+      {!hideWeatherBlock && <WeatherWidget isFullWidth={hideActivePageBlock} />}
       <section className="span-12 flex flex-col gap-8">
         {activeBlocks.length ? (
           activeBlocks.map((block) => (
