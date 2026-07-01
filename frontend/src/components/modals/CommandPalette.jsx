@@ -1,4 +1,5 @@
 import {
+  BookOpen,
   Command,
   History,
   Repeat,
@@ -15,6 +16,7 @@ export function CommandPalette({ onClose }) {
   const isWorkspace = view === "workspace" && activePageId;
   const normalized = query.trim().toLowerCase();
   const actions = [
+    ["/diary", "Diary", BookOpen, () => { setView("diary"); onClose(); }],
     ["/recurring", "Recurring Tasks", Repeat, () => setRecurringTasksOpen(true)],
     ["/recovery", "Recovery & Deletions", History, () => { setRecoveryOpen(true); onClose(); }],
   ].filter(([shortcut, label]) => {

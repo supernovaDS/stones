@@ -93,8 +93,11 @@ export const useAppStore = create((set, get) => ({
     const { setActiveDiaryKey } = await import("../db/schema");
     const { supabase } = await import("../lib/supabaseClient");
     
-    const { data: { session } } = await supabase.auth.getSession();
-    const userId = session?.user?.id || "local";
+    let userId = "local";
+    if (supabase) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.id) userId = session.user.id;
+    }
     
     const hash = await hashPassword(password);
     const salt = getDeterministicSalt(userId);
@@ -132,8 +135,11 @@ export const useAppStore = create((set, get) => ({
       let salt = saltRecord?.value;
       if (!salt) {
         const { supabase } = await import("../lib/supabaseClient");
-        const { data: { session } } = await supabase.auth.getSession();
-        const userId = session?.user?.id || "local";
+        let userId = "local";
+        if (supabase) {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user?.id) userId = session.user.id;
+        }
         const { getDeterministicSalt } = await import("../utils/crypto");
         salt = getDeterministicSalt(userId);
       }

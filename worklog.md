@@ -182,3 +182,9 @@
   - Cleaned up the `CommandPalette` by removing contextual "add block" commands and unnecessary "Go to" links.
 - **Documentation:**
   - Completely rewrote the `README.md` to a professional standard, highlighting the new E2EE architecture and Supabase synchronization, removing obsolete local backend setup instructions, and adding the hosted live demo link and logo.
+
+### July 01, 2026
+- **UI Adjustments**:
+  - Restored the Diary access link into the topbar Command Palette menu.
+- **Bug Fixes**:
+  - Fixed a silent failure in Diary authentication where `supabase` object null-checks were missing, allowing the Diary to be properly locked and unlocked even when running offline or without Supabase configured.
