@@ -129,29 +129,76 @@ export const useAppStore = create((set, get) => ({
     const { setActiveDiaryKey } = await import("../db/schema");
     
     const hash = await hashPassword(password);
-    const { diaryPasswordHash } = get();
-    if (hash === diaryPasswordHash) {
-      let saltRecord = await db.settings.get("diarySalt");
-      let salt = saltRecord?.value;
-      if (!salt) {
-        const { supabase } = await import("../lib/supabaseClient");
-        let userId = "local";
-        if (supabase) {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.user?.id) userId = session.user.id;
-        }
-        const { getDeterministicSalt } = await import("../utils/crypto");
-        salt = getDeterministicSalt(userId);
+    const { diaryPasswordHash, pages, blocks } = get();
+    
+    let isMatch = false;
+    let salt = null;
+
+    const { supabase } = await import("../lib/supabaseClient");
+    let userId = "local";
+    if (supabase) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.id) userId = session.user.id;
+    }
+    const { getDeterministicSalt } = await import("../utils/crypto");
+    const defaultSalt = getDeterministicSalt(userId);
+
+    if (diaryPasswordHash) {
+      if (hash === diaryPasswordHash) {
+        isMatch = true;
+        let saltRecord = await db.settings.get("diarySalt");
+        salt = saltRecord?.value || defaultSalt;
       }
-      
+    } else {
+      // If diaryPasswordHash is null, but we have synced pages, we try to derive the key and decrypt
+      const diaryPages = pages.filter(p => p.workspaceId === "diary");
+      if (diaryPages.length > 0) {
+        salt = defaultSalt;
+        const testKey = await deriveKey(password, salt);
+        // Find an encrypted page to test decryption
+        const encryptedPage = diaryPages.find(p => isEncryptedString(p.title));
+        const encryptedBlock = blocks.find(b => {
+          const p = pages.find(page => page.id === b.pageId);
+          return p?.workspaceId === "diary" && isEncryptedObject(b.content);
+        });
+
+        if (encryptedPage || encryptedBlock) {
+          try {
+            if (encryptedPage) {
+              await decryptString(encryptedPage.title, testKey);
+            } else {
+              await decryptObject(encryptedBlock.content, testKey);
+            }
+            isMatch = true;
+            // Success! Save hash and salt locally
+            await db.settings.put({ key: "diaryPasswordHash", value: hash });
+            await db.settings.put({ key: "diarySalt", value: salt });
+            set({ diaryPasswordHash: hash });
+          } catch (e) {
+            isMatch = false;
+          }
+        } else {
+          // If no encrypted pages/blocks are found, we assume correct
+          isMatch = true;
+          await db.settings.put({ key: "diaryPasswordHash", value: hash });
+          await db.settings.put({ key: "diarySalt", value: salt });
+          set({ diaryPasswordHash: hash });
+        }
+      }
+    }
+
+    if (isMatch && salt) {
       const key = await deriveKey(password, salt);
       setActiveDiaryKey(key);
       
-      const { pages, blocks } = get();
-      
       const newPages = await Promise.all(pages.map(async (p) => {
         if (p.workspaceId === "diary" && isEncryptedString(p.title)) {
-          return { ...p, title: await decryptString(p.title, key) };
+          try {
+            return { ...p, title: await decryptString(p.title, key) };
+          } catch (e) {
+            console.error("Failed to decrypt page title", e);
+            return p;
+          }
         }
         return p;
       }));
@@ -159,7 +206,12 @@ export const useAppStore = create((set, get) => ({
       const diaryPageIds = new Set(newPages.filter(p => p.workspaceId === "diary").map(p => p.id));
       const newBlocks = await Promise.all(blocks.map(async (b) => {
         if (diaryPageIds.has(b.pageId) && isEncryptedObject(b.content)) {
-          return { ...b, content: await decryptObject(b.content, key) };
+          try {
+            return { ...b, content: await decryptObject(b.content, key) };
+          } catch (e) {
+            console.error("Failed to decrypt block content", e);
+            return b;
+          }
         }
         return b;
       }));

@@ -188,3 +188,6 @@
   - Restored the Diary access link into the topbar Command Palette menu.
 - **Bug Fixes**:
   - Fixed a silent failure in Diary authentication where `supabase` object null-checks were missing, allowing the Diary to be properly locked and unlocked even when running offline or without Supabase configured.
+- **Multi-Device Sync Improvements**:
+  - Resolved a major Diary sync UX issue: when logging in on a new device, the local database lacked the password hash (as local settings are not synced to the backend to maintain zero-knowledge privacy), resulting in the app incorrectly prompting the user to perform a new "Setup" rather than an "Unlock".
+  - The app now checks if synced diary pages exist on the device. If they do, the user is presented with an "Unlock Synced Diary" screen. Entering the correct password will now test-decrypt the synced items and, upon successful verification, automatically recreate and save the verification hash and salt locally.

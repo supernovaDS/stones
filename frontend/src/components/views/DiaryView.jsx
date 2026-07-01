@@ -62,7 +62,9 @@ export function DiaryView() {
     }
   };
 
-  if (!diaryPasswordHash) {
+  const hasSyncedDiary = diaryPages.length > 0;
+
+  if (!diaryPasswordHash && !hasSyncedDiary) {
     return (
       <div className="flex min-h-[100dvh] items-center justify-center p-6 max-md:p-4">
         <form onSubmit={handleSetupSubmit} className="bento-card max-w-md w-full bg-[#f1f5ff] p-8 text-center dark:bg-[#0c0e11] max-md:p-6">
@@ -98,8 +100,14 @@ export function DiaryView() {
           <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border-[3px] border-black bg-[#c4a8ff] dark:border-[#1e232a] dark:bg-[#1a1040]">
             <Lock size={32} />
           </div>
-          <h2 className="mb-2 text-2xl font-black">Unlock Diary</h2>
-          <p className="mb-6 text-sm font-bold text-stone-600 dark:text-[#7a7670]">Enter your password to access your private entries.</p>
+          <h2 className="mb-2 text-2xl font-black">
+            {!diaryPasswordHash ? "Unlock Synced Diary" : "Unlock Diary"}
+          </h2>
+          <p className="mb-6 text-sm font-bold text-stone-600 dark:text-[#7a7670]">
+            {!diaryPasswordHash
+              ? "It looks like you have a synced diary from another device. Enter your password to access your entries."
+              : "Enter your password to access your private entries."}
+          </p>
           {errorMsg && <p className="mb-4 text-sm font-black text-[#ff5a5f]">{errorMsg}</p>}
           <input
             autoFocus
