@@ -620,4 +620,12 @@
   .scroll-btn {
     @apply fixed bottom-6 right-6 z-40 flex h-12 w-12 items-center justify-center rounded-full border-[3px] border-black bg-[#ffdc4a] text-black shadow-[4px_4px_0_#111] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0_#111] active:translate-y-0 active:shadow-[2px_2px_0_#111] dark:border-black dark:bg-[#21caff] dark:text-black dark:shadow-[3px_3px_0_#000] duration-200;
   }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none !important;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+  }
 }

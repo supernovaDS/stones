@@ -186,8 +186,13 @@
 ### July 01, 2026
 - **UI Adjustments**:
   - Restored the Diary access link into the topbar Command Palette menu.
+  - Added a toggle button (`Eye`/`EyeOff`) on external links to allow users to hide/show their embed previews.
+  - Fixed a layout distortion bug in the Calendar view where selecting a day with too many tasks would vertically stretch the task sidebar, consequently stretching the entire calendar grid cell heights. Set the page size to 4 tasks per page, ensuring the sidebar content never exceeds the calendar's minimum height (which naturally prevents stretching without requiring any scrolling container), and replaced the "Page X of Y" text with neo-brutalist pagination circles (carousel indicators) between the `<` and `>` arrow controls. This keeps the layout height fixed and prevents calendar grid distortion entirely.
 - **Bug Fixes**:
   - Fixed a silent failure in Diary authentication where `supabase` object null-checks were missing, allowing the Diary to be properly locked and unlocked even when running offline or without Supabase configured.
 - **Multi-Device Sync Improvements**:
   - Resolved a major Diary sync UX issue: when logging in on a new device, the local database lacked the password hash (as local settings are not synced to the backend to maintain zero-knowledge privacy), resulting in the app incorrectly prompting the user to perform a new "Setup" rather than an "Unlock".
   - The app now checks if synced diary pages exist on the device. If they do, the user is presented with an "Unlock Synced Diary" screen. Entering the correct password will now test-decrypt the synced items and, upon successful verification, automatically recreate and save the verification hash and salt locally.
+- **Settings & Layout Persistence**:
+  - Added robust local persistence for Workspace Layout settings (Sidebar visibility, Active Page Title block, Weather widget) and Color Profile settings (Theme mode, Neo/Minimal profile).
+  - These preferences are now written to both IndexedDB (`db.settings`) and LocalStorage, and automatically reloaded during app initialization on startup.

@@ -20,7 +20,9 @@ import {
   ZoomIn,
   ZoomOut,
   Archive,
-  ArchiveRestore
+  ArchiveRestore,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useEffect, useRef, useState } from "react";
@@ -637,6 +639,13 @@ function LinkBlock({ block }) {
                   >
                     <Link size={12} /> Open
                   </a>
+                  {embedUrl && (
+                    <IconButton
+                      icon={link.hidePreview ? EyeOff : Eye}
+                      onClick={() => updateLinks(links.map((item, i) => i === index ? { ...item, hidePreview: !item.hidePreview } : item))}
+                      title={link.hidePreview ? "Show preview" : "Hide preview"}
+                    />
+                  )}
                   {links.length > 1 && (
                     <IconButton
                       danger
@@ -653,7 +662,7 @@ function LinkBlock({ block }) {
                 placeholder="URL (https://...)"
                 value={link.url ?? ""}
               />
-              {embedUrl ? (
+              {embedUrl && !link.hidePreview ? (
                 <iframe
                   className="mt-2 w-full max-w-[560px] aspect-video h-auto rounded-lg border-[3px] border-black shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:shadow-[3px_3px_0_#000]"
                   src={embedUrl}

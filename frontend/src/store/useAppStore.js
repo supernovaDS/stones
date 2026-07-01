@@ -20,6 +20,9 @@ const sortSections = (sections) =>
 
 const defaultTheme = () => localStorage.getItem("stones-theme") ?? "light";
 const defaultColorProfile = () => localStorage.getItem("stones-color-profile") ?? "neo";
+const defaultSidebarHidden = () => localStorage.getItem("stones-sidebar-hidden") === "true";
+const defaultHideActivePageBlock = () => localStorage.getItem("stones-hide-active-page-block") === "true";
+const defaultHideWeatherBlock = () => localStorage.getItem("stones-hide-weather-block") === "true";
 
 const getUniquePageTitle = (baseTitle, existingPages, excludeId = null) => {
   let title = baseTitle;
@@ -72,12 +75,24 @@ export const useAppStore = create((set, get) => ({
   setRecurringTasksOpen: (recurringTasksOpen) => set({ recurringTasksOpen }),
   recoveryOpen: false,
   setRecoveryOpen: (recoveryOpen) => set({ recoveryOpen }),
-  sidebarHidden: false,
-  setSidebarHidden: (sidebarHidden) => set({ sidebarHidden }),
-  hideActivePageBlock: false,
-  setHideActivePageBlock: (hideActivePageBlock) => set({ hideActivePageBlock }),
-  hideWeatherBlock: false,
-  setHideWeatherBlock: (hideWeatherBlock) => set({ hideWeatherBlock }),
+  sidebarHidden: defaultSidebarHidden(),
+  setSidebarHidden: async (sidebarHidden) => {
+    localStorage.setItem("stones-sidebar-hidden", String(sidebarHidden));
+    await db.settings.put({ key: "sidebarHidden", value: sidebarHidden });
+    set({ sidebarHidden });
+  },
+  hideActivePageBlock: defaultHideActivePageBlock(),
+  setHideActivePageBlock: async (hideActivePageBlock) => {
+    localStorage.setItem("stones-hide-active-page-block", String(hideActivePageBlock));
+    await db.settings.put({ key: "hideActivePageBlock", value: hideActivePageBlock });
+    set({ hideActivePageBlock });
+  },
+  hideWeatherBlock: defaultHideWeatherBlock(),
+  setHideWeatherBlock: async (hideWeatherBlock) => {
+    localStorage.setItem("stones-hide-weather-block", String(hideWeatherBlock));
+    await db.settings.put({ key: "hideWeatherBlock", value: hideWeatherBlock });
+    set({ hideWeatherBlock });
+  },
   editingRepeatedTaskId: null,
   setEditingRepeatedTaskId: (editingRepeatedTaskId) => set({ editingRepeatedTaskId }),
 
@@ -254,13 +269,34 @@ export const useAppStore = create((set, get) => ({
 
     // Removed forced section migration since sections are now optional.
     
-    // Load diary settings
+    // Load other settings
     let diaryHash = null;
+    let sidebarHidden = defaultSidebarHidden();
+    let hideActivePageBlock = defaultHideActivePageBlock();
+    let hideWeatherBlock = defaultHideWeatherBlock();
+    let colorProfile = defaultColorProfile();
+    let theme = defaultTheme();
+
     try {
       const hashRecord = await db.settings?.get("diaryPasswordHash");
       if (hashRecord) diaryHash = hashRecord.value;
+
+      const sidebarRecord = await db.settings?.get("sidebarHidden");
+      if (sidebarRecord) sidebarHidden = sidebarRecord.value;
+
+      const hideActivePageRecord = await db.settings?.get("hideActivePageBlock");
+      if (hideActivePageRecord) hideActivePageBlock = hideActivePageRecord.value;
+
+      const hideWeatherRecord = await db.settings?.get("hideWeatherBlock");
+      if (hideWeatherRecord) hideWeatherBlock = hideWeatherRecord.value;
+
+      const colorProfileRecord = await db.settings?.get("colorProfile");
+      if (colorProfileRecord) colorProfile = colorProfileRecord.value;
+
+      const themeRecord = await db.settings?.get("theme");
+      if (themeRecord) theme = themeRecord.value;
     } catch (err) {
-      console.warn("Failed to load diary settings:", err);
+      console.warn("Failed to load settings:", err);
     }
 
     set({
@@ -270,7 +306,12 @@ export const useAppStore = create((set, get) => ({
       blocks: sortBlocks(blocks.map(normalizeBlock)),
       activePageId: pages[0]?.id,
       loading: false,
-      diaryPasswordHash: diaryHash
+      diaryPasswordHash: diaryHash,
+      sidebarHidden,
+      hideActivePageBlock,
+      hideWeatherBlock,
+      colorProfile,
+      theme
     });
   },
 
@@ -371,12 +412,14 @@ export const useAppStore = create((set, get) => ({
   setSelectedTask: (taskId) => set({ selectedTaskId: taskId }),
   openTaskModal: (params = {}) => set({ taskModalParams: params }),
   closeTaskModal: () => set({ taskModalParams: null }),
-  setTheme: (theme) => {
+  setTheme: async (theme) => {
     localStorage.setItem("stones-theme", theme);
+    await db.settings.put({ key: "theme", value: theme });
     set({ theme });
   },
-  setColorProfile: (colorProfile) => {
+  setColorProfile: async (colorProfile) => {
     localStorage.setItem("stones-color-profile", colorProfile);
+    await db.settings.put({ key: "colorProfile", value: colorProfile });
     set({ colorProfile });
   },
   setNotification: (msg) => {
