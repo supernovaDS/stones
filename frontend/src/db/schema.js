@@ -1,4 +1,5 @@
 import Dexie from "dexie";
+import { encryptString, encryptObject, isEncryptedString, isEncryptedObject } from "../utils/crypto";
 
 class StonesDatabase extends Dexie {
   constructor() {
@@ -62,9 +63,6 @@ export function setActiveDiaryKey(key) {
   activeDiaryKey = key;
 }
 
-// We dynamically import crypto to avoid circular deps or top-level await issues
-const getCrypto = () => import("../utils/crypto");
-
 const originalPagesPut = db.pages.put.bind(db.pages);
 const originalPagesAdd = db.pages.add.bind(db.pages);
 const originalPagesBulkPut = db.pages.bulkPut.bind(db.pages);
@@ -75,18 +73,18 @@ const originalBlocksBulkPut = db.blocks.bulkPut.bind(db.blocks);
 
 async function encryptPage(page) {
   if (!activeDiaryKey || page.workspaceId !== "diary") return page;
-  const { encryptString, isEncryptedString } = await getCrypto();
   if (isEncryptedString(page.title)) return page; // already encrypted
-  return { ...page, title: await encryptString(page.title, activeDiaryKey) };
+  const encryptedTitle = await Dexie.waitFor(encryptString(page.title, activeDiaryKey));
+  return { ...page, title: encryptedTitle };
 }
 
 async function encryptBlock(block) {
   if (!activeDiaryKey) return block;
   const page = await db.pages.get(block.pageId);
   if (page?.workspaceId !== "diary") return block;
-  const { encryptObject, isEncryptedObject } = await getCrypto();
   if (isEncryptedObject(block.content)) return block; // already encrypted
-  return { ...block, content: await encryptObject(block.content, activeDiaryKey) };
+  const encryptedContent = await Dexie.waitFor(encryptObject(block.content, activeDiaryKey));
+  return { ...block, content: encryptedContent };
 }
 
 db.pages.put = async function (item, key) {

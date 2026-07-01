@@ -1,4 +1,5 @@
 import { db, activeDiaryKey } from "../db/schema";
+import { encryptString, encryptObject, isEncryptedString, isEncryptedObject } from "../utils/crypto";
 
 const nowIso = () => new Date().toISOString();
 
@@ -22,7 +23,6 @@ export async function enqueueMutation(entity, entityId, operation, payload) {
   };
 
   if (activeDiaryKey) {
-    const { encryptObject, encryptString, isEncryptedObject, isEncryptedString } = await import("../utils/crypto");
     if (entity === "page" && finalPayload.workspaceId === "diary") {
       if (!isEncryptedString(finalPayload.title)) {
         finalPayload.title = await encryptString(finalPayload.title, activeDiaryKey);
