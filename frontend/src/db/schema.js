@@ -53,6 +53,9 @@ class StonesDatabase extends Dexie {
       sync_meta: "id, entity, synced_at",
       settings: "key"
     });
+    this.version(6).stores({
+      tasks: null
+    });
   }
 }
 

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { db } from "../db/schema";
+import { db, setActiveDiaryKey } from "../db/schema";
 import { deleteTaskImage, uploadTaskImage } from "../services/imageUploadService";
 import { enqueueMutation } from "../sync/syncQueue";
 import {
@@ -9,9 +9,12 @@ import {
   todayPageTitle
 } from "../utils/date";
 import { getVirtualTasksForDate } from "../utils/recurrence";
+import { createUuid } from "../utils/ids";
+import { legacyHashPassword } from "../utils/helpers";
+import { deriveHash, deriveKey, decryptString, decryptObject, isEncryptedObject, isEncryptedString, getDeterministicSalt } from "../utils/crypto";
+import { supabase } from "../lib/supabaseClient";
 
-const createId = (prefix) =>
-  `${prefix}_${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
+const createId = (prefix) => `${prefix}_${createUuid()}`;
 
 const nowIso = () => new Date().toISOString();
 const sortBlocks = (blocks) => [...blocks].sort((a, b) => a.order - b.order);
@@ -103,19 +106,14 @@ export const useAppStore = create((set, get) => ({
   activeDiaryPageId: null,
 
   setDiaryPassword: async (password) => {
-    const { hashPassword } = await import("../utils/helpers");
-    const { getDeterministicSalt, deriveKey } = await import("../utils/crypto");
-    const { setActiveDiaryKey } = await import("../db/schema");
-    const { supabase } = await import("../lib/supabaseClient");
-    
     let userId = "local";
     if (supabase) {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user?.id) userId = session.user.id;
     }
     
-    const hash = await hashPassword(password);
     const salt = getDeterministicSalt(userId);
+    const hash = await deriveHash(password, salt);
     const key = await deriveKey(password, salt);
     
     await db.settings.put({ key: "diaryPasswordHash", value: hash });
@@ -139,36 +137,38 @@ export const useAppStore = create((set, get) => ({
   },
 
   authenticateDiary: async (password) => {
-    const { hashPassword } = await import("../utils/helpers");
-    const { deriveKey, decryptString, decryptObject, isEncryptedObject, isEncryptedString } = await import("../utils/crypto");
-    const { setActiveDiaryKey } = await import("../db/schema");
-    
-    const hash = await hashPassword(password);
     const { diaryPasswordHash, pages, blocks } = get();
     
     let isMatch = false;
     let salt = null;
 
-    const { supabase } = await import("../lib/supabaseClient");
     let userId = "local";
     if (supabase) {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user?.id) userId = session.user.id;
     }
-    const { getDeterministicSalt } = await import("../utils/crypto");
     const defaultSalt = getDeterministicSalt(userId);
+
+    let saltRecord = await db.settings.get("diarySalt");
+    salt = saltRecord?.value || defaultSalt;
+
+    const hash = await deriveHash(password, salt);
+    const legacyHash = await legacyHashPassword(password);
 
     if (diaryPasswordHash) {
       if (hash === diaryPasswordHash) {
         isMatch = true;
-        let saltRecord = await db.settings.get("diarySalt");
-        salt = saltRecord?.value || defaultSalt;
+      } else if (legacyHash === diaryPasswordHash) {
+        // Transparently upgrade legacy hash
+        isMatch = true;
+        await db.settings.put({ key: "diaryPasswordHash", value: hash });
+        await db.settings.put({ key: "diarySalt", value: salt });
+        set({ diaryPasswordHash: hash });
       }
     } else {
       // If diaryPasswordHash is null, but we have synced pages, we try to derive the key and decrypt
       const diaryPages = pages.filter(p => p.workspaceId === "diary");
       if (diaryPages.length > 0) {
-        salt = defaultSalt;
         const testKey = await deriveKey(password, salt);
         // Find an encrypted page to test decryption
         const encryptedPage = diaryPages.find(p => isEncryptedString(p.title));
@@ -193,11 +193,9 @@ export const useAppStore = create((set, get) => ({
             isMatch = false;
           }
         } else {
-          // If no encrypted pages/blocks are found, we assume correct
-          isMatch = true;
-          await db.settings.put({ key: "diaryPasswordHash", value: hash });
-          await db.settings.put({ key: "diarySalt", value: salt });
-          set({ diaryPasswordHash: hash });
+          // If no encrypted pages/blocks are found, we cannot verify the password.
+          // Return false. The UI will force the user to setup a new password instead.
+          isMatch = false;
         }
       }
     }
@@ -206,30 +204,7 @@ export const useAppStore = create((set, get) => ({
       const key = await deriveKey(password, salt);
       setActiveDiaryKey(key);
       
-      const newPages = await Promise.all(pages.map(async (p) => {
-        if (p.workspaceId === "diary" && isEncryptedString(p.title)) {
-          try {
-            return { ...p, title: await decryptString(p.title, key) };
-          } catch (e) {
-            console.error("Failed to decrypt page title", e);
-            return p;
-          }
-        }
-        return p;
-      }));
-      
-      const diaryPageIds = new Set(newPages.filter(p => p.workspaceId === "diary").map(p => p.id));
-      const newBlocks = await Promise.all(blocks.map(async (b) => {
-        if (diaryPageIds.has(b.pageId) && isEncryptedObject(b.content)) {
-          try {
-            return { ...b, content: await decryptObject(b.content, key) };
-          } catch (e) {
-            console.error("Failed to decrypt block content", e);
-            return b;
-          }
-        }
-        return b;
-      }));
+      const { pages: newPages, blocks: newBlocks } = await decryptDiaryData(pages, blocks, key);
       
       set({ diaryAuthenticated: true, diaryKey: key, pages: newPages, blocks: newBlocks });
       return true;
@@ -325,22 +300,9 @@ export const useAppStore = create((set, get) => ({
 
     const { diaryKey } = get();
     if (diaryKey) {
-      const { decryptString, decryptObject, isEncryptedObject, isEncryptedString } = await import("../utils/crypto");
-      
-      dbPages = await Promise.all(dbPages.map(async (p) => {
-        if (p.workspaceId === "diary" && isEncryptedString(p.title)) {
-          return { ...p, title: await decryptString(p.title, diaryKey) };
-        }
-        return p;
-      }));
-      
-      const diaryPageIds = new Set(dbPages.filter(p => p.workspaceId === "diary").map(p => p.id));
-      dbBlocks = await Promise.all(dbBlocks.map(async (b) => {
-        if (diaryPageIds.has(b.pageId) && isEncryptedObject(b.content)) {
-          return { ...b, content: await decryptObject(b.content, diaryKey) };
-        }
-        return b;
-      }));
+      const decrypted = await decryptDiaryData(dbPages, dbBlocks, diaryKey);
+      dbPages = decrypted.pages;
+      dbBlocks = decrypted.blocks;
     }
 
     set((state) => {
@@ -429,6 +391,16 @@ export const useAppStore = create((set, get) => ({
         set({ notification: undefined });
       }
     }, 3000);
+  },
+  setError: (msg) => {
+    set({ error: msg });
+    if (msg) {
+      setTimeout(() => {
+        if (useAppStore.getState().error === msg) {
+          set({ error: undefined });
+        }
+      }, 3000);
+    }
   },
 
   undoLastChange: async () => {
@@ -586,7 +558,7 @@ export const useAppStore = create((set, get) => ({
     if (page) await enqueueMutation("page", pageId, "upsert", { ...page, sectionId, updatedAt });
     set((state) => ({
       pages: state.pages.map((page) =>
-        page.id === pageId ? { ...page, sectionId } : page
+        page.id === pageId ? { ...page, sectionId, updatedAt } : page
       )
     }));
   },
@@ -736,17 +708,11 @@ export const useAppStore = create((set, get) => ({
 
   addSubtask: async (taskId) => {
     let task;
-    let isVirtual = false;
-    let templateId, dateStr;
-    if (taskId.startsWith("virtual_")) {
-      isVirtual = true;
-      const cleaned = taskId.substring("virtual_".length);
-      const lastUnderscore = cleaned.lastIndexOf("_");
-      templateId = cleaned.substring(0, lastUnderscore);
-      dateStr = cleaned.substring(lastUnderscore + 1);
-      
+    const { isVirtual, templateId, dateStr } = parseVirtualTaskId(taskId);
+
+    if (isVirtual) {
       const virtualTasks = getVirtualTasksForDate(dateStr, get().blocks);
-      task = virtualTasks.find(t => t.id === taskId);
+      task = virtualTasks.find((t) => t.id === taskId);
     } else {
       task = get().blocks.find((block) => block.id === taskId);
     }
@@ -759,51 +725,7 @@ export const useAppStore = create((set, get) => ({
     ];
 
     if (isVirtual) {
-      const instanceId = `instance_${templateId}_${dateStr}`;
-      let instance = get().blocks.find(b => b.id === instanceId);
-      const createdAt = nowIso();
-      const updatedAt = createdAt;
-      
-      if (!instance) {
-        instance = {
-          id: instanceId,
-          pageId: "system-recurring-instances",
-          type: "recurring_instance",
-          order: 0,
-          content: {
-            templateId,
-            dateStr,
-            subtasks: nextSubtasks
-          },
-          metadata: {
-            createdAt,
-            updatedAt
-          }
-        };
-        await db.blocks.add(instance);
-      } else {
-        instance = {
-          ...instance,
-          content: {
-            ...instance.content,
-            subtasks: nextSubtasks
-          },
-          metadata: {
-            ...instance.metadata,
-            updatedAt
-          }
-        };
-        await db.blocks.put(instance);
-      }
-      await enqueueMutation("block", instanceId, "upsert", instance);
-      
-      set((state) => ({
-        blocks: sortBlocks(
-          state.blocks.map((item) => item.id === instanceId ? instance : item).concat(
-            state.blocks.some(b => b.id === instanceId) ? [] : [instance]
-          )
-        )
-      }));
+      await upsertRecurringInstance(templateId, dateStr, nextSubtasks, get, set);
     } else {
       await get().updateTask(taskId, {
         subtasks: nextSubtasks
@@ -813,15 +735,8 @@ export const useAppStore = create((set, get) => ({
 
   updateSubtask: async (taskId, subtaskId, patch) => {
     let task;
-    let isVirtual = false;
-    let templateId, dateStr;
-    if (taskId.startsWith("virtual_")) {
-      isVirtual = true;
-      const cleaned = taskId.substring("virtual_".length);
-      const lastUnderscore = cleaned.lastIndexOf("_");
-      templateId = cleaned.substring(0, lastUnderscore);
-      dateStr = cleaned.substring(lastUnderscore + 1);
-      
+    const { isVirtual, templateId, dateStr } = parseVirtualTaskId(taskId);
+    if (isVirtual) {
       const virtualTasks = getVirtualTasksForDate(dateStr, get().blocks);
       task = virtualTasks.find(t => t.id === taskId);
     } else {
@@ -835,51 +750,7 @@ export const useAppStore = create((set, get) => ({
     );
 
     if (isVirtual) {
-      const instanceId = `instance_${templateId}_${dateStr}`;
-      let instance = get().blocks.find(b => b.id === instanceId);
-      const createdAt = nowIso();
-      const updatedAt = createdAt;
-      
-      if (!instance) {
-        instance = {
-          id: instanceId,
-          pageId: "system-recurring-instances",
-          type: "recurring_instance",
-          order: 0,
-          content: {
-            templateId,
-            dateStr,
-            subtasks: nextSubtasks
-          },
-          metadata: {
-            createdAt,
-            updatedAt
-          }
-        };
-        await db.blocks.add(instance);
-      } else {
-        instance = {
-          ...instance,
-          content: {
-            ...instance.content,
-            subtasks: nextSubtasks
-          },
-          metadata: {
-            ...instance.metadata,
-            updatedAt
-          }
-        };
-        await db.blocks.put(instance);
-      }
-      await enqueueMutation("block", instanceId, "upsert", instance);
-      
-      set((state) => ({
-        blocks: sortBlocks(
-          state.blocks.map((item) => item.id === instanceId ? instance : item).concat(
-            state.blocks.some(b => b.id === instanceId) ? [] : [instance]
-          )
-        )
-      }));
+      await upsertRecurringInstance(templateId, dateStr, nextSubtasks, get, set);
 
       const hasIncompleteSubtasks = nextSubtasks.some((s) => !s.completed);
       if (hasIncompleteSubtasks && task.metadata.completed) {
@@ -903,15 +774,8 @@ export const useAppStore = create((set, get) => ({
 
   deleteSubtask: async (taskId, subtaskId) => {
     let task;
-    let isVirtual = false;
-    let templateId, dateStr;
-    if (taskId.startsWith("virtual_")) {
-      isVirtual = true;
-      const cleaned = taskId.substring("virtual_".length);
-      const lastUnderscore = cleaned.lastIndexOf("_");
-      templateId = cleaned.substring(0, lastUnderscore);
-      dateStr = cleaned.substring(lastUnderscore + 1);
-      
+    const { isVirtual, templateId, dateStr } = parseVirtualTaskId(taskId);
+    if (isVirtual) {
       const virtualTasks = getVirtualTasksForDate(dateStr, get().blocks);
       task = virtualTasks.find(t => t.id === taskId);
     } else {
@@ -925,51 +789,7 @@ export const useAppStore = create((set, get) => ({
     );
 
     if (isVirtual) {
-      const instanceId = `instance_${templateId}_${dateStr}`;
-      let instance = get().blocks.find(b => b.id === instanceId);
-      const createdAt = nowIso();
-      const updatedAt = createdAt;
-      
-      if (!instance) {
-        instance = {
-          id: instanceId,
-          pageId: "system-recurring-instances",
-          type: "recurring_instance",
-          order: 0,
-          content: {
-            templateId,
-            dateStr,
-            subtasks: nextSubtasks
-          },
-          metadata: {
-            createdAt,
-            updatedAt
-          }
-        };
-        await db.blocks.add(instance);
-      } else {
-        instance = {
-          ...instance,
-          content: {
-            ...instance.content,
-            subtasks: nextSubtasks
-          },
-          metadata: {
-            ...instance.metadata,
-            updatedAt
-          }
-        };
-        await db.blocks.put(instance);
-      }
-      await enqueueMutation("block", instanceId, "upsert", instance);
-      
-      set((state) => ({
-        blocks: sortBlocks(
-          state.blocks.map((item) => item.id === instanceId ? instance : item).concat(
-            state.blocks.some(b => b.id === instanceId) ? [] : [instance]
-          )
-        )
-      }));
+      await upsertRecurringInstance(templateId, dateStr, nextSubtasks, get, set);
     } else {
       await get().updateTask(taskId, {
         subtasks: nextSubtasks
@@ -981,11 +801,8 @@ export const useAppStore = create((set, get) => ({
     get().updateTask(taskId, { dependencyIds }),
 
   toggleTask: async (blockId) => {
-    if (blockId.startsWith("virtual_")) {
-      const cleaned = blockId.substring("virtual_".length);
-      const lastUnderscore = cleaned.lastIndexOf("_");
-      const templateId = cleaned.substring(0, lastUnderscore);
-      const dateStr = cleaned.substring(lastUnderscore + 1);
+    const { isVirtual, templateId, dateStr } = parseVirtualTaskId(blockId);
+    if (isVirtual) {
       await get().toggleRepeatedTaskInstance(templateId, dateStr);
       return;
     }
@@ -993,7 +810,7 @@ export const useAppStore = create((set, get) => ({
     const block = get().blocks.find((item) => item.id === blockId);
     if (!block || block.type !== "task") return;
     if (block.metadata.failed) {
-      set({ error: "Cannot complete a failed task. Unfail it first." });
+      get().setError("Cannot complete a failed task. Unfail it first.");
       return;
     }
 
@@ -1003,14 +820,14 @@ export const useAppStore = create((set, get) => ({
       return dependency?.type === "task" && !dependency.metadata.completed;
     });
     if (!block.metadata.completed && blocked) {
-      set({ error: "Complete dependent tasks before closing this task." });
+      get().setError("Complete dependent tasks before closing this task.");
       return;
     }
 
     const subtasks = block.content.subtasks ?? [];
     const hasIncompleteSubtasks = subtasks.some((s) => !s.completed);
     if (!block.metadata.completed && hasIncompleteSubtasks) {
-      set({ error: "Complete all subtasks before closing this task." });
+      get().setError("Complete all subtasks before closing this task.");
       return;
     }
 
@@ -1072,11 +889,8 @@ export const useAppStore = create((set, get) => ({
   },
 
   toggleFailTask: async (blockId) => {
-    if (blockId.startsWith("virtual_")) {
-      const cleaned = blockId.substring("virtual_".length);
-      const lastUnderscore = cleaned.lastIndexOf("_");
-      const templateId = cleaned.substring(0, lastUnderscore);
-      const dateStr = cleaned.substring(lastUnderscore + 1);
+    const { isVirtual, templateId, dateStr } = parseVirtualTaskId(blockId);
+    if (isVirtual) {
       await get().toggleRepeatedTaskInstanceFail(templateId, dateStr);
       return;
     }
@@ -1085,7 +899,7 @@ export const useAppStore = create((set, get) => ({
     if (!block || block.type !== "task") return;
 
     if (block.metadata.completed && !block.metadata.failed) {
-      set({ error: "Cannot fail a completed task. Incomplete it first." });
+      get().setError("Cannot fail a completed task. Incomplete it first.");
       return;
     }
 
@@ -1302,7 +1116,7 @@ export const useAppStore = create((set, get) => ({
     const task = virtualTasks.find(t => t.id === `virtual_${templateId}_${dateStr}`);
     
     if (task && task.metadata.failed) {
-      set({ error: "Cannot complete a failed task. Unfail it first." });
+      get().setError("Cannot complete a failed task. Unfail it first.");
       return;
     }
 
@@ -1310,7 +1124,7 @@ export const useAppStore = create((set, get) => ({
       // Trying to complete the task
       const hasIncompleteSubtasks = task.content.subtasks?.some(s => !s.completed);
       if (hasIncompleteSubtasks) {
-        set({ error: "Complete all subtasks before closing this task." });
+        get().setError("Complete all subtasks before closing this task.");
         return;
       }
     }
@@ -1371,7 +1185,7 @@ export const useAppStore = create((set, get) => ({
     const existingComp = get().blocks.find(b => b.id === compId);
     
     if (existingComp && !existingFail) {
-      set({ error: "Cannot fail a completed task. Incomplete it first." });
+      get().setError("Cannot fail a completed task. Incomplete it first.");
       return;
     }
 
@@ -1598,30 +1412,6 @@ export const useAppStore = create((set, get) => ({
 
   clearClipboard: () => set({ clipboard: [] }),
 
-  convertNoteToTask: async (blockId) => {
-    const note = get().blocks.find((block) => block.id === blockId);
-    if (!note || note.type !== "note" || !note.content.text.trim()) return;
-
-    get().openTaskModal({
-      title: note.content.text.trim().split("\n")[0],
-      priority: "medium",
-      sourceBlockId: note.id,
-      pageId: note.pageId
-    });
-  },
-
-  convertTextToTask: async (blockId, text) => {
-    const note = get().blocks.find((block) => block.id === blockId);
-    const title = text?.trim();
-    if (!note || note.type !== "note" || !title) return;
-
-    get().openTaskModal({
-      title: title.split("\n")[0],
-      priority: "medium",
-      sourceBlockId: note.id,
-      pageId: note.pageId
-    });
-  },
 
 
 
@@ -1698,35 +1488,7 @@ const addBlock = async (get, set, pageId, type, content, metadata = {}, extra = 
   get().setNotification(`${type.charAt(0).toUpperCase() + type.slice(1)} added`);
 };
 
-const createTaskFromExtraction = async (
-  task,
-  fallbackPageId,
-  get,
-  set,
-  overrides = {}
-) => {
-  const pageId = task.pageId ?? fallbackPageId;
-  if (!pageId) return;
-  await addBlock(
-    get,
-    set,
-    pageId,
-    "task",
-    {
-      title: task.title,
-      notes: task.notes ?? "",
-      subtasks: [],
-      dependencyIds: []
-    },
-    {
-      completed: false,
-      priority: task.priority ?? "medium",
-      deadline: overrides.deadline ?? task.deadline ?? normalizeDateText(task.dueText),
-      recurrence: overrides.recurrence ?? "none",
-      customRecurrenceInterval: overrides.customRecurrenceInterval ?? 1
-    }
-  );
-};
+
 
 const normalizeBlock = (block) => {
   if (block.type !== "task") return block;
@@ -1745,69 +1507,6 @@ const normalizeBlock = (block) => {
       completed: false,
       ...block.metadata
     }
-  };
-};
-
-const parseQuickTask = (input) => {
-  let title = input;
-  let priority = "medium";
-  let recurrence = "none";
-  let dueText;
-  let deadline;
-
-  const priorityMatch = title.match(/\b(high|medium|low)\b/i);
-  if (priorityMatch) {
-    priority = priorityMatch[1].toLowerCase();
-    title = title.replace(priorityMatch[0], "").trim();
-  }
-
-  const recurrenceMatch = title.match(/\b(daily|weekly)\b/i);
-  if (recurrenceMatch) {
-    recurrence = recurrenceMatch[1].toLowerCase();
-    title = title.replace(recurrenceMatch[0], "").trim();
-  }
-
-  if (/\bweekdays\b/i.test(title)) {
-    recurrence = "weekdays";
-    title = title.replace(/\bweekdays\b/i, "").trim();
-  }
-
-  if (/\bmonthly\b/i.test(title)) {
-    recurrence = "monthly";
-    title = title.replace(/\bmonthly\b/i, "").trim();
-  }
-
-  const customMatch = title.match(/\bevery\s+(\d+)\s+days?\b/i);
-  let customRecurrenceInterval;
-  if (customMatch) {
-    recurrence = "custom";
-    customRecurrenceInterval = Number(customMatch[1]);
-    title = title.replace(customMatch[0], "").trim();
-  }
-
-  if (/\btomorrow\b/i.test(title)) {
-    dueText = "tomorrow";
-    deadline = normalizeDateText(dueText);
-    title = title.replace(/\btomorrow\b/i, "").trim();
-  } else if (/\btoday\b/i.test(title)) {
-    dueText = "today";
-    deadline = todayIso();
-    title = title.replace(/\btoday\b/i, "").trim();
-  }
-
-  const dateMatch = title.match(/\b\d{4}-\d{2}-\d{2}\b/);
-  if (dateMatch) {
-    deadline = dateMatch[0];
-    title = title.replace(dateMatch[0], "").trim();
-  }
-
-  return {
-    title: title.replace(/\s+/g, " ").trim() || input,
-    priority,
-    dueText,
-    deadline,
-    recurrence,
-    customRecurrenceInterval
   };
 };
 
@@ -1908,16 +1607,113 @@ const replaceWorkspaceData = async (data) => {
     db.pages,
     db.blocks,
     async () => {
+      const currentBlocks = await db.blocks.toArray();
+      const snapshotBlockIds = new Set((data.blocks ?? []).map((b) => b.id));
+
+      const blocksToDelete = currentBlocks
+        .filter(
+          (b) =>
+            !snapshotBlockIds.has(b.id) &&
+            !["recurring_template", "recurring_instance", "completed_repeat", "failed_repeat"].includes(b.type)
+        )
+        .map((b) => b.id);
+
+      if (blocksToDelete.length > 0) {
+        await db.blocks.bulkDelete(blocksToDelete);
+      }
+
       await db.workspaces.clear();
       await db.sections.clear();
       await db.pages.clear();
-      await db.blocks.clear();
+      
       await db.workspaces.bulkAdd(data.workspaces ?? []);
       await db.sections.bulkAdd(data.sections ?? []);
       await db.pages.bulkAdd(data.pages ?? []);
-      await db.blocks.bulkAdd(data.blocks ?? []);
+      await db.blocks.bulkPut(data.blocks ?? []);
     }
   );
+};
+
+const parseVirtualTaskId = (taskId) => {
+  if (!taskId.startsWith("virtual_")) return { isVirtual: false };
+  const cleaned = taskId.substring("virtual_".length);
+  const lastUnderscore = cleaned.lastIndexOf("_");
+  if (lastUnderscore === -1) return { isVirtual: false };
+  const templateId = cleaned.substring(0, lastUnderscore);
+  const dateStr = cleaned.substring(lastUnderscore + 1);
+  return { isVirtual: true, templateId, dateStr };
+};
+
+const upsertRecurringInstance = async (templateId, dateStr, subtasksPatch, get, set) => {
+  const instanceId = `instance_${templateId}_${dateStr}`;
+  let instance = get().blocks.find((b) => b.id === instanceId);
+  const updatedAt = nowIso();
+  if (!instance) {
+    instance = {
+      id: instanceId,
+      pageId: "system-recurring-instances",
+      type: "recurring_instance",
+      order: 0,
+      content: {
+        templateId,
+        dateStr,
+        subtasks: subtasksPatch
+      },
+      metadata: {
+        createdAt: updatedAt,
+        updatedAt
+      }
+    };
+  } else {
+    instance = {
+      ...instance,
+      content: {
+        ...instance.content,
+        subtasks: subtasksPatch
+      },
+      metadata: {
+        ...instance.metadata,
+        updatedAt
+      }
+    };
+  }
+  await db.blocks.put(instance);
+  await enqueueMutation("block", instance.id, "upsert", instance);
+  
+  set((state) => ({
+    blocks: sortBlocks([
+      ...state.blocks.filter((b) => b.id !== instanceId),
+      instance
+    ])
+  }));
+};
+
+const decryptDiaryData = async (pages, blocks, key) => {
+  const newPages = await Promise.all(pages.map(async (p) => {
+    if (p.workspaceId === "diary" && isEncryptedString(p.title)) {
+      try {
+        return { ...p, title: await decryptString(p.title, key) };
+      } catch (e) {
+        console.error("Failed to decrypt page title", e);
+        return p;
+      }
+    }
+    return p;
+  }));
+  
+  const diaryPageIds = new Set(newPages.filter(p => p.workspaceId === "diary").map(p => p.id));
+  const newBlocks = await Promise.all(blocks.map(async (b) => {
+    if (diaryPageIds.has(b.pageId) && isEncryptedObject(b.content)) {
+      try {
+        return { ...b, content: await decryptObject(b.content, key) };
+      } catch (e) {
+        console.error("Failed to decrypt block content", e);
+        return b;
+      }
+    }
+    return b;
+  }));
+  return { pages: newPages, blocks: newBlocks };
 };
 
 const fileToDataUrl = (file) =>

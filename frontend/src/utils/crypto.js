@@ -1,7 +1,6 @@
 // ── Web Crypto API Utilities for Client-Side Encryption ──────────
 
 const ENCRYPTION_PREFIX = "ENC:";
-const SALT_LENGTH = 16;
 const IV_LENGTH = 12;
 const ITERATIONS = 100000;
 const HASH_ALGO = "SHA-256";
@@ -67,6 +66,39 @@ export async function deriveKey(password, saltBase64) {
     false,
     ["encrypt", "decrypt"]
   );
+}
+
+/**
+ * Derives a secure password verification hash using PBKDF2.
+ * @param {string} password
+ * @param {string} saltBase64
+ * @returns {Promise<string>} Hex encoded hash
+ */
+export async function deriveHash(password, saltBase64) {
+  const enc = new TextEncoder();
+  const keyMaterial = await window.crypto.subtle.importKey(
+    "raw",
+    enc.encode(password),
+    { name: "PBKDF2" },
+    false,
+    ["deriveBits"]
+  );
+
+  const salt = base64ToBuffer(saltBase64);
+
+  const bits = await window.crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt: salt,
+      iterations: ITERATIONS,
+      hash: HASH_ALGO
+    },
+    keyMaterial,
+    256
+  );
+
+  const hashArray = Array.from(new Uint8Array(bits));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 /**

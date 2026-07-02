@@ -90,6 +90,37 @@ function isOccurringOnDate(template, dateStr) {
   return false;
 }
 
+export function buildVirtualTask(template, dateStr, overrides = {}) {
+  const {
+    isCompleted = false,
+    completedAt = undefined,
+    isFailed = false,
+    failedAt = undefined,
+    subtasks = template?.content?.subtasks || []
+  } = overrides;
+
+  return {
+    id: `virtual_${template?.id}_${dateStr}`,
+    isVirtual: true,
+    templateId: template?.id,
+    type: "task",
+    content: {
+      title: template?.content?.title || "Recurring Task",
+      notes: template?.content?.notes || "",
+      subtasks
+    },
+    metadata: {
+      deadline: dateStr + (template?.metadata?.deadlineTime ? `T${template.metadata.deadlineTime}` : ""),
+      completed: isCompleted,
+      completedAt,
+      failed: isFailed,
+      failedAt,
+      priority: template?.metadata?.priority || "medium",
+      isRepeated: true
+    }
+  };
+}
+
 /**
  * Returns virtual task instances occurring on a specific date.
  */
@@ -113,25 +144,12 @@ export function getVirtualTasksForDate(dateStr, blocks) {
       const isFailed = failures.some((f) => f.content?.templateId === template.id);
       const instance = instances.find((inst) => inst.content?.templateId === template.id);
       const subtasks = instance ? (instance.content?.subtasks || []) : (template.content?.subtasks || []);
-      return {
-        id: `virtual_${template.id}_${dateStr}`,
-        isVirtual: true,
-        templateId: template.id,
-        type: "task",
-        content: {
-          title: template.content?.title || "Untitled task",
-          notes: template.content?.notes || "",
-          subtasks: subtasks
-        },
-        metadata: {
-          deadline: dateStr + (template.metadata?.deadlineTime ? `T${template.metadata.deadlineTime}` : ""),
-          completed: isCompleted,
-          completedAt: comp ? comp.metadata?.completedAt : undefined,
-          failed: isFailed,
-          priority: template.metadata?.priority || "medium",
-          isRepeated: true
-        }
-      };
+      return buildVirtualTask(template, dateStr, {
+        isCompleted,
+        completedAt: comp ? comp.metadata?.completedAt : undefined,
+        isFailed,
+        subtasks
+      });
     });
 }
 
@@ -182,24 +200,11 @@ export function getVirtualTasksForFilter(filter, blocks) {
         (b) => b.type === "recurring_instance" && b.content?.templateId === c.content?.templateId && b.content?.dateStr === dateStr && !b.deleted
       );
       const subtasks = instance ? (instance.content?.subtasks || []) : (template?.content?.subtasks || []);
-      return {
-        id: `virtual_${c.content?.templateId}_${dateStr}`,
-        isVirtual: true,
-        templateId: c.content?.templateId,
-        type: "task",
-        content: {
-          title: template?.content?.title || "Recurring Task",
-          notes: template?.content?.notes || "",
-          subtasks: subtasks
-        },
-        metadata: {
-          deadline: dateStr + (template?.metadata?.deadlineTime ? `T${template.metadata.deadlineTime}` : ""),
-          completed: true,
-          completedAt: c.metadata?.completedAt,
-          priority: template?.metadata?.priority || "medium",
-          isRepeated: true
-        }
-      };
+      return buildVirtualTask(template, dateStr, {
+        isCompleted: true,
+        completedAt: c.metadata?.completedAt,
+        subtasks
+      });
     });
   }
 
@@ -213,25 +218,11 @@ export function getVirtualTasksForFilter(filter, blocks) {
         (b) => b.type === "recurring_instance" && b.content?.templateId === f.content?.templateId && b.content?.dateStr === dateStr && !b.deleted
       );
       const subtasks = instance ? (instance.content?.subtasks || []) : (template?.content?.subtasks || []);
-      return {
-        id: `virtual_${f.content?.templateId}_${dateStr}`,
-        isVirtual: true,
-        templateId: f.content?.templateId,
-        type: "task",
-        content: {
-          title: template?.content?.title || "Recurring Task",
-          notes: template?.content?.notes || "",
-          subtasks: subtasks
-        },
-        metadata: {
-          deadline: dateStr + (template?.metadata?.deadlineTime ? `T${template.metadata.deadlineTime}` : ""),
-          completed: false,
-          failed: true,
-          failedAt: f.metadata?.failedAt,
-          priority: template?.metadata?.priority || "medium",
-          isRepeated: true
-        }
-      };
+      return buildVirtualTask(template, dateStr, {
+        isFailed: true,
+        failedAt: f.metadata?.failedAt,
+        subtasks
+      });
     });
   }
 
@@ -290,25 +281,13 @@ export function getHistoryVirtualTasks(blocks, limitDays = 30) {
           (b) => b.type === "recurring_instance" && b.content?.templateId === template.id && b.content?.dateStr === dateStr && !b.deleted
         );
         const subtasks = instance ? (instance.content?.subtasks || []) : (template.content?.subtasks || []);
-        list.push({
-          id: `virtual_${template.id}_${dateStr}`,
-          isVirtual: true,
-          type: "task",
-          content: {
-            title: template.content?.title || "Untitled task",
-            notes: template.content?.notes || "",
-            subtasks: subtasks
-          },
-          metadata: {
-            deadline: dateStr + (template.metadata?.deadlineTime ? `T${template.metadata.deadlineTime}` : ""),
-            completed: !!comp,
-            completedAt: comp ? comp.metadata?.completedAt : undefined,
-            failed: !!fail,
-            failedAt: fail ? fail.metadata?.failedAt : undefined,
-            priority: template.metadata?.priority || "medium",
-            isRepeated: true
-          }
-        });
+        list.push(buildVirtualTask(template, dateStr, {
+          isCompleted: !!comp,
+          completedAt: comp ? comp.metadata?.completedAt : undefined,
+          isFailed: !!fail,
+          failedAt: fail ? fail.metadata?.failedAt : undefined,
+          subtasks
+        }));
       }
     }
   });

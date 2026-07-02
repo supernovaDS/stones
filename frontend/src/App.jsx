@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "./store/useAppStore";
-import { isOverdue, isToday } from "./utils/date";
 import { notifyDueReminders } from "./utils/helpers";
 import { useAuth } from "./contexts/AuthContext";
 import { useSync } from "./hooks/useSync";
