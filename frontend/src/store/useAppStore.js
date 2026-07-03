@@ -359,18 +359,22 @@ export const useAppStore = create((set, get) => ({
 
   setView: (view) => {
     if (view !== "diary") {
-      // When leaving the diary, purge any undo snapshots that were captured
-      // while in the diary view so workspace Ctrl+Z never undoes diary changes.
       const wasDiary = get().view === "diary";
       const undoStack = wasDiary
         ? get().undoStack.filter((s) => s.data.view !== "diary")
         : get().undoStack;
-      set({ view, diaryAuthenticated: false, undoStack });
+      const recentlyDeleted = wasDiary
+        ? get().recentlyDeleted.filter((s) => s.view !== "diary")
+        : get().recentlyDeleted;
+      set({ view, diaryAuthenticated: false, undoStack, recentlyDeleted });
     } else {
       set({ view });
     }
   },
-  setActivePage: (pageId) => set({ activePageId: pageId, view: "workspace" }),
+  setActivePage: (pageId) => {
+    set({ activePageId: pageId });
+    get().setView("workspace");
+  },
   setSelectedTask: (taskId) => set({ selectedTaskId: taskId }),
   openTaskModal: (params = {}) => set({ taskModalParams: params }),
   closeTaskModal: () => set({ taskModalParams: null }),
@@ -523,9 +527,9 @@ export const useAppStore = create((set, get) => ({
     await enqueueMutation("page", page.id, "upsert", page);
     set((state) => ({
       pages: [...state.pages, page],
-      activePageId: page.id,
-      view: "workspace"
+      activePageId: page.id
     }));
+    get().setView("workspace");
     get().setNotification(`Page "${title}" created`);
   },
 
@@ -1290,11 +1294,12 @@ export const useAppStore = create((set, get) => ({
     await enqueueMutation("section", sectionId, "delete", section);
     await Promise.all(pages.map((page) => enqueueMutation("page", page.id, "delete", page)));
     await Promise.all(blocks.map((block) => enqueueMutation("block", block.id, "delete", block)));
-    const deletedItem = makeDeletedItem("section", section.title, {
-      section,
-      pages,
-      blocks
-    });
+    const deletedItem = makeDeletedItem(
+      "section",
+      section.title,
+      { section, pages, blocks },
+      get().view
+    );
     set((state) => ({
       sections: state.sections.filter((item) => item.id !== sectionId),
       pages: state.pages.filter((page) => page.sectionId !== sectionId),
@@ -1317,7 +1322,7 @@ export const useAppStore = create((set, get) => ({
     });
     await enqueueMutation("page", pageId, "delete", page);
     await Promise.all(blocks.map((block) => enqueueMutation("block", block.id, "delete", block)));
-    const deletedItem = makeDeletedItem("page", page.title, { page, blocks });
+    const deletedItem = makeDeletedItem("page", page.title, { page, blocks }, get().view);
     set((state) => ({
       pages: state.pages.filter((item) => item.id !== pageId),
       blocks: state.blocks.filter((block) => block.pageId !== pageId),
@@ -1341,7 +1346,8 @@ export const useAppStore = create((set, get) => ({
     const deletedItem = makeDeletedItem(
       "block",
       block.type === "task" ? block.content.title || "Untitled task" : `${block.type} block`,
-      { block }
+      { block },
+      get().view
     );
     set((state) => ({
       blocks: state.blocks.filter((block) => block.id !== blockId),
@@ -1553,11 +1559,12 @@ const makeNextRecurringTask = (task, createdAt, get) => {
   };
 };
 
-const makeDeletedItem = (type, label, payload) => ({
+const makeDeletedItem = (type, label, payload, view) => ({
   id: createId("deleted"),
   type,
   label,
   payload,
+  view,
   deletedAt: nowIso()
 });
 

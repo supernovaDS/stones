@@ -209,3 +209,5 @@
   - Consolidated duplicate UUID parsing into a single `parseVirtualTaskId()` helper to parse recurring task IDs uniformly.
   - Abstracted duplicate state mutations for recurring instances (when toggling subtasks, etc.) into a centralized `upsertRecurringInstance()` helper function.
   - Refactored `recurrence.js` by replacing 70+ lines of repetitive task object construction blocks with a new, unified `buildVirtualTask()` factory method.
+- **Privacy & Security**:
+  - Closed a diary privacy leak where deleted blocks or undo snapshots created in the Diary could still be restored from the workspace if the user bypassed the `setView` navigation loop (e.g., clicking directly to a workspace page). Modified `makeDeletedItem` to capture the view context, and updated navigation helpers to reliably trigger the `setView` purge logic, completely wiping both the undo stack and recently deleted items of any diary content immediately upon exiting the Diary.
