@@ -197,3 +197,15 @@
 - **Settings & Layout Persistence**:
   - Added robust local persistence for Workspace Layout settings (Sidebar visibility, Active Page Title block, Weather widget) and Color Profile settings (Theme mode, Neo/Minimal profile).
   - These preferences are now written to both IndexedDB (`db.settings`) and LocalStorage, and automatically reloaded during app initialization on startup.
+
+### July 02 - 03, 2026
+- **Bug Fixes**:
+  - Replaced direct `set({ error: "..." })` mutations in `useAppStore.js` with a centralized `setError` helper to ensure error toasts correctly clear themselves after 3 seconds, preventing persistent/stuck error messages.
+  - Removed dynamic `await import()` statements inside `syncDbUpdates` to strictly preserve IndexedDB (Dexie) transaction zones and prevent silent synchronization failures.
+  - Added missing `updatedAt` timestamps when calling `movePageToSection`, preventing the synchronization loop from incorrectly pulling stale page states over fresh local changes.
+- **Codebase Optimization & Reusability**:
+  - Purged over 120 lines of dead code from `useAppStore.js` (including unused `convertNoteToTask`, `parseQuickTask`, and `createTaskFromExtraction` handlers) and cleaned up unused React imports across the application.
+  - Safely dropped the obsolete `tasks` table from the IndexedDB schema by bumping the schema version.
+  - Consolidated duplicate UUID parsing into a single `parseVirtualTaskId()` helper to parse recurring task IDs uniformly.
+  - Abstracted duplicate state mutations for recurring instances (when toggling subtasks, etc.) into a centralized `upsertRecurringInstance()` helper function.
+  - Refactored `recurrence.js` by replacing 70+ lines of repetitive task object construction blocks with a new, unified `buildVirtualTask()` factory method.
