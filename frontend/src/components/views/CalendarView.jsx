@@ -104,11 +104,9 @@ export function CalendarView() {
       <aside className="bento-card span-4 bg-white p-4 text-black dark:bg-[#12151a] dark:text-[#c8c3ba] flex flex-col min-h-0 md:h-full">
         <h3 className="mb-3 text-2xl font-black">{formatShortDate(selectedDay)}</h3>
         <div className="flex flex-col gap-2 mb-4">
-          {selectedDay >= todayIso() && (
-            <button className="nb-button action w-full" onClick={() => void openTaskModal({ deadline: selectedDay, pageId: "system-calendar" })} type="button">
-              <Plus size={16} /> Add task for day
-            </button>
-          )}
+          <button className="nb-button action w-full" onClick={() => void openTaskModal({ deadline: selectedDay, pageId: "system-calendar" })} type="button">
+            <Plus size={16} /> Add task for day
+          </button>
         </div>
         <div className="flex-1 flex flex-col justify-between pr-1 min-h-0">
           {selectedTasks.length ? (

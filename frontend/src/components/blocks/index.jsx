@@ -86,22 +86,18 @@ export function BlockCard({ block }) {
 
 // ── Block shell ─────────────────────────────────────────────────
 
-function BlockShell({ block, label, children, actions }) {
-  const { deleteBlock, moveBlock, toggleArchiveBlock, cutBlock, clipboard } = useAppStore();
+function BlockShell({ block, children }) {
+  const { clipboard, showContextMenu } = useAppStore();
   const isCut = clipboard?.some((b) => b.id === block.id);
   return (
-    <article className={clsx("bento-card block-shell h-full border-l-[10px] p-4 transition-all duration-150", `block-type-${block.type}`, blockTypeRail[block.type] ?? "border-l-stone-400", isCut && "is-cut")}>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <p className="text-xs font-black uppercase tracking-wide text-stone-700 dark:text-[#7a7670]">{label}</p>
-        <div className="block-actions flex flex-wrap gap-2">
-          <IconButton icon={ArrowUp} title="Move up" onClick={() => void moveBlock(block.id, "up")} />
-          <IconButton icon={ArrowDown} title="Move down" onClick={() => void moveBlock(block.id, "down")} />
-          {actions}
-          <IconButton icon={Scissors} title="Cut block" onClick={() => cutBlock(block.id)} />
-          <IconButton icon={block.metadata.archived ? ArchiveRestore : Archive} title={block.metadata.archived ? "Unarchive block" : "Archive block"} onClick={() => void toggleArchiveBlock(block.id)} />
-          <IconButton danger icon={Trash2} title="Delete block" onClick={() => void deleteBlock(block.id)} />
-        </div>
-      </div>
+    <article
+      className={clsx("bento-card block-shell h-full border-l-[10px] p-4 transition-all duration-150", `block-type-${block.type}`, blockTypeRail[block.type] ?? "border-l-stone-400", isCut && "is-cut")}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showContextMenu(e.clientX, e.clientY, block.id);
+      }}
+    >
       {children}
     </article>
   );
@@ -436,11 +432,18 @@ function TitleBlock({ block }) {
 // ── Task block ──────────────────────────────────────────────────
 
 function TaskBlock({ block }) {
-  const { deleteBlock, setSelectedTask, toggleTask, toggleFailTask, updateTask, moveBlock, updateSubtask, deleteSubtask, addSubtask, toggleArchiveBlock, cutBlock, clipboard } = useAppStore();
+  const { deleteBlock, setSelectedTask, toggleTask, toggleFailTask, updateTask, moveBlock, updateSubtask, deleteSubtask, addSubtask, toggleArchiveBlock, cutBlock, clipboard, showContextMenu } = useAppStore();
   const blocked = useIsBlocked(block);
   const isCut = clipboard?.some((b) => b.id === block.id);
   return (
-    <article className={clsx("bento-card block-shell block-type-task h-full border-l-[10px] p-4 transition-all duration-150", priorityRail[block.metadata.priority ?? "medium"], isCut && "is-cut")}>
+    <article
+      className={clsx("bento-card block-shell block-type-task h-full border-l-[10px] p-4 transition-all duration-150", priorityRail[block.metadata.priority ?? "medium"], isCut && "is-cut")}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showContextMenu(e.clientX, e.clientY, block.id);
+      }}
+    >
       <div className="grid gap-3">
         <div className="task-block-header flex items-start gap-3">
           <Checkbox checked={block.metadata.completed} onChange={() => void toggleTask(block.id)} className="mt-1" />
@@ -450,26 +453,6 @@ function TaskBlock({ block }) {
             placeholder="Task title"
             value={block.content.title}
           />
-          <div className="task-block-actions flex shrink-0 flex-wrap gap-2">
-            <IconButton icon={ArrowUp} title="Move up" onClick={() => void moveBlock(block.id, "up")} />
-            <IconButton icon={ArrowDown} title="Move down" onClick={() => void moveBlock(block.id, "down")} />
-            {(!block.metadata.completed || block.metadata.failed) && (
-              <IconButton 
-                icon={XCircle} 
-                title={block.metadata.failed ? "Unfail task" : "Fail task"} 
-                onClick={() => void toggleFailTask(block.id)} 
-                className={clsx(
-                  block.metadata.failed 
-                    ? "!bg-[#ff5a5f] !text-black border-black dark:!bg-[#5c1a1d] dark:!text-[#e8a0a2] dark:border-[#1e232a]" 
-                    : "bg-white text-stone-600 dark:bg-[#12151a] dark:text-[#7a7670]"
-                )}
-              />
-            )}
-            <IconButton icon={PanelRight} title="Open details" onClick={() => setSelectedTask(block.id)} className="prevent-outside-close" />
-            <IconButton icon={Scissors} title="Cut task" onClick={() => cutBlock(block.id)} />
-            <IconButton icon={block.metadata.archived ? ArchiveRestore : Archive} title={block.metadata.archived ? "Unarchive task" : "Archive task"} onClick={() => void toggleArchiveBlock(block.id)} />
-            <IconButton danger icon={Trash2} title="Delete task" onClick={() => void deleteBlock(block.id)} />
-          </div>
         </div>
         <div className="task-block-controls flex flex-wrap items-center gap-2 pl-8">
           <select className={clsx("nb-select h-10 px-2 text-sm font-black", priorityClasses[block.metadata.priority ?? "medium"])} onChange={(event) => void updateTask(block.id, { priority: event.target.value })} value={block.metadata.priority ?? "medium"}>

@@ -47,3 +47,4 @@ export function Badge({ children, tone }) {
 }
 
 export { Checkbox } from "./Checkbox";
+export { ContextMenu } from "./ContextMenu";

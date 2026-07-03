@@ -211,3 +211,29 @@
   - Refactored `recurrence.js` by replacing 70+ lines of repetitive task object construction blocks with a new, unified `buildVirtualTask()` factory method.
 - **Privacy & Security**:
   - Closed a diary privacy leak where deleted blocks or undo snapshots created in the Diary could still be restored from the workspace if the user bypassed the `setView` navigation loop (e.g., clicking directly to a workspace page). Modified `makeDeletedItem` to capture the view context, and updated navigation helpers to reliably trigger the `setView` purge logic, completely wiping both the undo stack and recently deleted items of any diary content immediately upon exiting the Diary.
+
+### July 03, 2026
+- **Undo System Partitioning**:
+  - Split the undo stack into two independent tracks: `undoStack` (for the workspace) and `diaryUndoStack` (for the diary). Toggling states, updating blocks, or editing pages in the diary will now only push to/pop from the `diaryUndoStack`.
+  - Configured the topbar Undo button to dynamically evaluate the active stack (`diaryUndoStack` when in diary view, `undoStack` when in workspace view) for its disabled and action states.
+  - Ensured that navigating away from the Diary immediately resets the `diaryUndoStack` to `[]`, preserving zero-knowledge privacy while keeping workspace undo snapshots completely intact.
+- **Dexie Transaction Stack Overflow Resolution**:
+  - Resolved a critical `Maximum call stack size exceeded` error when triggering undo inside the diary. In-memory snapshots are stored decrypted, but writing them back to Dexie via `replaceWorkspaceData` triggered monkey-patched table hooks (`db.blocks.put`, `db.pages.put`). This resulted in a stack overflow when resolving hundreds of blocks concurrently via `db.pages.get` and nested `Dexie.waitFor` calls inside the active transaction.
+  - Introduced a `bypassEncryption` flag in the DB schema to temporarily ignore encryption hooks, allowing the data to be pre-encrypted in memory and written back to Dexie via original bulk methods safely.
+  - Fixed a hidden stack overflow error in the `bufferToBase64` utility within `crypto.js`. The utility was spreading the binary array (`...new Uint8Array(buffer)`) as arguments to `String.fromCharCode`, which throws `Maximum call stack size exceeded` when encrypting large payloads (e.g. large note contents or images). Rewrote the conversion to safely process buffers in chunks of `0xffff` (65535) elements.
+- **Calendar & Task Features**:
+  - Enabled the ability to add tasks for past dates from the Calendar view sidebar by removing the `selectedDay >= todayIso()` condition around the "Add task for day" button. Let users schedule tasks retroactively on any calendar day.
+  - Dynamically configured `getCalendarDays` to return 35 days (5 weeks) instead of always 42 days (6 weeks) if the calendar days fit within 5 rows. This eliminates empty rows belonging solely to the next month (e.g. July 2026 showing August 2-8). Introduced an optional `force42` flag for the Insights page completion heatmap, which relies on a strict 14-column/42-day layout.
+- **Refined Recurring Task Lifecycle (Future-Only Removal)**:
+  - Configured paused task templates to only remove tasks scheduled for the future (dates > `pausedAt`), ensuring the current (today) and past instances remain visible.
+  - Configured ended task templates to preserve tasks scheduled for the past and present (dates <= `endDate`), removing only future instances from the calendar.
+  - Added `pausedAt` metadata to track exactly when a template is paused, and cleared it during resumption to start fresh from the day of resumption.
+- **Custom Context Menu & Header/Button Removals**:
+  - Hijacked the native right-click event (`onContextMenu`) on block wrappers (`BlockShell` and directly in `TaskBlock` which is structured independently of the shell) to suppress default browser options and open a custom context menu.
+  - Removed block header elements entirely from `BlockShell` (which contained the block type labels like "Note", "Checklist", "External links" and their respective action buttons) and deleted the `task-block-actions` buttons panel from `TaskBlock` in [index.jsx](file:///s:/projects/stones/frontend/src/components/blocks/index.jsx) to eliminate visual clutter.
+  - Defined block context menu classes in `styles/components.css` (for default Neo-Brutalist thick borders and heavy shadows) and added overrides in `styles/minimal.css` to render thin borders, soft shadows, and rounder corners when colorProfile is set to "minimal".
+  - Configured it to dynamically self-adjust coordinates when rendered near the edges of the browser window to avoid clipping.
+  - Added key context operations: Move Up / Move Down, Duplicate Block (including re-sorting other blocks on the page; disabled for Task blocks), Cut, Archive/Unarchive, and Delete.
+  - Added exclusive actions for Task blocks: "Open Details", "Mark Complete" / "Mark Incomplete", and "Fail Task" / "Restore Task" based on the current block metadata.
+  - Restricted the copy action to Note blocks ("Copy Text Content"), which automatically strips HTML tags to copy pure text to the clipboard.
+  - Handled overlay closing gracefully on clicking outside or choosing an item.

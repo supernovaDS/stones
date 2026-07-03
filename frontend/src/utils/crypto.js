@@ -5,11 +5,14 @@ const IV_LENGTH = 12;
 const ITERATIONS = 100000;
 const HASH_ALGO = "SHA-256";
 
-/**
- * Utility to convert ArrayBuffer to Base64 string
- */
 function bufferToBase64(buffer) {
-  return btoa(String.fromCharCode(...new Uint8Array(buffer)));
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunkSize = 0xffff; // 65535, safe limit for JS engine arguments stack
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
 }
 
 /**

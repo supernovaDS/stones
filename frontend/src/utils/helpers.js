@@ -16,11 +16,19 @@ export function taskMatchesFilter(task, filter) {
 
 // ── Calendar helpers ────────────────────────────────────────────
 
-export function getCalendarDays(cursor) {
+export function getCalendarDays(cursor, force42 = false) {
   const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+  const last = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
   const start = new Date(first);
   start.setDate(first.getDate() - first.getDay());
-  return Array.from({ length: 42 }, (_, index) => {
+  
+  let length = 42;
+  if (!force42) {
+    const totalDaysNeeded = first.getDay() + last.getDate();
+    length = totalDaysNeeded > 35 ? 42 : 35;
+  }
+
+  return Array.from({ length }, (_, index) => {
     const day = new Date(start);
     day.setDate(start.getDate() + index);
     return day;

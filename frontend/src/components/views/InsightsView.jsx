@@ -43,7 +43,7 @@ export function InsightsView() {
   const failRate = currentAndPastTasks.length ? Math.round((failedCount / currentAndPastTasks.length) * 100) : 0;
 
   const [heatmapCursor, setHeatmapCursor] = useState(new Date());
-  const heatmapDays = useMemo(() => getCalendarDays(heatmapCursor), [heatmapCursor]);
+  const heatmapDays = useMemo(() => getCalendarDays(heatmapCursor, true), [heatmapCursor]);
   const heatmapMonthLabel = heatmapCursor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
 
 

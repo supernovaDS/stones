@@ -10,6 +10,15 @@ function parseLocalDate(dateStr) {
  * Checks if a repeating template is scheduled to occur on a given date.
  */
 function isOccurringOnDate(template, dateStr) {
+  if (template.metadata?.status === "paused") {
+    const pausedAt = template.metadata?.pausedAt || todayIso();
+    if (dateStr > pausedAt) return false;
+  }
+  if (template.metadata?.status === "ended") {
+    const statusEndStr = template.metadata?.endDate || todayIso();
+    if (dateStr > statusEndStr) return false;
+  }
+
   const startStr = template.metadata?.startDate;
   if (!startStr || dateStr < startStr) return false;
 
@@ -137,7 +146,11 @@ export function getVirtualTasksForDate(dateStr, blocks) {
   );
 
   return templates
-    .filter((template) => isOccurringOnDate(template, dateStr))
+    .filter((template) => {
+      const comp = completions.find((c) => c.content?.templateId === template.id);
+      const isFailed = failures.some((f) => f.content?.templateId === template.id);
+      return isOccurringOnDate(template, dateStr) || !!comp || isFailed;
+    })
     .map((template) => {
       const comp = completions.find((c) => c.content?.templateId === template.id);
       const isCompleted = !!comp;

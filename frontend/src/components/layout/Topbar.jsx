@@ -13,8 +13,11 @@ export function Topbar({ onCommandOpen, onMenuToggle, activePage, view, sidebarH
   const {
     undoLastChange,
     undoStack,
+    diaryUndoStack,
     setRecurringTasksOpen
   } = useAppStore();
+
+  const activeUndoStack = view === "diary" ? diaryUndoStack : undoStack;
 
   return (
     <header className="topbar">
@@ -49,7 +52,7 @@ export function Topbar({ onCommandOpen, onMenuToggle, activePage, view, sidebarH
         />
         <HeaderButton icon={Command} label="Menu" onClick={onCommandOpen} />
         <HeaderButton
-          disabled={!undoStack.length}
+          disabled={!activeUndoStack.length}
           icon={RotateCcw}
           label="Undo"
           onClick={() => void undoLastChange()}

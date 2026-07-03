@@ -11,6 +11,7 @@ import { Sidebar } from "./components/layout/Sidebar";
 import { Topbar } from "./components/layout/Topbar";
 import { WorkspaceView, TaskListView, CalendarView, InsightsView, DiaryView } from "./components/views";
 import { TaskDetailPanel, TaskModal, CommandPalette, SettingsModal, RecurringTasksModal, RecoveryModal } from "./components/modals";
+import { ContextMenu } from "./components/ui";
 
 function App() {
   const auth = useAuth();
@@ -269,6 +270,7 @@ function App() {
       {settingsOpen ? <SettingsModal syncStatus={syncStatus} /> : null}
       {recurringTasksOpen ? <RecurringTasksModal onClose={() => setRecurringTasksOpen(false)} /> : null}
       {recoveryOpen ? <RecoveryModal /> : null}
+      <ContextMenu />
       <Toaster 
         position="top-center" 
         toastOptions={{

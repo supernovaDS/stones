@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Repeat, Pencil, Trash2, Plus, ArrowLeft, Clock, Calendar, ListChecks } from "lucide-react";
+import { X, Repeat, Pencil, Trash2, Plus, ArrowLeft, Clock, Calendar, ListChecks, Pause, Play, StopCircle } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { todayIso, formatShortDate } from "../../utils/date";
 import { Checkbox } from "../ui";
@@ -10,11 +10,20 @@ export function RecurringTasksModal({ onClose }) {
     addRepeatedTask,
     updateRepeatedTask,
     deleteRepeatedTask,
+    pauseRepeatedTask,
+    resumeRepeatedTask,
+    endRepeatedTask,
     editingRepeatedTaskId,
     setEditingRepeatedTaskId
   } = useAppStore();
 
-  const templates = blocks.filter((b) => b.type === "recurring_template" && !b.deleted && !b.metadata?.isArchived);
+  const [activeTab, setActiveTab] = useState("active");
+
+  const templates = blocks.filter((b) => {
+    if (b.type !== "recurring_template" || b.deleted || b.metadata?.isArchived) return false;
+    const status = b.metadata?.status || "active";
+    return status === activeTab;
+  });
 
   // Form states
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -332,14 +341,40 @@ export function RecurringTasksModal({ onClose }) {
           ) : (
             /* LIST VIEW */
             <div className="grid gap-4">
-              <button
-                className="nb-button action w-full py-3 flex items-center justify-center gap-2 font-black"
-                onClick={handleOpenCreate}
-                style={{ animation: "none" }}
-                type="button"
-              >
-                <Plus size={18} /> Create New Repeating Task
-              </button>
+              <div className="flex gap-2 mb-2 shrink-0">
+                <button
+                  className={`nb-button px-4 py-2 flex-1 text-xs font-black transition-all ${activeTab === "active" ? "action" : "bg-white dark:bg-[#12151a]"}`}
+                  onClick={() => setActiveTab("active")}
+                  type="button"
+                >
+                  Active
+                </button>
+                <button
+                  className={`nb-button px-4 py-2 flex-1 text-xs font-black transition-all ${activeTab === "paused" ? "action" : "bg-white dark:bg-[#12151a]"}`}
+                  onClick={() => setActiveTab("paused")}
+                  type="button"
+                >
+                  Paused
+                </button>
+                <button
+                  className={`nb-button px-4 py-2 flex-1 text-xs font-black transition-all ${activeTab === "ended" ? "action" : "bg-white dark:bg-[#12151a]"}`}
+                  onClick={() => setActiveTab("ended")}
+                  type="button"
+                >
+                  Ended
+                </button>
+              </div>
+
+              {activeTab === "active" && (
+                <button
+                  className="nb-button action w-full py-3 flex items-center justify-center gap-2 font-black"
+                  onClick={handleOpenCreate}
+                  style={{ animation: "none" }}
+                  type="button"
+                >
+                  <Plus size={18} /> Create New Repeating Task
+                </button>
+              )}
 
               <div className="grid gap-3">
                 {templates.length > 0 ? (
@@ -382,21 +417,65 @@ export function RecurringTasksModal({ onClose }) {
                         </div>
                       </div>
 
-                      <div className="flex gap-2 shrink-0">
-                        <button
-                          className="icon-button danger"
-                          onClick={() => void handleDelete(template.id)}
-                          title="Delete template"
-                          type="button"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                      <div className="flex gap-1.5 shrink-0">
+                        {activeTab !== "ended" && (
+                          <button
+                            className="icon-button"
+                            onClick={() => {
+                              setEditingRepeatedTaskId(template.id);
+                            }}
+                            title="Edit template"
+                            type="button"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                        )}
+                        {activeTab === "active" && (
+                          <button
+                            className="icon-button"
+                            onClick={() => void pauseRepeatedTask(template.id)}
+                            title="Pause task"
+                            type="button"
+                          >
+                            <Pause size={14} />
+                          </button>
+                        )}
+                        {activeTab === "paused" && (
+                          <button
+                            className="icon-button"
+                            onClick={() => void resumeRepeatedTask(template.id)}
+                            title="Resume task"
+                            type="button"
+                          >
+                            <Play size={14} />
+                          </button>
+                        )}
+                        {activeTab !== "ended" && (
+                          <button
+                            className="icon-button danger"
+                            onClick={() => void endRepeatedTask(template.id)}
+                            title="End task"
+                            type="button"
+                          >
+                            <StopCircle size={14} />
+                          </button>
+                        )}
+                        {activeTab === "ended" && (
+                          <button
+                            className="icon-button danger"
+                            onClick={() => void handleDelete(template.id)}
+                            title="Delete permanently"
+                            type="button"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))
                 ) : (
                   <div className="rounded-lg border-[3px] border-dashed border-black dark:border-[#1e232a] px-4 py-12 text-center text-stone-600 dark:text-[#7a7670] font-black">
-                    No repeating task schedules configured yet.
+                    No {activeTab} repeating task schedules configured yet.
                   </div>
                 )}
               </div>

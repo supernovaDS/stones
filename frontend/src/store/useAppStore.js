@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { db, setActiveDiaryKey } from "../db/schema";
+import { db, setActiveDiaryKey, activeDiaryKey as getActiveDiaryKey, originalPagesBulkAdd, originalBlocksBulkPut, setBypassEncryption } from "../db/schema";
 import { deleteTaskImage, uploadTaskImage } from "../services/imageUploadService";
 import { enqueueMutation } from "../sync/syncQueue";
 import {
@@ -11,7 +11,7 @@ import {
 import { getVirtualTasksForDate } from "../utils/recurrence";
 import { createUuid } from "../utils/ids";
 import { legacyHashPassword } from "../utils/helpers";
-import { deriveHash, deriveKey, decryptString, decryptObject, isEncryptedObject, isEncryptedString, getDeterministicSalt } from "../utils/crypto";
+import { deriveHash, deriveKey, decryptString, decryptObject, encryptString, encryptObject, isEncryptedObject, isEncryptedString, getDeterministicSalt } from "../utils/crypto";
 import { supabase } from "../lib/supabaseClient";
 
 const createId = (prefix) => `${prefix}_${createUuid()}`;
@@ -68,12 +68,16 @@ export const useAppStore = create((set, get) => ({
   notification: undefined,
   taskModalParams: null,
   undoStack: [],
+  diaryUndoStack: [],
   recentlyDeleted: [],
   clipboard: [],
   theme: defaultTheme(),
   colorProfile: defaultColorProfile(),
+  contextMenu: { visible: false, x: 0, y: 0, blockId: null },
 
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
+  showContextMenu: (x, y, blockId) => set({ contextMenu: { visible: true, x, y, blockId } }),
+  hideContextMenu: () => set({ contextMenu: { visible: false, x: 0, y: 0, blockId: null } }),
   recurringTasksOpen: false,
   setRecurringTasksOpen: (recurringTasksOpen) => set({ recurringTasksOpen }),
   recoveryOpen: false,
@@ -274,11 +278,12 @@ export const useAppStore = create((set, get) => ({
       console.warn("Failed to load settings:", err);
     }
 
+    const processedBlocks = await checkAndEndExpiredRecurringTasks(blocks);
     set({
       workspaces,
       sections: sortSections(sections),
       pages,
-      blocks: sortBlocks(blocks.map(normalizeBlock)),
+      blocks: sortBlocks(processedBlocks.map(normalizeBlock)),
       activePageId: pages[0]?.id,
       loading: false,
       diaryPasswordHash: diaryHash,
@@ -304,6 +309,8 @@ export const useAppStore = create((set, get) => ({
       dbPages = decrypted.pages;
       dbBlocks = decrypted.blocks;
     }
+
+    dbBlocks = await checkAndEndExpiredRecurringTasks(dbBlocks);
 
     set((state) => {
       // Build lookup maps from current in-memory state
@@ -360,13 +367,12 @@ export const useAppStore = create((set, get) => ({
   setView: (view) => {
     if (view !== "diary") {
       const wasDiary = get().view === "diary";
-      const undoStack = wasDiary
-        ? get().undoStack.filter((s) => s.data.view !== "diary")
-        : get().undoStack;
+      // When leaving diary, purge diary undo stack and diary deleted items for privacy
+      const diaryUndoStack = wasDiary ? [] : get().diaryUndoStack;
       const recentlyDeleted = wasDiary
         ? get().recentlyDeleted.filter((s) => s.view !== "diary")
         : get().recentlyDeleted;
-      set({ view, diaryAuthenticated: false, undoStack, recentlyDeleted });
+      set({ view, diaryAuthenticated: false, diaryUndoStack, recentlyDeleted });
     } else {
       set({ view });
     }
@@ -408,21 +414,29 @@ export const useAppStore = create((set, get) => ({
   },
 
   undoLastChange: async () => {
-    const [snapshot, ...rest] = get().undoStack;
+    const isDiary = get().view === "diary";
+    const stackKey = isDiary ? "diaryUndoStack" : "undoStack";
+    const stack = get()[stackKey];
+    const [snapshot, ...rest] = stack;
     if (!snapshot) return;
 
-    await replaceWorkspaceData(snapshot.data);
-    set({
-      ...snapshot.data,
-      blocks: sortBlocks((snapshot.data.blocks ?? []).map(normalizeBlock)),
-      sections: sortSections(snapshot.data.sections ?? []),
-      undoStack: rest,
-      selectedTaskId: undefined
-    });
-    // Reset debounce so the next edit after undo creates a fresh snapshot
-    _lastUndoLabel = null;
-    _lastUndoTime = 0;
-    get().setNotification(`Undid ${snapshot.label}`);
+    try {
+      await replaceWorkspaceData(snapshot.data);
+      set({
+        ...snapshot.data,
+        blocks: sortBlocks((snapshot.data.blocks ?? []).map(normalizeBlock)),
+        sections: sortSections(snapshot.data.sections ?? []),
+        [stackKey]: rest,
+        selectedTaskId: undefined
+      });
+      // Reset debounce so the next edit after undo creates a fresh snapshot
+      _lastUndoLabel = null;
+      _lastUndoTime = 0;
+      get().setNotification(`Undid ${snapshot.label}`);
+    } catch (err) {
+      console.error("Undo failed:", err);
+      get().setNotification(`Undo failed: ${err.message}`);
+    }
   },
 
   restoreDeletedItem: async (itemId) => {
@@ -534,6 +548,7 @@ export const useAppStore = create((set, get) => ({
   },
 
   addDiaryPage: async (title) => {
+    pushUndoSnapshot(get, set, "create diary page");
     const createdAt = nowIso();
     const uniqueTitle = getUniquePageTitle(title, get().pages);
     const page = {
@@ -1109,6 +1124,75 @@ export const useAppStore = create((set, get) => ({
     get().setNotification("Repeating task deleted");
   },
 
+  pauseRepeatedTask: async (id) => {
+    const template = get().blocks.find(b => b.id === id);
+    if (!template) return;
+    pushUndoSnapshot(get, set, "pause repeated task");
+    const updatedAt = nowIso();
+    const updatedTemplate = {
+      ...template,
+      metadata: {
+        ...template.metadata,
+        status: "paused",
+        pausedAt: todayIso(),
+        updatedAt
+      }
+    };
+    await db.blocks.put(updatedTemplate);
+    await enqueueMutation("block", id, "upsert", updatedTemplate);
+    set((current) => ({
+      blocks: sortBlocks(current.blocks.map(b => b.id === id ? updatedTemplate : b))
+    }));
+    get().setNotification("Repeating task paused");
+  },
+
+  resumeRepeatedTask: async (id) => {
+    const template = get().blocks.find(b => b.id === id);
+    if (!template) return;
+    pushUndoSnapshot(get, set, "resume repeated task");
+    const updatedAt = nowIso();
+    
+    // Remove pausedAt when resuming
+    const { pausedAt, ...restMetadata } = template.metadata;
+    const updatedTemplate = {
+      ...template,
+      metadata: {
+        ...restMetadata,
+        status: "active",
+        startDate: todayIso(),
+        updatedAt
+      }
+    };
+    await db.blocks.put(updatedTemplate);
+    await enqueueMutation("block", id, "upsert", updatedTemplate);
+    set((current) => ({
+      blocks: sortBlocks(current.blocks.map(b => b.id === id ? updatedTemplate : b))
+    }));
+    get().setNotification("Repeating task resumed");
+  },
+
+  endRepeatedTask: async (id) => {
+    const template = get().blocks.find(b => b.id === id);
+    if (!template) return;
+    pushUndoSnapshot(get, set, "end repeated task");
+    const updatedAt = nowIso();
+    const updatedTemplate = {
+      ...template,
+      metadata: {
+        ...template.metadata,
+        status: "ended",
+        endDate: todayIso(),
+        updatedAt
+      }
+    };
+    await db.blocks.put(updatedTemplate);
+    await enqueueMutation("block", id, "upsert", updatedTemplate);
+    set((current) => ({
+      blocks: sortBlocks(current.blocks.map(b => b.id === id ? updatedTemplate : b))
+    }));
+    get().setNotification("Repeating task ended");
+  },
+
   toggleRepeatedTaskInstance: async (templateId, dateStr) => {
     const compId = `comp_${templateId}_${dateStr}`;
     const failId = `fail_${templateId}_${dateStr}`;
@@ -1275,6 +1359,63 @@ export const useAppStore = create((set, get) => ({
         })
       )
     }));
+  },
+
+  duplicateBlock: async (blockId) => {
+    const state = get();
+    const block = state.blocks.find((item) => item.id === blockId);
+    if (!block) return;
+
+    pushUndoSnapshot(get, set, `duplicate ${block.type}`);
+    const pageBlocks = sortBlocks(
+      state.blocks.filter((item) => item.pageId === block.pageId)
+    );
+    const index = pageBlocks.findIndex((item) => item.id === blockId);
+    
+    const shiftedBlocks = [];
+    for (let i = index + 1; i < pageBlocks.length; i++) {
+      const b = pageBlocks[i];
+      shiftedBlocks.push({
+        ...b,
+        order: b.order + 1
+      });
+    }
+
+    const newId = createId(block.type);
+    const newBlock = {
+      ...block,
+      id: newId,
+      order: block.order + 1,
+      metadata: {
+        ...block.metadata,
+        createdAt: nowIso(),
+        updatedAt: nowIso()
+      }
+    };
+
+    await db.transaction("rw", db.blocks, async () => {
+      await db.blocks.add(newBlock);
+      if (shiftedBlocks.length > 0) {
+        await db.blocks.bulkPut(shiftedBlocks);
+      }
+    });
+
+    await enqueueMutation("block", newBlock.id, "upsert", newBlock);
+    for (const b of shiftedBlocks) {
+      await enqueueMutation("block", b.id, "upsert", b);
+    }
+
+    set((current) => {
+      const shiftedMap = new Map(shiftedBlocks.map(b => [b.id, b]));
+      const nextBlocks = current.blocks.map(item => {
+        if (shiftedMap.has(item.id)) return shiftedMap.get(item.id);
+        return item;
+      });
+      return {
+        blocks: sortBlocks([...nextBlocks, newBlock])
+      };
+    });
+    get().setNotification("Block duplicated");
   },
 
   deleteSection: async (sectionId) => {
@@ -1588,6 +1729,8 @@ const pushUndoSnapshot = (get, set, label) => {
   _lastUndoTime = now;
 
   const state = get();
+  const isDiary = state.view === "diary";
+  const stackKey = isDiary ? "diaryUndoStack" : "undoStack";
   const snapshot = {
     id: createId("undo"),
     label,
@@ -1602,43 +1745,75 @@ const pushUndoSnapshot = (get, set, label) => {
     }
   };
   set((current) => ({
-    undoStack: [snapshot, ...current.undoStack].slice(0, 30)
+    [stackKey]: [snapshot, ...current[stackKey]].slice(0, 30)
   }));
 };
 
 const replaceWorkspaceData = async (data) => {
-  await db.transaction(
-    "rw",
-    db.workspaces,
-    db.sections,
-    db.pages,
-    db.blocks,
-    async () => {
-      const currentBlocks = await db.blocks.toArray();
-      const snapshotBlockIds = new Set((data.blocks ?? []).map((b) => b.id));
+  // Encrypt diary items before writing, since snapshot data is decrypted in memory.
+  // We use the original (non-wrapped) Dexie methods to avoid the encryption hooks
+  // which call db.pages.get() for every block — causing stack overflow inside a
+  // transaction that just cleared and re-added pages.
+  const diaryKey = getActiveDiaryKey;
+  let pagesToWrite = data.pages ?? [];
+  let blocksToWrite = data.blocks ?? [];
 
-      const blocksToDelete = currentBlocks
-        .filter(
-          (b) =>
-            !snapshotBlockIds.has(b.id) &&
-            !["recurring_template", "recurring_instance", "completed_repeat", "failed_repeat"].includes(b.type)
-        )
-        .map((b) => b.id);
+  if (diaryKey) {
+    const diaryPageIds = new Set(pagesToWrite.filter(p => p.workspaceId === "diary").map(p => p.id));
 
-      if (blocksToDelete.length > 0) {
-        await db.blocks.bulkDelete(blocksToDelete);
+    pagesToWrite = await Promise.all(pagesToWrite.map(async (p) => {
+      if (p.workspaceId === "diary" && !isEncryptedString(p.title)) {
+        return { ...p, title: await encryptString(p.title, diaryKey) };
       }
+      return p;
+    }));
 
-      await db.workspaces.clear();
-      await db.sections.clear();
-      await db.pages.clear();
-      
-      await db.workspaces.bulkAdd(data.workspaces ?? []);
-      await db.sections.bulkAdd(data.sections ?? []);
-      await db.pages.bulkAdd(data.pages ?? []);
-      await db.blocks.bulkPut(data.blocks ?? []);
-    }
-  );
+    blocksToWrite = await Promise.all(blocksToWrite.map(async (b) => {
+      if (diaryPageIds.has(b.pageId) && !isEncryptedObject(b.content)) {
+        return { ...b, content: await encryptObject(b.content, diaryKey) };
+      }
+      return b;
+    }));
+  }
+
+  setBypassEncryption(true);
+  try {
+    await db.transaction(
+      "rw",
+      db.workspaces,
+      db.sections,
+      db.pages,
+      db.blocks,
+      async () => {
+        const currentBlocks = await db.blocks.toArray();
+        const snapshotBlockIds = new Set(blocksToWrite.map((b) => b.id));
+
+        const blocksToDelete = currentBlocks
+          .filter(
+            (b) =>
+              !snapshotBlockIds.has(b.id) &&
+              !["recurring_template", "recurring_instance", "completed_repeat", "failed_repeat"].includes(b.type)
+          )
+          .map((b) => b.id);
+
+        if (blocksToDelete.length > 0) {
+          await db.blocks.bulkDelete(blocksToDelete);
+        }
+
+        await db.workspaces.clear();
+        await db.sections.clear();
+        await db.pages.clear();
+        
+        await db.workspaces.bulkAdd(data.workspaces ?? []);
+        await db.sections.bulkAdd(data.sections ?? []);
+        // Use original methods — data is already encrypted above
+        await originalPagesBulkAdd(pagesToWrite);
+        await originalBlocksBulkPut(blocksToWrite);
+      }
+    );
+  } finally {
+    setBypassEncryption(false);
+  }
 };
 
 const parseVirtualTaskId = (taskId) => {
@@ -1730,3 +1905,43 @@ const fileToDataUrl = (file) =>
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+
+const checkAndEndExpiredRecurringTasks = async (blocks) => {
+  const today = todayIso();
+  const updatedBlocks = [];
+  const templatesToUpdate = [];
+
+  for (const block of blocks) {
+    if (block.type === "recurring_template" && !block.deleted) {
+      const status = block.metadata?.status || "active";
+      const endDate = block.metadata?.endDate;
+      if (status !== "ended" && endDate && today > endDate) {
+        const updated = {
+          ...block,
+          metadata: {
+            ...block.metadata,
+            status: "ended",
+            updatedAt: nowIso()
+          }
+        };
+        templatesToUpdate.push(updated);
+        updatedBlocks.push(updated);
+      } else {
+        updatedBlocks.push(block);
+      }
+    } else {
+      updatedBlocks.push(block);
+    }
+  }
+
+  if (templatesToUpdate.length > 0) {
+    await db.transaction("rw", db.blocks, async () => {
+      await db.blocks.bulkPut(templatesToUpdate);
+    });
+    for (const t of templatesToUpdate) {
+      await enqueueMutation("block", t.id, "upsert", t);
+    }
+  }
+
+  return updatedBlocks;
+};
