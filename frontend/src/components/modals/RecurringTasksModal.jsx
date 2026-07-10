@@ -261,11 +261,12 @@ export function RecurringTasksModal({ onClose }) {
                 <label className="grid gap-1 text-sm font-black">
                   Starts On
                   <input
-                    className="nb-input w-full px-3 py-2 font-bold"
+                    className="nb-input w-full px-3 py-2 font-bold disabled:opacity-75 disabled:cursor-not-allowed"
                     onChange={(e) => setStartDate(e.target.value)}
                     required
                     type="date"
                     value={startDate}
+                    disabled={!!editingRepeatedTaskId}
                   />
                 </label>
                 <label className="grid gap-1 text-sm font-black">
@@ -399,7 +400,7 @@ export function RecurringTasksModal({ onClose }) {
                           {template.metadata?.endDate && (
                             <span className="flex items-center gap-1 text-[#ff5a5f] font-black">
                               <Calendar size={12} />
-                              Ends {formatShortDate(template.metadata.endDate)}
+                              {activeTab === "ended" ? "Ended" : "Ends"} {formatShortDate(template.metadata.endDate)}
                             </span>
                           )}
                           {template.metadata?.deadlineTime && (

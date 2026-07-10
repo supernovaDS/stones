@@ -56,7 +56,7 @@ export function ContextMenu() {
     setAdjustedPos({ x: Math.max(10, newX), y: Math.max(10, newY) });
   }, [x, y, visible]);
 
-  // Click outside to close
+  // Click outside or scroll to close
   useEffect(() => {
     if (!visible) return;
     const handleOutsideClick = (e) => {
@@ -64,18 +64,35 @@ export function ContextMenu() {
         hideContextMenu();
       }
     };
+    const handleScroll = () => {
+      hideContextMenu();
+    };
+
     document.addEventListener("mousedown", handleOutsideClick);
-    return () => document.removeEventListener("mousedown", handleOutsideClick);
+    window.addEventListener("scroll", handleScroll, { capture: true });
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      window.removeEventListener("scroll", handleScroll, { capture: true });
+    };
   }, [visible, hideContextMenu]);
 
   if (!visible || !block) return null;
 
-  const handleAction = async (actionFn) => {
+  const handleAction = async (actionFn, e) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
     hideContextMenu();
     await actionFn();
   };
 
-  const handleCopyText = async () => {
+  const handleCopyText = async (e) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
     hideContextMenu();
     const rawText = block.content?.text || "";
     // Strip HTML tags for clean text copying
@@ -109,7 +126,7 @@ export function ContextMenu() {
       <button
         type="button"
         className="block-context-menu-item"
-        onClick={() => handleAction(() => moveBlock(block.id, "up"))}
+        onClick={(e) => handleAction(() => moveBlock(block.id, "up"), e)}
       >
         <ArrowUp size={14} /> Move Up
       </button>
@@ -117,7 +134,7 @@ export function ContextMenu() {
       <button
         type="button"
         className="block-context-menu-item"
-        onClick={() => handleAction(() => moveBlock(block.id, "down"))}
+        onClick={(e) => handleAction(() => moveBlock(block.id, "down"), e)}
       >
         <ArrowDown size={14} /> Move Down
       </button>
@@ -126,7 +143,7 @@ export function ContextMenu() {
         <button
           type="button"
           className="block-context-menu-item"
-          onClick={() => handleAction(() => duplicateBlock(block.id))}
+          onClick={(e) => handleAction(() => duplicateBlock(block.id), e)}
         >
           <Plus size={14} /> Duplicate Block
         </button>
@@ -135,9 +152,9 @@ export function ContextMenu() {
       <button
         type="button"
         className="block-context-menu-item"
-        onClick={() => handleAction(() => {
+        onClick={(e) => handleAction(() => {
           cutBlock(block.id);
-        })}
+        }, e)}
       >
         <Scissors size={14} /> Cut Block
       </button>
@@ -147,7 +164,7 @@ export function ContextMenu() {
           <button
             type="button"
             className="block-context-menu-item"
-            onClick={() => handleAction(() => setSelectedTask(block.id))}
+            onClick={(e) => handleAction(() => setSelectedTask(block.id), e)}
           >
             <PanelRight size={14} /> Open Details
           </button>
@@ -155,7 +172,7 @@ export function ContextMenu() {
           <button
             type="button"
             className="block-context-menu-item"
-            onClick={() => handleAction(() => toggleTask(block.id))}
+            onClick={(e) => handleAction(() => toggleTask(block.id), e)}
           >
             <Check size={14} /> {block.metadata.completed ? "Mark Incomplete" : "Mark Complete"}
           </button>
@@ -163,7 +180,7 @@ export function ContextMenu() {
           <button
             type="button"
             className="block-context-menu-item"
-            onClick={() => handleAction(() => toggleFailTask(block.id))}
+            onClick={(e) => handleAction(() => toggleFailTask(block.id), e)}
           >
             <XCircle size={14} /> {block.metadata.failed ? "Restore Task" : "Fail Task"}
           </button>
@@ -174,7 +191,7 @@ export function ContextMenu() {
         <button
           type="button"
           className="block-context-menu-item"
-          onClick={handleCopyText}
+          onClick={(e) => handleCopyText(e)}
         >
           <Copy size={14} /> Copy Text Content
         </button>
@@ -183,7 +200,7 @@ export function ContextMenu() {
       <button
         type="button"
         className="block-context-menu-item"
-        onClick={() => handleAction(() => toggleArchiveBlock(block.id))}
+        onClick={(e) => handleAction(() => toggleArchiveBlock(block.id), e)}
       >
         <Archive size={14} /> {block.metadata.archived ? "Unarchive" : "Archive"}
       </button>
@@ -193,7 +210,7 @@ export function ContextMenu() {
       <button
         type="button"
         className="block-context-menu-item danger"
-        onClick={() => handleAction(() => deleteBlock(block.id))}
+        onClick={(e) => handleAction(() => deleteBlock(block.id), e)}
       >
         <Trash2 size={14} /> Delete Block
       </button>

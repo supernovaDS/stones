@@ -74,12 +74,15 @@ export const useAppStore = create((set, get) => ({
   theme: defaultTheme(),
   colorProfile: defaultColorProfile(),
   contextMenu: { visible: false, x: 0, y: 0, blockId: null },
+  deletedPagesBin: [],
 
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   showContextMenu: (x, y, blockId) => set({ contextMenu: { visible: true, x, y, blockId } }),
   hideContextMenu: () => set({ contextMenu: { visible: false, x: 0, y: 0, blockId: null } }),
   recurringTasksOpen: false,
   setRecurringTasksOpen: (recurringTasksOpen) => set({ recurringTasksOpen }),
+  recycleBinOpen: false,
+  setRecycleBinOpen: (recycleBinOpen) => set({ recycleBinOpen }),
   recoveryOpen: false,
   setRecoveryOpen: (recoveryOpen) => set({ recoveryOpen }),
   sidebarHidden: defaultSidebarHidden(),
@@ -255,6 +258,7 @@ export const useAppStore = create((set, get) => ({
     let hideWeatherBlock = defaultHideWeatherBlock();
     let colorProfile = defaultColorProfile();
     let theme = defaultTheme();
+    let deletedPagesBin = [];
 
     try {
       const hashRecord = await db.settings?.get("diaryPasswordHash");
@@ -274,6 +278,18 @@ export const useAppStore = create((set, get) => ({
 
       const themeRecord = await db.settings?.get("theme");
       if (themeRecord) theme = themeRecord.value;
+
+      const binRecord = await db.settings?.get("deletedPagesBin");
+      if (binRecord) {
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        const parsedBin = Array.isArray(binRecord.value) ? binRecord.value : [];
+        const activeBin = parsedBin.filter(item => item.deletedAt >= thirtyDaysAgo);
+        
+        if (activeBin.length !== parsedBin.length) {
+          await db.settings.put({ key: "deletedPagesBin", value: activeBin });
+        }
+        deletedPagesBin = activeBin;
+      }
     } catch (err) {
       console.warn("Failed to load settings:", err);
     }
@@ -291,7 +307,8 @@ export const useAppStore = create((set, get) => ({
       hideActivePageBlock,
       hideWeatherBlock,
       colorProfile,
-      theme
+      theme,
+      deletedPagesBin
     });
   },
 
@@ -302,6 +319,31 @@ export const useAppStore = create((set, get) => ({
       db.pages.toArray(),
       db.blocks.toArray()
     ]);
+
+    // If there are no workspaces after a sync completes, this is a brand new user.
+    // Seed default workspace and section so they don't start with a blank app.
+    if (dbWorkspaces.length === 0) {
+      const seed = seedData();
+      await db.transaction(
+        "rw",
+        db.workspaces,
+        db.sections,
+        async () => {
+          await db.workspaces.add(seed.workspace);
+          await db.sections.add(seed.section);
+        }
+      );
+
+      // Re-read arrays from Dexie
+      [dbWorkspaces, dbSections] = await Promise.all([
+        db.workspaces.toArray(),
+        db.sections.toArray()
+      ]);
+
+      // Enqueue sync mutations to push the seed records to Supabase
+      void enqueueMutation("workspace", seed.workspace.id, "upsert", seed.workspace);
+      void enqueueMutation("section", seed.section.id, "upsert", seed.section);
+    }
 
     const { diaryKey } = get();
     if (diaryKey) {
@@ -1419,7 +1461,7 @@ export const useAppStore = create((set, get) => ({
   },
 
   deleteSection: async (sectionId) => {
-    if (!window.confirm("Are you sure you want to delete this section and all its pages?")) return;
+    if (!window.confirm("Are you sure you want to delete this section and all its pages? They will be moved to the Recycle Bin.")) return;
     const section = get().sections.find((item) => item.id === sectionId);
     if (!section) return;
     const pages = get().pages.filter((page) => page.sectionId === sectionId);
@@ -1435,19 +1477,31 @@ export const useAppStore = create((set, get) => ({
     await enqueueMutation("section", sectionId, "delete", section);
     await Promise.all(pages.map((page) => enqueueMutation("page", page.id, "delete", page)));
     await Promise.all(blocks.map((block) => enqueueMutation("block", block.id, "delete", block)));
-    const deletedItem = makeDeletedItem(
-      "section",
-      section.title,
-      { section, pages, blocks },
-      get().view
-    );
-    set((state) => ({
-      sections: state.sections.filter((item) => item.id !== sectionId),
-      pages: state.pages.filter((page) => page.sectionId !== sectionId),
-      blocks: state.blocks.filter((block) => !pageIds.has(block.pageId)),
-      activePageId: pageIds.has(state.activePageId) ? state.pages.find((page) => page.sectionId !== sectionId)?.id : state.activePageId,
-      recentlyDeleted: [deletedItem, ...state.recentlyDeleted].slice(0, 12)
-    }));
+
+    const binItem = {
+      id: section.id,
+      title: section.title,
+      type: "section",
+      workspaceId: section.workspaceId,
+      deletedAt: nowIso(),
+      payload: { section, pages, blocks }
+    };
+
+    const updatedBin = [binItem, ...get().deletedPagesBin];
+    await db.settings.put({ key: "deletedPagesBin", value: updatedBin });
+
+    set((state) => {
+      const remainingPages = state.pages.filter((page) => page.sectionId !== sectionId);
+      return {
+        sections: state.sections.filter((item) => item.id !== sectionId),
+        pages: remainingPages,
+        blocks: state.blocks.filter((block) => !pageIds.has(block.pageId)),
+        activePageId: pageIds.has(state.activePageId) ? remainingPages.find((page) => page.workspaceId !== "diary")?.id || null : state.activePageId,
+        deletedPagesBin: updatedBin
+      };
+    });
+
+    get().setNotification(`Section "${section.title}" moved to bin`);
   },
 
   deletePage: async (pageId) => {
@@ -1457,20 +1511,176 @@ export const useAppStore = create((set, get) => ({
     const blocks = get().blocks.filter((block) => block.pageId === pageId);
 
     pushUndoSnapshot(get, set, "delete page");
+
+    // Remove from Dexie
     await db.transaction("rw", db.pages, db.blocks, async () => {
       await db.pages.delete(pageId);
       await Promise.all(blocks.map((block) => db.blocks.delete(block.id)));
     });
+
+    // Enqueue delete sync mutations
     await enqueueMutation("page", pageId, "delete", page);
     await Promise.all(blocks.map((block) => enqueueMutation("block", block.id, "delete", block)));
-    const deletedItem = makeDeletedItem("page", page.title, { page, blocks }, get().view);
-    set((state) => ({
-      pages: state.pages.filter((item) => item.id !== pageId),
-      blocks: state.blocks.filter((block) => block.pageId !== pageId),
-      activePageId: state.activePageId === pageId ? state.pages.find((item) => item.id !== pageId)?.id : state.activePageId,
-      recentlyDeleted: [deletedItem, ...state.recentlyDeleted].slice(0, 12)
-    }));
-    get().setNotification(`Page "${page.title}" deleted`);
+
+    const binItem = {
+      id: page.id,
+      title: page.title,
+      type: "page",
+      workspaceId: page.workspaceId,
+      sectionId: page.sectionId,
+      deletedAt: nowIso(),
+      blocks
+    };
+
+    const updatedBin = [binItem, ...get().deletedPagesBin];
+    await db.settings.put({ key: "deletedPagesBin", value: updatedBin });
+
+    set((state) => {
+      const remainingPages = state.pages.filter((item) => item.id !== pageId);
+      const remainingDiaryPages = remainingPages.filter((item) => item.workspaceId === "diary");
+      const nextActiveDiaryPageId = state.activeDiaryPageId === pageId ? (remainingDiaryPages[0]?.id || null) : state.activeDiaryPageId;
+
+      return {
+        pages: remainingPages,
+        blocks: state.blocks.filter((block) => block.pageId !== pageId),
+        activePageId: state.activePageId === pageId ? remainingPages.find((item) => item.workspaceId !== "diary")?.id : state.activePageId,
+        activeDiaryPageId: nextActiveDiaryPageId,
+        deletedPagesBin: updatedBin
+      };
+    });
+
+    get().setNotification(`Page "${page.title}" moved to bin`);
+  },
+
+  restorePageFromBin: async (binItemId) => {
+    const binItem = get().deletedPagesBin.find(item => item.id === binItemId);
+    if (!binItem) return;
+
+    if (binItem.type === "section") {
+      const { section, pages, blocks } = binItem.payload;
+
+      const restoredSection = {
+        ...section,
+        createdAt: nowIso(),
+        updatedAt: nowIso()
+      };
+
+      const restoredPages = pages.map(p => ({
+        ...p,
+        createdAt: nowIso(),
+        updatedAt: nowIso()
+      }));
+
+      const restoredBlocks = blocks.map(b => ({
+        ...b,
+        metadata: {
+          ...b.metadata,
+          updatedAt: nowIso()
+        }
+      }));
+
+      // Write back to Dexie
+      await db.transaction("rw", db.sections, db.pages, db.blocks, async () => {
+        await db.sections.put(restoredSection);
+        for (const p of restoredPages) {
+          await db.pages.put(p);
+        }
+        for (const b of restoredBlocks) {
+          await db.blocks.put(b);
+        }
+      });
+
+      // Enqueue upsert sync mutations so they sync to other devices
+      await enqueueMutation("section", restoredSection.id, "upsert", restoredSection);
+      for (const p of restoredPages) {
+        await enqueueMutation("page", p.id, "upsert", p);
+      }
+      for (const b of restoredBlocks) {
+        await enqueueMutation("block", b.id, "upsert", b);
+      }
+
+      const updatedBin = get().deletedPagesBin.filter(item => item.id !== binItemId);
+      await db.settings.put({ key: "deletedPagesBin", value: updatedBin });
+
+      set((state) => {
+        const newSections = [...state.sections, restoredSection];
+        const newPages = [...state.pages, ...restoredPages];
+        const newBlocks = [...state.blocks, ...restoredBlocks];
+        
+        return {
+          sections: newSections,
+          pages: newPages,
+          blocks: sortBlocks(newBlocks),
+          deletedPagesBin: updatedBin,
+          activePageId: restoredPages[0]?.id || state.activePageId
+        };
+      });
+
+      get().setNotification(`Section "${restoredSection.title}" restored`);
+    } else {
+      const restoredPage = {
+        id: binItem.id,
+        title: binItem.title,
+        workspaceId: binItem.workspaceId,
+        sectionId: binItem.sectionId,
+        createdAt: nowIso(),
+        updatedAt: nowIso()
+      };
+
+      const restoredBlocks = binItem.blocks.map(b => ({
+        ...b,
+        metadata: {
+          ...b.metadata,
+          updatedAt: nowIso()
+        }
+      }));
+
+      // Write back to Dexie
+      await db.transaction("rw", db.pages, db.blocks, async () => {
+        await db.pages.put(restoredPage);
+        for (const block of restoredBlocks) {
+          await db.blocks.put(block);
+        }
+      });
+
+      // Enqueue upsert sync mutations so they sync to other devices
+      await enqueueMutation("page", restoredPage.id, "upsert", restoredPage);
+      for (const block of restoredBlocks) {
+        await enqueueMutation("block", block.id, "upsert", block);
+      }
+
+      const updatedBin = get().deletedPagesBin.filter(item => item.id !== binItemId);
+      await db.settings.put({ key: "deletedPagesBin", value: updatedBin });
+
+      set((state) => {
+        const newPages = [...state.pages, restoredPage];
+        const newBlocks = [...state.blocks, ...restoredBlocks];
+        
+        return {
+          pages: newPages,
+          blocks: sortBlocks(newBlocks),
+          deletedPagesBin: updatedBin,
+          // If it's workspace, make it active
+          activePageId: restoredPage.workspaceId !== "diary" ? restoredPage.id : state.activePageId,
+          activeDiaryPageId: restoredPage.workspaceId === "diary" ? restoredPage.id : state.activeDiaryPageId
+        };
+      });
+
+      get().setNotification(`Page "${restoredPage.title}" restored`);
+    }
+  },
+
+  permanentlyDeletePageFromBin: async (binItemId) => {
+    const binItem = get().deletedPagesBin.find(item => item.id === binItemId);
+    if (!binItem) return;
+
+    if (!window.confirm(`Are you sure you want to permanently delete "${binItem.title}"? This cannot be undone.`)) return;
+
+    const updatedBin = get().deletedPagesBin.filter(item => item.id !== binItemId);
+    await db.settings.put({ key: "deletedPagesBin", value: updatedBin });
+
+    set({ deletedPagesBin: updatedBin });
+    get().setNotification(`"${binItem.title}" permanently deleted`);
   },
 
   deleteBlock: async (blockId) => {

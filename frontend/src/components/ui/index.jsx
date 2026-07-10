@@ -18,13 +18,13 @@ export function IconButton({ danger, icon: Icon, onClick, title, className }) {
 
 export function Metric({ label, value, color }) {
   const colors = {
-    green: "bg-white border-l-[10px] border-l-[#2ef2a6] dark:bg-[#12151a] dark:border-l-[#0a3d28]",
-    orange: "bg-white border-l-[10px] border-l-[#ffb84d] dark:bg-[#12151a] dark:border-l-[#3d2800]",
-    red: "bg-white border-l-[10px] border-l-[#ff5a5f] dark:bg-[#12151a] dark:border-l-[#3d1215]",
-    blue: "bg-white border-l-[10px] border-l-[#21caff] dark:bg-[#12151a] dark:border-l-[#002535]",
-    purple: "bg-white border-l-[10px] border-l-[#c4a8ff] dark:bg-[#12151a] dark:border-l-[#1a1040]",
-    pink: "bg-white border-l-[10px] border-l-[#ff5ec4] dark:bg-[#12151a] dark:border-l-[#3d0030]",
-    teal: "bg-white border-l-[10px] border-l-[#00e0c6] dark:bg-[#12151a] dark:border-l-[#002e28]"
+    blue: "bg-[#e0f2fe] dark:bg-[#0c2540]",
+    green: "bg-[#dcfce7] dark:bg-[#0c331e]",
+    red: "bg-[#ffe4e6] dark:bg-[#3b0d12]",
+    purple: "bg-[#f3e8ff] dark:bg-[#25103c]",
+    pink: "bg-[#fce7f3] dark:bg-[#3b0825]",
+    teal: "bg-[#ccfbf1] dark:bg-[#072c27]",
+    orange: "bg-[#ffedd5] dark:bg-[#381608]"
   };
   return (
     <div className={clsx("bento-card p-3 text-black dark:text-[#c8c3ba]", colors[color] ?? "bg-white dark:bg-[#12151a]")}>

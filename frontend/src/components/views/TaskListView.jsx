@@ -10,7 +10,7 @@ import { useFilteredTasks } from "../../hooks/useFilteredTasks";
 export function TaskListView() {
   const { blocks, setRecurringTasksOpen, setEditingRepeatedTaskId } = useAppStore();
   const [filter, setFilter] = useState("open");
-  const [sortBy, setSortBy] = useState("date");
+  const [sortBy, setSortBy] = useState("date_scheduled");
   const [sortOrder, setSortOrder] = useState("asc");
 
   const tasks = useFilteredTasks(blocks, filter, sortBy, sortOrder);
@@ -19,13 +19,24 @@ export function TaskListView() {
     <div className="bento-grid">
       <section className="bento-card span-12 bg-white border-l-[10px] border-l-[#21caff] p-4 text-black dark:bg-[#12151a] dark:border-l-[#002535] dark:text-[#c8c3ba]">
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          {["open","today","overdue","upcoming","failed","done","all"].map((item) => (
-            <button className={clsx("nb-button min-h-0 px-3 py-2 text-sm capitalize", filter === item ? "primary" : "bg-white dark:bg-[#12151a]")} key={item} onClick={() => setFilter(item)} type="button">{item}</button>
-          ))}
+          <select 
+            className="nb-select h-11 px-3 text-sm font-black capitalize" 
+            onChange={(e) => setFilter(e.target.value)} 
+            value={filter}
+          >
+            <option value="open">Open</option>
+            <option value="today">Today</option>
+            <option value="overdue">Overdue</option>
+            <option value="upcoming">Upcoming</option>
+            <option value="failed">Failed</option>
+            <option value="done">Done</option>
+            <option value="all">All</option>
+          </select>
           <div className="ml-auto flex items-center gap-2 max-sm:w-full max-sm:mt-2">
             <select className="nb-select h-11 px-3 text-sm font-black max-sm:flex-1" onChange={(e) => setSortBy(e.target.value)} value={sortBy}>
-              <option value="date">Sort by date</option>
               <option value="priority">Sort by priority</option>
+              <option value="date_completed">Sort by date completed</option>
+              <option value="date_scheduled">Sort by date scheduled</option>
             </select>
             <select className="nb-select h-11 px-3 text-sm font-black max-sm:flex-1" onChange={(e) => setSortOrder(e.target.value)} value={sortOrder}>
               <option value="asc">Ascending</option>

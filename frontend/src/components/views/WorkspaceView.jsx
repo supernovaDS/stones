@@ -91,6 +91,19 @@ function WeatherWidget({ isFullWidth }) {
 function AddBlockMenu({ pageId }) {
   const { addTitleBlock, addNoteBlock, openTaskModal, addChecklistBlock, addCodeBlock, addLinkBlock, addImageBlock, theme, colorProfile } = useAppStore();
   const [isOpen, setIsOpen] = useState(false);
+  const [position, setPosition] = useState("above");
+
+  const handleToggle = (e) => {
+    if (!isOpen) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      if (rect.top < 320) {
+        setPosition("below");
+      } else {
+        setPosition("above");
+      }
+    }
+    setIsOpen((prev) => !prev);
+  };
 
   const handleImageClick = () => {
     const input = document.createElement("input");
@@ -167,7 +180,10 @@ function AddBlockMenu({ pageId }) {
       )}
 
       {isOpen && (
-        <div className="absolute bottom-20 z-50 grid w-64 grid-cols-2 gap-2 rounded-xl border-[3px] border-black bg-white p-3 shadow-[6px_6px_0_#111] animate-in fade-in slide-in-from-bottom-2 duration-150 dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[4px_4px_0_#000]">
+        <div className={clsx(
+          "absolute z-50 grid w-64 grid-cols-2 gap-2 rounded-xl border-[3px] border-black bg-white p-3 shadow-[6px_6px_0_#111] animate-in fade-in duration-150 dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[4px_4px_0_#000]",
+          position === "above" ? "bottom-20 slide-in-from-bottom-2" : "top-20 slide-in-from-top-2"
+        )}>
           <button
             className="nb-button col-span-2 flex items-center gap-3 p-2.5 transition hover:-translate-y-0.5 hover:shadow-[3px_3px_0_#111]"
             onClick={() => {
@@ -206,7 +222,7 @@ function AddBlockMenu({ pageId }) {
           "nb-button flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-black !p-0 shadow-[4px_4px_0_#111] transition-all hover:scale-105 active:scale-95 dark:border-[#1e232a] dark:shadow-[3px_3px_0_#000]",
           isOpen ? "bg-[#ff5a5f] rotate-45 text-black" : (theme === "dark" && colorProfile === "neo" ? "bg-[#21caff] text-black" : "bg-[#2ef2a6] text-black")
         )}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleToggle}
         title="Add block"
         type="button"
       >

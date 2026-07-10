@@ -235,5 +235,72 @@
   - Configured it to dynamically self-adjust coordinates when rendered near the edges of the browser window to avoid clipping.
   - Added key context operations: Move Up / Move Down, Duplicate Block (including re-sorting other blocks on the page; disabled for Task blocks), Cut, Archive/Unarchive, and Delete.
   - Added exclusive actions for Task blocks: "Open Details", "Mark Complete" / "Mark Incomplete", and "Fail Task" / "Restore Task" based on the current block metadata.
+  - Implemented event propagation prevention (`e.stopPropagation()` and `e.preventDefault()`) on all context menu action items, resolving a race condition where the unmounting of the menu on item selection would propagate to the document click handler and instantly close the task details panel.
   - Restricted the copy action to Note blocks ("Copy Text Content"), which automatically strips HTML tags to copy pure text to the clipboard.
+  - Registered a window-level scroll listener with capture phase enabled (`{ capture: true }`) to automatically dismiss the context menu when scrolling the workspace or sub-containers.
   - Handled overlay closing gracefully on clicking outside or choosing an item.
+
+### July 10,2026
+- **Add Block Menu Clipping Resolution**:
+  - Fixed a UI clipping issue in `AddBlockMenu` within `components/views/WorkspaceView.jsx` where opening the block selection menu on empty pages or pages with few blocks would position the menu above the trigger button, causing it to run off the top of the browser viewport.
+  - Implemented client rect tracking on button click to measure the distance to the top of the viewport. If there is less than 320px of space, the menu dynamically shifts to render below the button (`top-20` with a smooth downward slide-in animation) instead of above (`bottom-20`).
+- **Recurring Task Starts On Locking**:
+  - Disabled the ability to edit the "Starts On" date input in `RecurringTasksModal.jsx` once a recurring template has been successfully created. This protects the calendar schedule and prevents shifting of completed/failed instance date sequences.
+  - Styled the disabled input with `disabled:opacity-75 disabled:cursor-not-allowed` styles.
+- **Ended Repeating Tasks Label Polish**:
+  - Configured `RecurringTasksModal.jsx` to render the metadata label as "Ended [Date]" instead of "Ends [Date]" inside the "Ended" schedules tab to align with past-tense naming conventions.
+- **Prevent Unwanted Seeding / Duplicate General Section on Login**:
+  - Added `auth.loading` and `auth.user` as dependencies to the bootstrap `useEffect` in `App.jsx` and returned early if `auth.loading` is true, ensuring `initialize` waits for session restoration.
+  - Passes `skipSeed: true` to `initialize` when a logged-in user is detected, preventing local seeding before remote data sync is complete.
+  - Implemented an post-sync seed fallback in `syncDbUpdates` (`useAppStore.js`) that creates a default workspace and section only if a logged-in user successfully completes a remote sync and has 0 local workspaces (e.g. new signup). This ensures new signups are seeded correctly while existing users logging in from other devices do not receive a duplicate local "General" section.
+- **Diary Page Deletion & 30-Day Recycle Bin**:
+  - Added a deletion trash button next to each entry item inside the sidebar page list in `DiaryView.jsx` to let users trigger page deletion for their private diary entries.
+  - Refactored `deletePage` inside `useAppStore.js` to perform soft deletions. It stores the deleted page metadata along with all of its sub-blocks inside a local-only `deletedPagesBin` setting list in Dexie, marked with a `deletedAt` ISO timestamp.
+  - Integrated 30-day auto-purge checking inside `initialize` to automatically delete entries older than 30 days.
+  - Created a dedicated `RecycleBinModal.jsx` popup to list deleted entries from either the Diary or Workspace context dynamically based on the current view (`view === "diary"` shows Diary entries only; otherwise it shows Workspace pages and sections).
+  - Refactored `deleteSection` in `useAppStore.js` to soft-delete entire workspace sections (and all child pages and blocks) into `deletedPagesBin` under `type: "section"`.
+  - Updated `restorePageFromBin` to dynamically support restoring sections as well as pages (re-writes all section/page/block elements to Dexie and queues upsert sync updates to Supabase).
+  - Linked Recycle Bin modal opening to a new "Open Bin" button inside `SettingsModal.jsx` (under the "Data & Storage" section) and configured opening/closing state management inside Zustand (`useAppStore.js`) and `App.jsx`. Added `e.stopPropagation()` and `e.preventDefault()` to the click handler to resolve a race condition where click bubbling to the newly rendered backdrop immediately closed the modal.
+  - Added "Restore" and "Delete permanently" (removes from local settings bin list) buttons inside the bin popup.
+- **Settings Account Action Button Sizing Polish**:
+  - Removed small-size overrides (`min-h-0 px-3 py-2 text-xs`) from the button inside `SyncStatusIndicator.jsx` to let it inherit standard `.nb-button` styling (matching height, padding, font size, and font weight).
+  - Adjusted status indicator and refresh icon sizes to match the adjacent Logout button.
+- **Collapsible Sidebar in Diary View**:
+  - Bound the store-level `sidebarHidden` and `setSidebarHidden` state variables into `DiaryView.jsx`.
+  - Added `"lg:hidden"` conditional styling to the Diary sidebar component so it is hidden on desktop screens if `sidebarHidden` is set to `true`.
+  - Made the menu toggle button persistent on desktop inside `DiaryView.jsx` to let users collapse/uncollapse the sidebar on desktop (via `setSidebarHidden`) or open the sidebar overlay drawer on tablet/mobile screens (via `setIsSidebarOpen`).
+- **Diary Editor Header Polish**:
+  - Removed the large yellow bento card title container from the top of the editor pane in `DiaryView.jsx`.
+  - Replaced it with a clean, borderless document-style title input field (`text-4xl font-black`) to improve visual presentation and layout hierarchy.
+  - Removed the redundant `"My Diary"` title text from the editor top bar.
+  - Placed the sidebar collapse button in the top row of the sidebar (in place of the Settings gear button).
+  - Moved the Settings gear button inside the `"My Diary"` bento card header in the sidebar.
+  - Added conditional CSS styling to the editor pane's toggle button on desktop, hiding it whenever the sidebar is actively open to eliminate button redundancy.
+  - Placed the page title input and the green toggle button inside a single horizontal flex container so that the page name is rendered to the right of the button instead of below it when the sidebar is collapsed.
+- **Task List Sorting and Filtering Polish**:
+  - Replaced the horizontal task status button filters (open, today, overdue, upcoming, failed, done, all) with a single select dropdown menu inside `TaskListView.jsx`.
+  - Expanded sort dropdown options to include: Priority, Sort by date completed, and Sort by date scheduled.
+  - Implemented sort logic for `date_scheduled` and `date_completed` inside `useFilteredTasks.js`.
+  - Configured state variables and defaults inside `TaskListView.jsx` (`sortBy` defaults to `date_scheduled`).
+- **Calendar Month Header Style Polish**:
+  - Removed the cyan highlight left border accent (`border-l-[#21caff]`/`dark:border-l-[#001a25]`) on the calendar's main month display card (`CalendarView.jsx`) completely. It now inherits standard uniform borders like other bento cards.
+- **Calendar Day Cell Highlights**:
+  - Replaced today's date and the selected date highlights with background color fills using the brand yellow theme.
+  - Selected day uses a soft, light pastel yellow (`bg-[#fff6cc]`) with active hover style.
+  - Today's day uses a rich, darker brand yellow (`bg-[#ffdc4a]`) with active hover style.
+- **Calendar Hover Animation Polish**:
+  - Added the `hover-static` class to the calendar header card, the main calendar grid card, and the right sidebar task list card inside `CalendarView.jsx` to remove the diagonal transform translate animation on hover.
+- **Insights View Border Accent Polish**:
+  - Removed thick left colored border classes (`border-l-[10px]`) from Recent Completions and Performance Statistics container panels in `InsightsView.jsx`.
+  - Replaced the thick left colored border highlights (`border-l-[10px]`) on the `Metric` subblocks by mapping them to light pastel background colors (soft blue, green, rose, purple, pink, teal, and orange) with standard black/dark borders to restore visual vibrancy without using side borders.
+  - Added the `hover-static` class to the main Recent Completions card and the Performance Statistics container card in `InsightsView.jsx` to disable hover translate animations on parent containers, leaving inner subblocks animated.
+- **Statistics Disclaimer Info Button**:
+  - Replaced the text block `* Excludes future tasks to keep rates accurate` with a Neobrutalism info button containing the `Info` icon from Lucide-react and a hover tooltip stating `"Future tasks are not counted towards statistics"`.
+- **Contribution Heatmap**:
+  - Replaced the single-month completions grid with a full-year LeetCode-style contribution heatmap in `InsightsView.jsx`.
+  - Groups columns/weeks by month with spacing gaps between month grids.
+  - Automatically prepends/appends empty padding days for starting/ending weeks of each month to align dates correctly to their weekday rows (Sunday to Saturday).
+  - Centered month labels directly below each month's columns.
+  - Integrated a functional neobrutalist dropdown button to select between rolling `Current` range or calendar years (2026, 2025, etc.).
+  - Calculates total completions, active days count, and max streak for the selected range dynamically.
+  - Colors cells based on LeetCode green intensity shades for completions count.

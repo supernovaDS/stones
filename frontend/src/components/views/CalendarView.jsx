@@ -40,12 +40,12 @@ export function CalendarView() {
 
   return (
     <div className="bento-grid">
-      <div className="calendar-header bento-card span-12 flex items-center justify-between gap-3 bg-white border-l-[10px] border-l-[#21caff] p-4 text-black dark:bg-[#12151a] dark:border-l-[#001a25] dark:text-[#c8c3ba]">
+      <div className="calendar-header bento-card hover-static span-12 flex items-center justify-between gap-3 bg-white p-4 text-black dark:bg-[#12151a] dark:text-[#c8c3ba]">
         <button className="icon-button" onClick={() => setCursor(shiftMonth(cursor, -1))} type="button"><ChevronLeft size={16} /></button>
         <h3 className="min-w-0 truncate text-center text-3xl font-black max-sm:text-xl">{monthLabel}</h3>
         <button className="icon-button" onClick={() => setCursor(shiftMonth(cursor, 1))} type="button"><ChevronRight size={16} /></button>
       </div>
-      <section className="bento-card span-8 grid grid-cols-7 gap-2 p-4 max-sm:gap-1">
+      <section className="bento-card hover-static span-8 grid grid-cols-7 gap-2 p-4 max-sm:gap-1">
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => <div className="text-center text-xs font-black uppercase text-stone-700 dark:text-[#7a7670]" key={day}>{day}</div>)}
         {days.map((day) => {
           const key = toLocalDateString(day);
@@ -57,9 +57,9 @@ export function CalendarView() {
             <button className={clsx(
               "calendar-cell min-h-24 rounded-lg border-[3px] border-black p-2 text-left font-black shadow-[3px_3px_0_#111] transition hover:-translate-y-1 hover:shadow-[5px_5px_0_#111] dark:border-[#1e232a] dark:shadow-[2px_2px_0_#000] dark:hover:shadow-[3px_3px_0_#000] max-sm:min-h-16",
               selectedDay === key 
-                ? "calendar-day-selected bg-white border-l-[8px] border-l-[#ffdc4a] text-black dark:bg-[#12151a] dark:border-l-[#3d2800] dark:text-[#c8c3ba]" 
+                ? "calendar-day-selected bg-[#fff6cc] text-black hover:bg-[#ffeb99] dark:bg-[#2b1c00] dark:text-[#c8c3ba] dark:hover:bg-[#3d2800]" 
                 : isToday
-                  ? "calendar-day-today bg-white border-l-[8px] border-l-[#21caff] text-black dark:bg-[#12151a] dark:border-l-[#003d52] dark:text-[#c8c3ba]"
+                  ? "calendar-day-today bg-[#ffdc4a] text-black hover:bg-[#ffcf11] dark:bg-[#523600] dark:text-[#c8c3ba] dark:hover:bg-[#664300]"
                   : isPast
                     ? "calendar-day-past bg-stone-100 hover:bg-stone-200 text-stone-400 dark:bg-[#0a0c0f] dark:hover:bg-[#12151a] dark:text-[#5a5650]"
                     : "calendar-day-default bg-white hover:bg-[#fff1b8] dark:bg-[#12151a] dark:hover:bg-[#1a1f26]",
@@ -101,7 +101,7 @@ export function CalendarView() {
           );
         })}
       </section>
-      <aside className="bento-card span-4 bg-white p-4 text-black dark:bg-[#12151a] dark:text-[#c8c3ba] flex flex-col min-h-0 md:h-full">
+      <aside className="bento-card hover-static span-4 bg-white p-4 text-black dark:bg-[#12151a] dark:text-[#c8c3ba] flex flex-col min-h-0 md:h-full">
         <h3 className="mb-3 text-2xl font-black">{formatShortDate(selectedDay)}</h3>
         <div className="flex flex-col gap-2 mb-4">
           <button className="nb-button action w-full" onClick={() => void openTaskModal({ deadline: selectedDay, pageId: "system-calendar" })} type="button">

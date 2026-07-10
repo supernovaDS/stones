@@ -10,7 +10,7 @@ import { AuthPage } from "./components/auth/AuthPage";
 import { Sidebar } from "./components/layout/Sidebar";
 import { Topbar } from "./components/layout/Topbar";
 import { WorkspaceView, TaskListView, CalendarView, InsightsView, DiaryView } from "./components/views";
-import { TaskDetailPanel, TaskModal, CommandPalette, SettingsModal, RecurringTasksModal, RecoveryModal } from "./components/modals";
+import { TaskDetailPanel, TaskModal, CommandPalette, SettingsModal, RecurringTasksModal, RecoveryModal, RecycleBinModal } from "./components/modals";
 import { ContextMenu } from "./components/ui";
 
 function App() {
@@ -33,6 +33,8 @@ function App() {
     settingsOpen,
     recurringTasksOpen,
     setRecurringTasksOpen,
+    recycleBinOpen,
+    setRecycleBinOpen,
     recoveryOpen,
     sidebarHidden,
     setSidebarHidden,
@@ -118,8 +120,9 @@ function App() {
 
   // ── Bootstrap ───────────────────────────────────────────────
   useEffect(() => {
+    if (auth.loading) return;
     void initialize({ skipSeed: Boolean(auth.user) });
-  }, [initialize]);
+  }, [initialize, auth.loading, auth.user]);
 
   // ── Theme sync ──────────────────────────────────────────────
   useEffect(() => {
@@ -269,6 +272,7 @@ function App() {
       {commandOpen ? <CommandPalette onClose={() => setCommandOpen(false)} /> : null}
       {settingsOpen ? <SettingsModal syncStatus={syncStatus} /> : null}
       {recurringTasksOpen ? <RecurringTasksModal onClose={() => setRecurringTasksOpen(false)} /> : null}
+      {recycleBinOpen ? <RecycleBinModal /> : null}
       {recoveryOpen ? <RecoveryModal /> : null}
       <ContextMenu />
       <Toaster 

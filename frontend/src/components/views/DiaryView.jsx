@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAppStore } from "../../store/useAppStore";
 import { BlockCard } from "../blocks";
 import { clsx } from "clsx";
-import { Plus, FileText, Link, Image as ImageIcon, Book, ArrowLeft, Lock, Menu, X, Settings } from "lucide-react";
+import { Plus, FileText, Link, Image as ImageIcon, Book, ArrowLeft, Lock, Menu, X, Settings, Trash2 } from "lucide-react";
 
 import { DiaryAddBlockMenu } from "./DiaryAddBlockMenu";
 
@@ -19,7 +19,10 @@ export function DiaryView() {
     addDiaryPage,
     renamePage,
     setView,
-    setSettingsOpen
+    setSettingsOpen,
+    deletePage,
+    sidebarHidden,
+    setSidebarHidden
   } = useAppStore();
 
   const [passwordInput, setPasswordInput] = useState("");
@@ -154,15 +157,27 @@ export function DiaryView() {
         "w-80 shrink-0 flex flex-col gap-4",
         "max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-50 max-lg:w-[320px] max-lg:bg-[#fffdf6] max-lg:p-4 max-lg:shadow-[6px_6px_0_#111]",
         "max-lg:dark:bg-[#12151a] max-lg:dark:shadow-[4px_4px_0_#000] max-lg:transition-transform max-lg:duration-200 max-lg:h-full max-lg:max-w-[85vw]",
-        !isSidebarOpen && "max-lg:-translate-x-full"
+        !isSidebarOpen && "max-lg:-translate-x-full",
+        sidebarHidden && "lg:hidden"
       )}>
         <div className="flex items-center justify-between">
           <div className="flex gap-2 min-w-0 flex-1 mr-2">
             <button className="nb-button justify-start px-4 flex-1 truncate" onClick={() => setView("workspace")}>
               <ArrowLeft size={16} className="shrink-0" /> <span className="truncate">Back to Workspace</span>
             </button>
-            <button className="nb-button p-2 shrink-0" onClick={() => setSettingsOpen(true)} title="Settings">
-              <Settings size={20} />
+            <button
+              className="nb-button p-2 shrink-0"
+              onClick={() => {
+                if (window.innerWidth <= 1024) {
+                  setIsSidebarOpen(false);
+                } else {
+                  setSidebarHidden(true);
+                }
+              }}
+              title="Collapse sidebar"
+              type="button"
+            >
+              <Menu size={20} />
             </button>
           </div>
           <button className="!hidden max-lg:!flex nb-button p-2 shrink-0" onClick={() => setIsSidebarOpen(false)}>
@@ -171,9 +186,19 @@ export function DiaryView() {
         </div>
         
         <div className="bento-card hover-static flex-1 flex flex-col bg-[#fff7e8] dark:bg-[#12151a] p-4 min-h-0">
-          <h3 className="mb-4 flex items-center gap-2 text-lg font-black">
-            <Book size={20} /> My Diary
-          </h3>
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="flex items-center gap-2 text-lg font-black">
+              <Book size={20} /> My Diary
+            </h3>
+            <button
+              className="nb-button p-2 shrink-0 bg-white dark:bg-[#0c0e11]"
+              onClick={() => setSettingsOpen(true)}
+              title="Settings"
+              type="button"
+            >
+              <Settings size={16} />
+            </button>
+          </div>
           
           <form onSubmit={handleCreatePage} className="mb-4 flex gap-2">
             <input
@@ -189,23 +214,38 @@ export function DiaryView() {
 
           <div className="flex-1 overflow-auto p-2 -m-2">
             <div className="grid gap-2">
-              {diaryPages.map((page) => (
-                <button
-                  key={page.id}
-                  onClick={() => {
-                    setActiveDiaryPage(page.id);
-                    setIsSidebarOpen(false);
-                  }}
-                  className={clsx(
-                    "nb-button w-full justify-start truncate text-left border-[2px]",
-                    activePage?.id === page.id 
-                      ? "bg-[#2ef2a6] dark:bg-[#0a3d28]" 
-                      : "bg-white dark:bg-[#0c0e11]"
-                  )}
-                >
-                  {page.title}
-                </button>
-              ))}
+              {diaryPages.map((page) => {
+                const isActive = activePage?.id === page.id;
+                return (
+                  <div key={page.id} className="flex gap-2 items-center">
+                    <button
+                      onClick={() => {
+                        setActiveDiaryPage(page.id);
+                        setIsSidebarOpen(false);
+                      }}
+                      className={clsx(
+                        "nb-button flex-1 justify-start truncate text-left border-[2px] min-w-0",
+                        isActive 
+                          ? "bg-[#2ef2a6] dark:bg-[#0a3d28]" 
+                          : "bg-white dark:bg-[#0c0e11]"
+                      )}
+                    >
+                      <span className="truncate">{page.title}</span>
+                    </button>
+                    <button
+                      className="nb-button p-2 hover:bg-[#ff5a5f] hover:text-white dark:hover:bg-[#ff5a5f] transition-all shrink-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deletePage(page.id);
+                      }}
+                      title="Delete entry"
+                      type="button"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                );
+              })}
               {diaryPages.length === 0 && (
                 <p className="text-center text-sm font-bold text-stone-500 mt-4">
                   No diary entries yet.
@@ -218,25 +258,53 @@ export function DiaryView() {
 
       {/* Editor Pane */}
       <div className="flex-1 flex flex-col min-w-0">
-        <div className="hidden max-lg:flex items-center gap-3 mb-4">
-          <button className="nb-button p-2 bg-[#2ef2a6] dark:bg-[#0a3d28]" onClick={() => setIsSidebarOpen(true)}>
-            <Menu size={20} />
-          </button>
-          <h2 className="text-xl font-black flex items-center gap-2">
-            <Book size={24} /> My Diary
-          </h2>
-        </div>
+        {!activePage && (
+          <div className={clsx("flex items-center gap-3 mb-4", !sidebarHidden && "lg:hidden")}>
+            <button 
+              className="nb-button p-2 bg-[#2ef2a6] dark:bg-[#0a3d28]" 
+              onClick={() => {
+                if (window.innerWidth <= 1024) {
+                  setIsSidebarOpen(true);
+                } else {
+                  setSidebarHidden(!sidebarHidden);
+                }
+              }}
+              title="Toggle sidebar"
+              type="button"
+            >
+              <Menu size={20} />
+            </button>
+          </div>
+        )}
         
         {activePage ? (
           <div className="flex-1 overflow-auto max-lg:overflow-visible pt-1 pr-4 pb-4 pl-1 -mt-1 -mr-4 -mb-4 -ml-1">
-            <section className="bento-card mb-8 bg-[#ffdc4a] p-5 dark:bg-[#1a1500] max-md:p-4">
-              <p className="mb-2 text-xs font-black uppercase tracking-wide text-black/70 dark:text-[#7a7670]">Diary Entry</p>
+            <div className="flex items-center gap-4 mb-6 px-1">
+              <button 
+                className={clsx(
+                  "nb-button p-2 bg-[#2ef2a6] dark:bg-[#0a3d28] shrink-0",
+                  !sidebarHidden && "lg:hidden"
+                )}
+                onClick={() => {
+                  if (window.innerWidth <= 1024) {
+                    setIsSidebarOpen(true);
+                  } else {
+                    setSidebarHidden(!sidebarHidden);
+                  }
+                }}
+                title="Toggle sidebar"
+                type="button"
+              >
+                <Menu size={20} />
+              </button>
+              
               <input
-                className="hero-title w-full bg-transparent outline-none"
+                className="flex-1 bg-transparent text-4xl font-black outline-none border-b-2 border-transparent focus:border-black/20 dark:focus:border-white/20 pb-2 text-black dark:text-[#c8c3ba] min-w-0"
                 onChange={(event) => renamePage(activePage.id, event.target.value)}
                 value={activePage.title}
+                placeholder="Untitled Entry"
               />
-            </section>
+            </div>
             
             <section className="flex flex-col gap-8 pb-12">
               {pageBlocks.length ? (
