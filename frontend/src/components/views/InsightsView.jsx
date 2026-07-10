@@ -22,7 +22,7 @@ export function InsightsView() {
     return [...realTasks, ...historyVirtualTasks];
   }, [blocks, historyVirtualTasks]);
 
-  const todayStr = useMemo(() => todayIso(), []);
+  const todayStr = todayIso();
 
   // Filter tasks to exclude future tasks (upcoming tasks that are not completed or failed)
   const currentAndPastTasks = useMemo(() => {
@@ -81,6 +81,16 @@ export function InsightsView() {
 
   const totalYearCompletions = yearTasks.length;
 
+  // Pre-compute completions-per-date map to avoid O(n²) .filter() per heatmap cell
+  const completionsByDate = useMemo(() => {
+    const map = new Map();
+    for (const task of completed) {
+      const key = toLocalDateFromIso(task.metadata.completedAt);
+      if (key) map.set(key, (map.get(key) || 0) + 1);
+    }
+    return map;
+  }, [completed]);
+
   const activeDaysCount = useMemo(() => {
     const uniqueDays = new Set(
       yearTasks.map((task) => toLocalDateFromIso(task.metadata.completedAt))
@@ -107,7 +117,7 @@ export function InsightsView() {
       const currentDate = new Date(dateStr);
       if (prevDate) {
         const diffTime = Math.abs(currentDate - prevDate);
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
         if (diffDays === 1) {
           currentRun += 1;
         } else if (diffDays > 1) {
@@ -220,6 +230,9 @@ export function InsightsView() {
               <span className="text-stone-400 dark:text-[#5a5650] font-bold">Max streak:</span> {maxStreak}
             </div>
             <div className="relative">
+              {isDropdownOpen && (
+                <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)} />
+              )}
               <button 
                 className="nb-button flex items-center gap-1.5 !py-1 !px-3 text-sm font-bold" 
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -260,7 +273,7 @@ export function InsightsView() {
                     return <div key={day.key} className="w-[11px] h-[11px] opacity-0" />;
                   }
                   const dateKey = day.key;
-                  const count = completed.filter((task) => toLocalDateFromIso(task.metadata.completedAt) === dateKey).length;
+                  const count = completionsByDate.get(dateKey) || 0;
                   return (
                     <div 
                       className={clsx(
