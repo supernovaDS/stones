@@ -259,6 +259,8 @@ export const useAppStore = create((set, get) => ({
     let colorProfile = defaultColorProfile();
     let theme = defaultTheme();
     let deletedPagesBin = [];
+    let savedActivePageId = null;
+    let savedActiveDiaryPageId = null;
 
     try {
       const hashRecord = await db.settings?.get("diaryPasswordHash");
@@ -279,6 +281,12 @@ export const useAppStore = create((set, get) => ({
       const themeRecord = await db.settings?.get("theme");
       if (themeRecord) theme = themeRecord.value;
 
+      const activePageRecord = await db.settings?.get("activePageId");
+      if (activePageRecord) savedActivePageId = activePageRecord.value;
+
+      const activeDiaryPageRecord = await db.settings?.get("activeDiaryPageId");
+      if (activeDiaryPageRecord) savedActiveDiaryPageId = activeDiaryPageRecord.value;
+
       const binRecord = await db.settings?.get("deletedPagesBin");
       if (binRecord) {
         const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -294,13 +302,24 @@ export const useAppStore = create((set, get) => ({
       console.warn("Failed to load settings:", err);
     }
 
+    // Validate saved active page IDs — fall back to first page if the saved one no longer exists
+    const pageIdSet = new Set(pages.map(p => p.id));
+    const resolvedActivePageId = (savedActivePageId && pageIdSet.has(savedActivePageId))
+      ? savedActivePageId
+      : pages.find(p => p.workspaceId !== "diary")?.id || pages[0]?.id;
+    const diaryPages = pages.filter(p => p.workspaceId === "diary");
+    const resolvedActiveDiaryPageId = (savedActiveDiaryPageId && pageIdSet.has(savedActiveDiaryPageId))
+      ? savedActiveDiaryPageId
+      : diaryPages[0]?.id || null;
+
     const processedBlocks = await checkAndEndExpiredRecurringTasks(blocks);
     set({
       workspaces,
       sections: sortSections(sections),
       pages,
       blocks: sortBlocks(processedBlocks.map(normalizeBlock)),
-      activePageId: pages[0]?.id,
+      activePageId: resolvedActivePageId,
+      activeDiaryPageId: resolvedActiveDiaryPageId,
       loading: false,
       diaryPasswordHash: diaryHash,
       sidebarHidden,
@@ -2155,3 +2174,17 @@ const checkAndEndExpiredRecurringTasks = async (blocks) => {
 
   return updatedBlocks;
 };
+
+// ── Persist activePageId & activeDiaryPageId whenever they change ──
+let _prevActivePageId = useAppStore.getState().activePageId;
+let _prevActiveDiaryPageId = useAppStore.getState().activeDiaryPageId;
+useAppStore.subscribe((state) => {
+  if (state.activePageId !== _prevActivePageId) {
+    _prevActivePageId = state.activePageId;
+    if (state.activePageId) void db.settings.put({ key: "activePageId", value: state.activePageId });
+  }
+  if (state.activeDiaryPageId !== _prevActiveDiaryPageId) {
+    _prevActiveDiaryPageId = state.activeDiaryPageId;
+    if (state.activeDiaryPageId) void db.settings.put({ key: "activeDiaryPageId", value: state.activeDiaryPageId });
+  }
+});
