@@ -18,16 +18,25 @@ export function IconButton({ danger, icon: Icon, onClick, title, className }) {
 
 export function Metric({ label, value, color }) {
   const colors = {
-    blue: "bg-[#e0f2fe] dark:bg-[#0c2540]",
-    green: "bg-[#dcfce7] dark:bg-[#0c331e]",
-    red: "bg-[#ffe4e6] dark:bg-[#3b0d12]",
-    purple: "bg-[#f3e8ff] dark:bg-[#25103c]",
-    pink: "bg-[#fce7f3] dark:bg-[#3b0825]",
-    teal: "bg-[#ccfbf1] dark:bg-[#072c27]",
-    orange: "bg-[#ffedd5] dark:bg-[#381608]"
+    yellow: "bg-[#ffdc4a] dark:bg-[#523600]",
+    amber: "bg-[#fde047] dark:bg-[#483a00]",
+    gold: "bg-[#fef9c3] dark:bg-[#39340b]",
+    lemon: "bg-[#fef08a] dark:bg-[#3f3500]",
+    cream: "bg-[#fef3c7] dark:bg-[#3b2d08]",
+    sunshine: "bg-[#fed7aa] dark:bg-[#402208]",
+    mustard: "bg-[#fde68a] dark:bg-[#423105]",
+
+    // Aliases to ensure all color references resolve to yellow shades
+    blue: "bg-[#fef9c3] dark:bg-[#39340b]",
+    green: "bg-[#fde047] dark:bg-[#483a00]",
+    red: "bg-[#fde68a] dark:bg-[#423105]",
+    purple: "bg-[#ffdc4a] dark:bg-[#523600]",
+    pink: "bg-[#fef08a] dark:bg-[#3f3500]",
+    teal: "bg-[#fef3c7] dark:bg-[#3b2d08]",
+    orange: "bg-[#fed7aa] dark:bg-[#402208]"
   };
   return (
-    <div className={clsx("bento-card p-3 text-black dark:text-[#c8c3ba]", colors[color] ?? "bg-white dark:bg-[#12151a]")}>
+    <div className={clsx("bento-card p-3 text-black dark:text-[#c8c3ba]", colors[color] ?? "bg-[#ffdc4a] dark:bg-[#523600]")}>
       <p className="text-xs font-black uppercase tracking-wide text-black/60 dark:text-[#7a7670]">{label}</p>
       <p className="mt-1 text-3xl font-black">{value}</p>
     </div>

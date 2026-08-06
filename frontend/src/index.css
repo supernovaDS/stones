@@ -7,7 +7,6 @@
 @import "./styles/components.css";
 @import "./styles/utilities.css";
 @import "./styles/animations.css";
-@import "./styles/minimal.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 

@@ -1,6 +1,6 @@
-import { Info, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { clsx } from "clsx";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { useAppStore } from "../../store/useAppStore";
 import { toLocalDateString, toLocalDateFromIso, isOverdue, todayIso } from "../../utils/date";
 import { calculateStreak } from "../../utils/helpers";
@@ -9,11 +9,26 @@ import { getHistoryVirtualTasks } from "../../utils/recurrence";
 
 export function InsightsView() {
   const {
-    blocks,
+    blocks
   } = useAppStore();
 
   const [selectedYear, setSelectedYear] = useState("Current");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const containerRef = useRef(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect) {
+          setContainerWidth(entry.contentRect.width);
+        }
+      }
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   const historyVirtualTasks = useMemo(() => getHistoryVirtualTasks(blocks, 30), [blocks]);
 
@@ -133,115 +148,143 @@ export function InsightsView() {
     return maxRun;
   }, [yearTasks]);
 
-  // Generate month blocks with appropriate padding days
-  const monthBlocks = useMemo(() => {
+  // Build LeetCode-style Month Clusters layout (Chronological order: Oldest on left -> Current on rightmost)
+  const monthClusters = useMemo(() => {
     const today = new Date();
-    const blocksList = [];
+    const monthsList = [];
 
     if (selectedYear === "Current") {
-      const start = new Date(today.getFullYear(), today.getMonth() - 11, 1);
-      for (let i = 0; i < 12; i++) {
-        const date = new Date(start.getFullYear(), start.getMonth() + i, 1);
-        blocksList.push({
-          year: date.getFullYear(),
-          month: date.getMonth(),
-          label: date.toLocaleDateString(undefined, { month: "short" })
-        });
+      for (let i = 23; i >= 0; i--) {
+        const mDate = new Date(today.getFullYear(), today.getMonth() - i, 1);
+        monthsList.push({ year: mDate.getFullYear(), month: mDate.getMonth() });
       }
     } else {
       const y = parseInt(selectedYear, 10);
-      for (let m = 0; m < 12; m++) {
-        const date = new Date(y, m, 1);
-        if (y === today.getFullYear() && m > today.getMonth()) {
-          continue;
-        }
-        blocksList.push({
-          year: y,
-          month: m,
-          label: date.toLocaleDateString(undefined, { month: "short" })
-        });
+      const maxMonth = (y === today.getFullYear()) ? today.getMonth() : 11;
+      for (let m = 0; m <= maxMonth; m++) {
+        monthsList.push({ year: y, month: m });
       }
     }
 
-    return blocksList.map(({ year, month, label }) => {
+    return monthsList.map(({ year, month }) => {
+      const firstDay = new Date(year, month, 1);
       const daysInMonth = new Date(year, month + 1, 0).getDate();
-      const firstDayOfWeek = new Date(year, month, 1).getDay();
+      const label = firstDay.toLocaleDateString(undefined, { month: "short" });
+      const startDayOfWeek = firstDay.getDay();
 
-      const daysArr = [];
+      const weeks = [];
+      let currentWeek = [];
 
-      for (let i = 0; i < firstDayOfWeek; i++) {
-        daysArr.push({ isPadding: true, key: `pad-start-${year}-${month}-${i}` });
+      // Padding before 1st of month
+      for (let i = 0; i < startDayOfWeek; i++) {
+        currentWeek.push({ isPadding: true, key: `pad-start-${year}-${month}-${i}` });
       }
 
       for (let d = 1; d <= daysInMonth; d++) {
-        const date = new Date(year, month, d);
-        daysArr.push({
-          isPadding: false,
-          date,
-          key: toLocalDateString(date)
-        });
-      }
+        const dateObj = new Date(year, month, d);
+        const dateKey = toLocalDateString(dateObj);
+        const count = completionsByDate.get(dateKey) || 0;
+        const isFuture = dateObj > today;
 
-      const remainder = daysArr.length % 7;
-      if (remainder !== 0) {
-        const paddingNeeded = 7 - remainder;
-        for (let i = 0; i < paddingNeeded; i++) {
-          daysArr.push({ isPadding: true, key: `pad-end-${year}-${month}-${i}` });
+        currentWeek.push({
+          isPadding: false,
+          date: dateObj,
+          key: dateKey,
+          count: isFuture ? 0 : count,
+          isFuture
+        });
+
+        if (currentWeek.length === 7) {
+          weeks.push(currentWeek);
+          currentWeek = [];
         }
       }
 
+      if (currentWeek.length > 0) {
+        while (currentWeek.length < 7) {
+          currentWeek.push({ isPadding: true, key: `pad-end-${year}-${month}-${currentWeek.length}` });
+        }
+        weeks.push(currentWeek);
+      }
+
       return {
-        label,
         year,
         month,
-        days: daysArr
+        label,
+        weeks
       };
     });
-  }, [selectedYear]);
+  }, [selectedYear, completionsByDate]);
+
+  // Compute ONLY 100% complete month clusters that fit inside the container width
+  const visibleMonthClusters = useMemo(() => {
+    if (!containerWidth || monthClusters.length === 0) return monthClusters;
+
+    const availableWidth = containerWidth - 32; // p-4 = 32px padding
+    let usedWidth = 0;
+    const fitMonths = [];
+
+    // Evaluate backwards from current month (right) to oldest (left)
+    for (let i = monthClusters.length - 1; i >= 0; i--) {
+      const cluster = monthClusters[i];
+      const clusterWidth = cluster.weeks.length * 19 - 4; // 15px cell + 4px gap per week
+      const gap = fitMonths.length > 0 ? 14 : 0; // 14px gap (gap-3.5)
+      const nextUsed = usedWidth + gap + clusterWidth;
+
+      if (nextUsed <= availableWidth) {
+        fitMonths.unshift(cluster);
+        usedWidth = nextUsed;
+      } else {
+        break; // Stop! Never include a month that cannot fit 100% completely
+      }
+    }
+
+    return fitMonths.length > 0 ? fitMonths : [monthClusters[monthClusters.length - 1]];
+  }, [monthClusters, containerWidth]);
 
   const getHeatColor = (count) => {
-    if (count === 0) return "bg-[#ebedf0] dark:bg-[#2d2d2d]";
-    if (count === 1) return "bg-[#9be9a8] dark:bg-[#0e4429]";
-    if (count === 2) return "bg-[#40c463] dark:bg-[#006d32]";
-    if (count === 3) return "bg-[#30a14e] dark:bg-[#26a641]";
-    return "bg-[#216e39] dark:bg-[#39d353]";
+    if (count === 0) return "bg-[#f4efe4] dark:bg-[#0d1017] border-[1.5px] border-black/60 dark:border-[#2b3342]";
+    if (count === 1) return "bg-[#2ef2a6] dark:bg-[#0b643e] border-[1.5px] border-black dark:border-[#1e232a]";
+    if (count === 2) return "bg-[#21caff] dark:bg-[#004e6c] border-[1.5px] border-black dark:border-[#1e232a]";
+    if (count === 3) return "bg-[#ffdc4a] dark:bg-[#7a6000] border-[1.5px] border-black dark:border-[#1e232a]";
+    return "bg-[#ff5ec4] dark:bg-[#a61272] border-[1.5px] border-black dark:border-[#1e232a]";
   };
 
   return (
     <div className="bento-grid">
       <section className="bento-card hover-static span-12 bg-white p-6 text-black dark:bg-[#12151a] dark:text-[#c8c3ba] flex flex-col min-w-0">
-        <div className="heatmap-header mb-6 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xl font-black text-black dark:text-[#c8c3ba]">
-              <span className="text-2xl font-black">{totalYearCompletions.toLocaleString()}</span> task completions
+        <div className="heatmap-header mb-6 flex flex-wrap items-center justify-between gap-4 relative z-30">
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-xl font-black text-black dark:text-[#c8c3ba] whitespace-nowrap inline-flex items-center gap-1.5 leading-none">
+              <span className="text-3xl font-black brand-word leading-none">{totalYearCompletions.toLocaleString()}</span> task completions
             </span>
-            <span className="text-sm font-medium text-stone-500 dark:text-[#7a7670]">
-              {selectedYear === "Current" ? "in the past one year" : `in ${selectedYear}`}
+            <span className="text-sm font-bold text-stone-500 dark:text-[#7a7670] whitespace-nowrap leading-none">
+              {selectedYear === "Current" ? "in the past year" : `in ${selectedYear}`}
             </span>
-            <div className="text-stone-400 dark:text-[#5a5650] cursor-help flex items-center" title="Future tasks are not counted.">
-              <Info size={14} />
-            </div>
           </div>
-          <div className="flex items-center gap-6 text-sm font-black text-stone-700 dark:text-[#c8c3ba] max-sm:text-xs">
-            <div>
-              <span className="text-stone-400 dark:text-[#5a5650] font-bold">Total active days:</span> {activeDaysCount}
+          <div className="flex items-center gap-5 text-sm font-black text-stone-700 dark:text-[#c8c3ba] shrink-0">
+            <div className="whitespace-nowrap">
+              <span className="text-stone-400 dark:text-[#5a5650] font-bold">Active days:</span> {activeDaysCount}
             </div>
-            <div>
-              <span className="text-stone-400 dark:text-[#5a5650] font-bold">Max streak:</span> {maxStreak}
+            <div className="whitespace-nowrap">
+              <span className="text-stone-400 dark:text-[#5a5650] font-bold">Current streak:</span> {streak}d
             </div>
-            <div className="relative">
+            <div className="whitespace-nowrap">
+              <span className="text-stone-400 dark:text-[#5a5650] font-bold">Max streak:</span> {maxStreak}d
+            </div>
+            <div className="relative z-50">
               {isDropdownOpen && (
                 <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)} />
               )}
               <button 
-                className="nb-button flex items-center gap-1.5 !py-1 !px-3 text-sm font-bold" 
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="nb-button flex items-center gap-1.5 !py-1 !px-3 text-sm font-black relative z-50" 
+                onClick={() => setIsDropdownOpen((prev) => !prev)}
                 type="button"
               >
                 {selectedYear} <ChevronDown size={14} />
               </button>
               {isDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-28 rounded-lg border-[3px] border-black bg-white shadow-[3px_3px_0_#111] z-50 overflow-hidden dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[2px_2px_0_#000]">
+                <div className="absolute right-0 top-full mt-1.5 w-28 rounded-lg border-[3px] border-black bg-white shadow-[3px_3px_0_#111] z-50 overflow-hidden dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[2px_2px_0_#000]">
                   {years.map((y) => (
                     <button
                       key={y}
@@ -264,54 +307,65 @@ export function InsightsView() {
           </div>
         </div>
 
-        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin select-none">
-          {monthBlocks.map((block) => (
-            <div key={`${block.year}-${block.month}`} className="flex flex-col items-center">
-              <div className="grid grid-rows-7 grid-flow-col gap-[3px]">
-                {block.days.map((day) => {
-                  if (day.isPadding) {
-                    return <div key={day.key} className="w-[11px] h-[11px] opacity-0" />;
-                  }
-                  const dateKey = day.key;
-                  const count = completionsByDate.get(dateKey) || 0;
-                  return (
-                    <div 
-                      className={clsx(
-                        "w-[11px] h-[11px] rounded-[2px] transition-colors duration-200 border border-black/5 dark:border-white/5", 
-                        getHeatColor(count)
-                      )} 
-                      key={dateKey} 
-                      title={`${count} task completion${count !== 1 ? 's' : ''} on ${day.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`}
-                    />
-                  );
-                })}
-              </div>
-              <span className="text-[10px] mt-2 font-bold text-stone-500 dark:text-[#7a7670] leading-none">
-                {block.label}
-              </span>
-            </div>
-          ))}
+        {/* LeetCode-Style Responsive Month Clusters Container */}
+        <div
+          ref={containerRef}
+          className="overflow-hidden no-scrollbar select-none p-4 rounded-2xl border-[3px] border-black bg-white shadow-[5px_5px_0_#111] dark:border-[#1e232a] dark:bg-[#0d0f12] dark:shadow-[4px_4px_0_#000]"
+        >
+          <div className="flex w-full items-end justify-end gap-3.5">
+            {visibleMonthClusters.map((cluster) => (
+                <div
+                  key={`${cluster.year}-${cluster.month}`}
+                  className="flex flex-col items-center gap-1.5 shrink-0"
+                >
+                  {/* 7-Row Grid of Weeks for this Month */}
+                  <div className="flex gap-1">
+                    {cluster.weeks.map((week, weekIdx) => (
+                      <div key={weekIdx} className="grid grid-rows-7 gap-1">
+                        {week.map((day) => {
+                          if (day.isPadding) {
+                            return (
+                              <div
+                                key={day.key}
+                                className="w-[15px] h-[15px] opacity-0"
+                              />
+                            );
+                          }
+                          return (
+                            <div
+                              key={day.key}
+                              className={clsx(
+                                "w-[15px] h-[15px] rounded-sm transition-all duration-150 hover:scale-130 hover:z-20 cursor-pointer",
+                                getHeatColor(day.count)
+                              )}
+                              title={`${day.count} task completion${day.count !== 1 ? 's' : ''} on ${day.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`}
+                            />
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                  {/* Centered Month Label below each Cluster */}
+                  <span className="text-[11px] font-black uppercase tracking-wider text-center leading-none mt-1 brand-word text-black dark:text-[#c8c3ba]">
+                    {cluster.label}
+                  </span>
+                </div>
+              ))}
+          </div>
         </div>
       </section>
       <section className="bento-card hover-static span-12 bg-white p-6 text-black dark:bg-[#12151a] dark:text-[#c8c3ba]">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-xl font-black">Performance Statistics</h3>
-          <button 
-            className="icon-button !h-8 !w-8 text-stone-500 dark:text-[#7a7670] flex items-center justify-center cursor-help"
-            title="Future tasks are not counted towards statistics"
-            type="button"
-          >
-            <Info size={16} />
-          </button>
         </div>
         <div className="grid grid-cols-7 gap-4 max-2xl:grid-cols-4 max-lg:grid-cols-3 max-md:grid-cols-2 max-sm:grid-cols-1">
-          <Metric label="Tasks" value={currentAndPastTasks.length.toString()} color="blue" />
-          <Metric label="Completed" value={completedCount.toString()} color="green" />
-          <Metric label="Failed" value={failedCount.toString()} color="red" />
-          <Metric label="Completion Rate" value={`${completionRate}%`} color="purple" />
-          <Metric label="Fail Rate" value={`${failRate}%`} color="pink" />
-          <Metric label="Overdue" value={overdueCount.toString()} color="teal" />
-          <Metric label="Streak" value={`${streak}d`} color="orange" />
+          <Metric label="Tasks" value={currentAndPastTasks.length.toString()} color="gold" />
+          <Metric label="Completed" value={completedCount.toString()} color="amber" />
+          <Metric label="Failed" value={failedCount.toString()} color="mustard" />
+          <Metric label="Completion Rate" value={`${completionRate}%`} color="yellow" />
+          <Metric label="Fail Rate" value={`${failRate}%`} color="lemon" />
+          <Metric label="Overdue" value={overdueCount.toString()} color="cream" />
+          <Metric label="Streak" value={`${streak}d`} color="sunshine" />
         </div>
       </section>
     </div>

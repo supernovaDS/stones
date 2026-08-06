@@ -43,15 +43,6 @@
     display: inline;
   }
 
-  /* Weather & clock default desktop styling to prevent overflow */
-  .weather-time {
-    font-size: 2.75rem !important;
-  }
-
-  .weather-temp {
-    font-size: 2.25rem !important;
-  }
-
   /* ═══════════════════════════════════════════════════════════
      BREAKPOINT: ≤ 1100px  (tablet / small desktop)
      ═══════════════════════════════════════════════════════════ */
@@ -64,31 +55,6 @@
       width: 2.35rem;
       min-height: 2.35rem;
       padding: 0;
-    }
-  }
-
-  /* ═══════════════════════════════════════════════════════════
-     BREAKPOINT: ≤ 1600px  (laptop / tablet landscape)
-     ═══════════════════════════════════════════════════════════ */
-  @media (max-width: 1600px) {
-    /* Weather & clock smaller and stacked on standard laptops & small screens to prevent overflow */
-    .weather-time {
-      font-size: 2.25rem !important;
-    }
-
-    .weather-temp {
-      font-size: 2rem !important;
-    }
-
-    .weather-layout {
-      align-items: flex-start !important;
-      flex-direction: column !important;
-      gap: 0.5rem !important;
-    }
-
-    .weather-meta {
-      width: 100% !important;
-      justify-content: space-between !important;
     }
   }
 
@@ -233,29 +199,6 @@
     .task-detail-panel {
       width: 100% !important;
     }
-
-    /* Weather widget compact layout on mobile */
-    .weather-layout {
-      flex-direction: row !important;
-      justify-content: space-between !important;
-      align-items: center !important;
-      gap: 1rem !important;
-    }
-
-    .weather-time {
-      font-size: 1.75rem !important;
-    }
-
-    .weather-temp {
-      font-size: 1.75rem !important;
-    }
-
-    .weather-meta {
-      width: auto !important;
-      flex-direction: row !important;
-      align-items: center !important;
-      gap: 0.5rem !important;
-    }
   }
 
   /* ═══════════════════════════════════════════════════════════
@@ -303,14 +246,6 @@
     .dark .rich-button,
     .dark .icon-button {
       box-shadow: 1.5px 1.5px 0 var(--dark-shadow) !important;
-    }
-
-    /* Let minimal theme retain its 1px borders on mobile */
-    .profile-minimal .nb-button,
-    .profile-minimal .rich-button,
-    .profile-minimal .icon-button {
-      border-width: 1px !important;
-      box-shadow: none !important;
     }
 
     .topbar {
@@ -365,11 +300,6 @@
 
     .dark .calendar-cell {
       box-shadow: 2px 2px 0 var(--dark-shadow) !important;
-    }
-
-    .profile-minimal .calendar-cell {
-      border-width: 1px !important;
-      box-shadow: none !important;
     }
 
     .calendar-cell .calendar-dots {
@@ -468,18 +398,12 @@
       padding: 0.375rem 0.5rem !important;
       gap: 0.5rem !important;
     }
-    .profile-minimal .block-type-checklist div[class*="border-[3px]"] {
-      border-width: 1px !important;
-    }
 
     /* Compact Link block items */
     .link-block-item {
       padding: 0.5rem !important;
       gap: 0.25rem !important;
       border-width: 1.5px !important;
-    }
-    .profile-minimal .link-block-item {
-      border-width: 1px !important;
     }
     .link-block-item input {
       height: 1.85rem !important;

@@ -11,12 +11,6 @@ export function AuthPage() {
   const [submitting, setSubmitting] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
 
-  useEffect(() => {
-    const root = document.documentElement;
-    root.classList.remove("profile-minimal");
-    root.classList.add("profile-neo");
-  }, []);
-
   const validatePassword = (pwd) => {
     const minLength = 8;
     const hasUpper = /[A-Z]/.test(pwd);

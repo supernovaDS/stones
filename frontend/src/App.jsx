@@ -21,7 +21,6 @@ function App() {
     addTaskBlock,
     blocks,
     closeTaskModal,
-    colorProfile,
     error,
     initialize,
     loading,
@@ -46,14 +45,99 @@ function App() {
   const [commandOpen, setCommandOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // ── Scroll to Top/Bottom button ──
+  // ── Scroll position persistence ──────────────────────────────
+  const scrollPositionsRef = useRef({});
+  const isRestoringRef = useRef(false);
+
+  const scrollKey = view === "workspace" ? `workspace-${activePageId}` : `view-${view}`;
+
+  // Helper: instantly jump to a scroll position, bypassing CSS scroll-behavior: smooth
+  const restoreScroll = (target) => {
+    if (target <= 0) return;
+    isRestoringRef.current = true;
+    window.scrollTo({ top: target, behavior: "instant" });
+    // Belt-and-suspenders: browsers may defer the first scrollTo when the
+    // viewport is still being laid out after restore, so we retry a couple
+    // of times on subsequent frames.
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: target, behavior: "instant" });
+      setTimeout(() => {
+        window.scrollTo({ top: target, behavior: "instant" });
+        isRestoringRef.current = false;
+      }, 80);
+    });
+  };
+
+  // Restore scroll position when the active page or view changes
+  useEffect(() => {
+    const target = scrollPositionsRef.current[scrollKey] || 0;
+    isRestoringRef.current = true;
+    window.scrollTo({ top: target, behavior: "instant" });
+    const rafId = requestAnimationFrame(() => {
+      window.scrollTo({ top: target, behavior: "instant" });
+      isRestoringRef.current = false;
+    });
+    return () => cancelAnimationFrame(rafId);
+  }, [scrollKey]);
+
+  // Save on every scroll & restore on minimize/restore
+  useEffect(() => {
+    // Only persist meaningful (> 0) positions so that a browser‐reset‐to‐0
+    // during minimize never overwrites a real saved value.
+    const savePosition = () => {
+      if (!isRestoringRef.current && window.scrollY > 0) {
+        scrollPositionsRef.current[scrollKey] = window.scrollY;
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        // scrollY is still the real value here (blur fires before collapse).
+        if (window.scrollY > 0) {
+          scrollPositionsRef.current[scrollKey] = window.scrollY;
+        }
+      } else if (document.visibilityState === "visible") {
+        const target = scrollPositionsRef.current[scrollKey];
+        if (target > 0) restoreScroll(target);
+      }
+    };
+
+    // blur fires *before* the browser collapses the viewport on minimize,
+    // so scrollY is still valid → capture it as a safety net.
+    const onBlur = () => {
+      if (window.scrollY > 0) {
+        scrollPositionsRef.current[scrollKey] = window.scrollY;
+      }
+    };
+
+    const onFocus = () => {
+      const target = scrollPositionsRef.current[scrollKey];
+      if (target > 0 && Math.abs(window.scrollY - target) > 2) {
+        restoreScroll(target);
+      }
+    };
+
+    window.addEventListener("scroll", savePosition, { passive: true });
+    window.addEventListener("blur", onBlur);
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.removeEventListener("scroll", savePosition);
+      window.removeEventListener("blur", onBlur);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [scrollKey]);
+
+  // ── Scroll to Top/Bottom button ────────────────────────────
   const [scrollDirection, setScrollDirection] = useState("down");
   const [isScrollVisible, setIsScrollVisible] = useState(false);
 
   useEffect(() => {
     let ticking = false;
 
-    const handleScroll = () => {
+    const updateScrollButton = () => {
       if (!ticking) {
         window.requestAnimationFrame(() => {
           const scrollTop = window.scrollY;
@@ -77,16 +161,16 @@ function App() {
       }
     };
 
-    window.addEventListener("scroll", handleScroll);
-    window.addEventListener("resize", handleScroll);
-    handleScroll();
+    window.addEventListener("scroll", updateScrollButton, { passive: true });
+    window.addEventListener("resize", updateScrollButton);
+    updateScrollButton();
 
-    const observer = new MutationObserver(handleScroll);
+    const observer = new MutationObserver(updateScrollButton);
     observer.observe(document.body, { childList: true, subtree: true });
 
     return () => {
-      window.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("resize", handleScroll);
+      window.removeEventListener("scroll", updateScrollButton);
+      window.removeEventListener("resize", updateScrollButton);
       observer.disconnect();
     };
   }, []);
@@ -138,14 +222,7 @@ function App() {
     }, 50);
     
     return () => clearTimeout(timer);
-  }, [theme, colorProfile]);
-
-  // ── Color profile sync ─────────────────────────────────────
-  useEffect(() => {
-    const root = document.documentElement;
-    root.classList.remove("profile-neo", "profile-minimal");
-    root.classList.add(`profile-${colorProfile}`);
-  }, [colorProfile]);
+  }, [theme]);
 
   // ── Global keyboard shortcuts ───────────────────────────────
   useEffect(() => {
@@ -286,11 +363,7 @@ function App() {
       />
       {isScrollVisible && (
         <button
-          className={
-            colorProfile === "minimal"
-              ? "scroll-btn-minimal"
-              : "scroll-btn"
-          }
+          className="scroll-btn"
           onClick={handleScrollClick}
           title={scrollDirection === "up" ? "Scroll to top" : "Scroll to bottom"}
           type="button"

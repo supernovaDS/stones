@@ -118,7 +118,7 @@ export function CalendarView() {
                   return (
                     <div 
                       className={clsx(
-                        "bento-card flex items-center justify-between gap-3 p-3 transition-all",
+                        "bento-card hover-static flex items-center justify-between gap-3 p-3 transition-all",
                         isCompleted
                           ? "bg-emerald-50/50 hover:bg-emerald-50 dark:bg-emerald-950/10 dark:hover:bg-emerald-950/20"
                           : isFailed

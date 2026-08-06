@@ -4,7 +4,7 @@ import { clsx } from "clsx";
 import { Plus, FileText, Link, Image as ImageIcon } from "lucide-react";
 
 export function DiaryAddBlockMenu({ pageId }) {
-  const { addNoteBlock, addLinkBlock, addImageBlock, theme, colorProfile } = useAppStore();
+  const { addNoteBlock, addLinkBlock, addImageBlock, theme } = useAppStore();
   const [isOpen, setIsOpen] = useState(false);
 
   const handleImageClick = () => {
@@ -78,7 +78,7 @@ export function DiaryAddBlockMenu({ pageId }) {
       <button
         className={clsx(
           "nb-button flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-black !p-0 shadow-[4px_4px_0_#111] transition-all hover:scale-105 active:scale-95 dark:border-[#1e232a] dark:shadow-[3px_3px_0_#000]",
-          isOpen ? "bg-[#ff5a5f] rotate-45 text-black" : (theme === "dark" && colorProfile === "neo" ? "bg-[#21caff] text-black" : "bg-[#a78bfa] text-black")
+          isOpen ? "bg-[#ff5a5f] rotate-45 text-black" : (theme === "dark" ? "bg-[#21caff] text-black" : "bg-[#a78bfa] text-black")
         )}
         onClick={() => setIsOpen(!isOpen)}
         title="Add block"

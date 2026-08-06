@@ -30,18 +30,6 @@
     font-family: "Space Grotesk", sans-serif;
   }
 
-  .profile-minimal h1,
-  .profile-minimal h2,
-  .profile-minimal h3,
-  .profile-minimal h4,
-  .profile-minimal h5,
-  .profile-minimal h6,
-  .profile-minimal .brand-word,
-  .profile-minimal .hero-title,
-  .profile-minimal .block-type-title input {
-    font-family: "Inter", sans-serif !important;
-  }
-
   html {
     scroll-behavior: smooth;
   }

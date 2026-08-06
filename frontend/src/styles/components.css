@@ -53,9 +53,6 @@
   }
 
   .topbar {
-    position: sticky;
-    top: 1rem;
-    z-index: 20;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -171,6 +168,17 @@
   .bento-card.is-cut {
     opacity: 0.55;
     border-style: dashed !important;
+  }
+
+  .bento-card.hover-static:hover,
+  .brutal-card.hover-static:hover {
+    transform: none !important;
+    box-shadow: 7px 7px 0 #111111 !important;
+  }
+
+  .dark .bento-card.hover-static:hover,
+  .dark .brutal-card.hover-static:hover {
+    box-shadow: 4px 4px 0 var(--dark-shadow) !important;
   }
 
   .nb-button,
@@ -613,16 +621,14 @@
     @apply !bg-[#ff5a5f] border-4 border-black !text-[#111111] !font-black !text-base shadow-[9px_9px_0_#111] rounded-[10px] dark:border-[#1e232a] dark:!bg-[#3d1215] dark:!text-[#e8a0a2] dark:shadow-[6px_6px_0_#000];
   }
 
-  .scroll-btn-minimal {
-    @apply fixed bottom-6 right-6 z-40 flex h-12 w-12 items-center justify-center rounded-full border border-stone-200 bg-white text-stone-700 shadow-md transition-all hover:bg-stone-50 hover:shadow-lg active:scale-95 dark:border-stone-800 dark:bg-[#12151a] dark:text-[#c8c3ba] dark:shadow-none duration-200;
-  }
-
   .scroll-btn {
     @apply fixed bottom-6 right-6 z-40 flex h-12 w-12 items-center justify-center rounded-full border-[3px] border-black bg-[#ffdc4a] text-black shadow-[4px_4px_0_#111] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0_#111] active:translate-y-0 active:shadow-[2px_2px_0_#111] dark:border-black dark:bg-[#21caff] dark:text-black dark:shadow-[3px_3px_0_#000] duration-200;
   }
 
   .no-scrollbar::-webkit-scrollbar {
     display: none !important;
+    width: 0 !important;
+    height: 0 !important;
   }
   .no-scrollbar {
     -ms-overflow-style: none !important;
