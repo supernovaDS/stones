@@ -2,7 +2,7 @@
 
 const ENCRYPTION_PREFIX = "ENC:";
 const IV_LENGTH = 12;
-const ITERATIONS = 100000;
+const ITERATIONS = 210000;
 const HASH_ALGO = "SHA-256";
 
 function bufferToBase64(buffer) {

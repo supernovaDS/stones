@@ -57,3 +57,5 @@ export function Badge({ children, tone }) {
 
 export { Checkbox } from "./Checkbox";
 export { ContextMenu } from "./ContextMenu";
+export { BentoCard } from "./BentoCard";
+export { PriorityBadge } from "./PriorityBadge";
