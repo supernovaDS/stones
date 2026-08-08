@@ -9,9 +9,24 @@ import { useFilteredTasks } from "../../hooks/useFilteredTasks";
 
 export function TaskListView() {
   const { blocks, setRecurringTasksOpen, setEditingRepeatedTaskId } = useAppStore();
-  const [filter, setFilter] = useState("open");
-  const [sortBy, setSortBy] = useState("date_scheduled");
-  const [sortOrder, setSortOrder] = useState("asc");
+  const [filter, setFilter] = useState(() => localStorage.getItem("stones-task-filter") || "open");
+  const [sortBy, setSortBy] = useState(() => localStorage.getItem("stones-task-sortby") || "date_scheduled");
+  const [sortOrder, setSortOrder] = useState(() => localStorage.getItem("stones-task-sortorder") || "asc");
+
+  const handleFilterChange = (val) => {
+    setFilter(val);
+    localStorage.setItem("stones-task-filter", val);
+  };
+
+  const handleSortByChange = (val) => {
+    setSortBy(val);
+    localStorage.setItem("stones-task-sortby", val);
+  };
+
+  const handleSortOrderChange = (val) => {
+    setSortOrder(val);
+    localStorage.setItem("stones-task-sortorder", val);
+  };
 
   const tasks = useFilteredTasks(blocks, filter, sortBy, sortOrder);
 
@@ -21,7 +36,7 @@ export function TaskListView() {
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <select 
             className="nb-select h-11 px-3 text-sm font-black capitalize" 
-            onChange={(e) => setFilter(e.target.value)} 
+            onChange={(e) => handleFilterChange(e.target.value)} 
             value={filter}
           >
             <option value="open">Open</option>
@@ -33,12 +48,12 @@ export function TaskListView() {
             <option value="all">All</option>
           </select>
           <div className="ml-auto flex items-center gap-2 max-sm:w-full max-sm:mt-2">
-            <select className="nb-select h-11 px-3 text-sm font-black max-sm:flex-1" onChange={(e) => setSortBy(e.target.value)} value={sortBy}>
+            <select className="nb-select h-11 px-3 text-sm font-black max-sm:flex-1" onChange={(e) => handleSortByChange(e.target.value)} value={sortBy}>
               <option value="priority">Sort by priority</option>
               <option value="date_completed">Sort by date completed</option>
               <option value="date_scheduled">Sort by date scheduled</option>
             </select>
-            <select className="nb-select h-11 px-3 text-sm font-black max-sm:flex-1" onChange={(e) => setSortOrder(e.target.value)} value={sortOrder}>
+            <select className="nb-select h-11 px-3 text-sm font-black max-sm:flex-1" onChange={(e) => handleSortOrderChange(e.target.value)} value={sortOrder}>
               <option value="asc">Ascending</option>
               <option value="desc">Descending</option>
             </select>
