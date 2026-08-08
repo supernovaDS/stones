@@ -71,6 +71,32 @@ export function setBypassEncryption(val) {
   bypassEncryption = val;
 }
 
+export async function clearLocalWorkspaceData() {
+  setActiveDiaryKey(null);
+  await db.transaction(
+    "rw",
+    db.workspaces,
+    db.sections,
+    db.pages,
+    db.blocks,
+    db.sync_queue,
+    db.sync_meta,
+    db.settings,
+    async () => {
+      await db.workspaces.clear();
+      await db.sections.clear();
+      await db.pages.clear();
+      await db.blocks.clear();
+      await db.sync_queue.clear();
+      await db.sync_meta.clear();
+      await db.settings.clear();
+    }
+  );
+  localStorage.removeItem("stones-active-page-id");
+  localStorage.removeItem("stones-active-diary-page-id");
+  localStorage.removeItem("stones-current-user-id");
+}
+
 const originalPagesPut = db.pages.put.bind(db.pages);
 const originalPagesAdd = db.pages.add.bind(db.pages);
 const originalPagesBulkPut = db.pages.bulkPut.bind(db.pages);
