@@ -78,6 +78,22 @@ export function AuthProvider({ children }) {
     return data;
   }, []);
 
+  const signInWithGoogle = useCallback(async () => {
+    if (!supabase) throw new Error("Supabase is not configured.");
+    setError("");
+    const { data, error: authError } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin
+      }
+    });
+    if (authError) {
+      setError(authError.message);
+      throw authError;
+    }
+    return data;
+  }, []);
+
   const signOut = useCallback(async () => {
     if (!supabase) return;
     setError("");
@@ -97,9 +113,10 @@ export function AuthProvider({ children }) {
       error,
       signUp,
       signIn,
+      signInWithGoogle,
       signOut
     }),
-    [error, loading, session, signIn, signOut, signUp, user]
+    [error, loading, session, signIn, signInWithGoogle, signOut, signUp, user]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
