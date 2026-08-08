@@ -8,6 +8,9 @@ import {
   Archive,
   ArchiveRestore,
   Copy,
+  Clipboard,
+  FileText,
+  CheckSquare,
   Plus,
   Check,
   XCircle,
@@ -94,18 +97,115 @@ export function ContextMenu() {
       e.preventDefault();
     }
     hideContextMenu();
-    const rawText = block.content?.text || "";
-    // Strip HTML tags for clean text copying
-    const cleanText = rawText.replace(/<[^>]*>/g, "");
-    try {
-      await navigator.clipboard.writeText(cleanText);
-      setNotification("Text copied to clipboard");
-    } catch (e) {
-      console.error("Failed to copy text", e);
+
+    const selection = window.getSelection();
+    const selectedText = selection ? selection.toString() : "";
+
+    if (selectedText.trim()) {
+      await navigator.clipboard.writeText(selectedText);
+      setNotification("Selected text copied");
+      return;
+    }
+
+    let text = "";
+    if (block.type === "note" || block.type === "title") {
+      text = (block.content?.text || block.content?.html || "").replace(/<[^>]*>/g, "");
+    } else if (block.type === "code") {
+      text = block.content?.code || "";
+    } else if (block.type === "checklist") {
+      text = (block.content?.items || []).map((i) => i.text).join("\n");
+    } else if (block.type === "link") {
+      text = block.content?.url || block.content?.title || "";
+    } else if (block.type === "task") {
+      text = block.content?.title || "";
+    }
+
+    if (text) {
+      await navigator.clipboard.writeText(text);
+      setNotification("Block content copied");
     }
   };
 
-  const isNoteBlock = block.type === "note";
+  const handlePasteText = async (asPlainText = false, e) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    hideContextMenu();
+
+    try {
+      let clipText = await navigator.clipboard.readText();
+      if (!clipText) return;
+
+      if (asPlainText) {
+        clipText = clipText.replace(/<[^>]*>/g, "");
+      }
+
+      const activeElem = document.activeElement;
+
+      if (activeElem && (activeElem.tagName === "INPUT" || activeElem.tagName === "TEXTAREA")) {
+        const start = activeElem.selectionStart ?? 0;
+        const end = activeElem.selectionEnd ?? 0;
+        const val = activeElem.value || "";
+        const nextVal = val.slice(0, start) + clipText + val.slice(end);
+        activeElem.value = nextVal;
+        activeElem.setSelectionRange(start + clipText.length, start + clipText.length);
+        activeElem.dispatchEvent(new Event("input", { bubbles: true }));
+        setNotification(asPlainText ? "Pasted plain text" : "Pasted text");
+        return;
+      }
+
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        range.deleteContents();
+        const textNode = document.createTextNode(clipText);
+        range.insertNode(textNode);
+        range.setStartAfter(textNode);
+        range.setEndAfter(textNode);
+        selection.removeAllRanges();
+        selection.addRange(range);
+
+        const container = range.startContainer.parentElement?.closest?.("[contenteditable]");
+        if (container) {
+          container.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        setNotification(asPlainText ? "Pasted plain text" : "Pasted text");
+        return;
+      }
+    } catch (err) {
+      console.error("Paste failed:", err);
+      setNotification("Failed to paste from clipboard");
+    }
+  };
+
+  const handleSelectAllText = (e) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    hideContextMenu();
+
+    const activeElem = document.activeElement;
+    if (activeElem && (activeElem.tagName === "INPUT" || activeElem.tagName === "TEXTAREA")) {
+      activeElem.select();
+      return;
+    }
+
+    const selection = window.getSelection();
+    const activeEditable = document.activeElement?.closest?.("[contenteditable]") ||
+      document.querySelector(`[data-block-id="${block.id}"] [contenteditable]`);
+
+    if (activeEditable) {
+      activeEditable.focus();
+      const range = document.createRange();
+      range.selectNodeContents(activeEditable);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+  };
+
+  const isEditableBlock = ["note", "title", "link", "code", "checklist"].includes(block.type);
   const isTaskBlock = block.type === "task";
 
   return (
@@ -187,14 +287,42 @@ export function ContextMenu() {
         </>
       )}
 
-      {isNoteBlock && (
-        <button
-          type="button"
-          className="block-context-menu-item"
-          onClick={(e) => handleCopyText(e)}
-        >
-          <Copy size={14} /> Copy Text Content
-        </button>
+      {isEditableBlock && (
+        <>
+          <div className="h-[2px] bg-dashed border-t-2 border-dashed border-stone-200 dark:border-[#1e232a] my-1" />
+
+          <button
+            type="button"
+            className="block-context-menu-item"
+            onClick={(e) => handleCopyText(e)}
+          >
+            <Copy size={14} /> Copy
+          </button>
+
+          <button
+            type="button"
+            className="block-context-menu-item"
+            onClick={(e) => handlePasteText(false, e)}
+          >
+            <Clipboard size={14} /> Paste
+          </button>
+
+          <button
+            type="button"
+            className="block-context-menu-item"
+            onClick={(e) => handlePasteText(true, e)}
+          >
+            <FileText size={14} /> Paste as Plain Text
+          </button>
+
+          <button
+            type="button"
+            className="block-context-menu-item"
+            onClick={(e) => handleSelectAllText(e)}
+          >
+            <CheckSquare size={14} /> Select All
+          </button>
+        </>
       )}
 
       <button

@@ -22,7 +22,11 @@ import {
   Archive,
   ArchiveRestore,
   Eye,
-  EyeOff
+  EyeOff,
+  Copy,
+  Clipboard,
+  FileText,
+  CheckSquare
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useEffect, useRef, useState } from "react";
@@ -267,6 +271,90 @@ function RichToolbar({ editorRef }) {
           </div>
         ) : null}
       </div>
+
+      <span className="rte-sep" />
+
+      {/* Copy */}
+      <button
+        className="rich-button"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={async () => {
+          const selection = window.getSelection();
+          const selText = selection ? selection.toString() : "";
+          const textToCopy = selText || editorRef.current?.innerText || "";
+          if (textToCopy) {
+            await navigator.clipboard.writeText(textToCopy);
+            useAppStore.getState().setNotification(selText ? "Selected text copied" : "Note text copied");
+          }
+        }}
+        type="button"
+        title="Copy (selected text or full note)"
+      >
+        <Copy size={14} strokeWidth={2.5} />
+      </button>
+
+      {/* Paste */}
+      <button
+        className="rich-button"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={async () => {
+          try {
+            const text = await navigator.clipboard.readText();
+            if (text) {
+              exec("insertText", text);
+              useAppStore.getState().setNotification("Pasted text");
+            }
+          } catch (err) {
+            console.error("Paste failed", err);
+          }
+        }}
+        type="button"
+        title="Paste (replaces selected text)"
+      >
+        <Clipboard size={14} strokeWidth={2.5} />
+      </button>
+
+      {/* Paste Plain */}
+      <button
+        className="rich-button"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={async () => {
+          try {
+            const raw = await navigator.clipboard.readText();
+            const clean = (raw || "").replace(/<[^>]*>/g, "");
+            if (clean) {
+              exec("insertText", clean);
+              useAppStore.getState().setNotification("Pasted plain text");
+            }
+          } catch (err) {
+            console.error("Paste plain failed", err);
+          }
+        }}
+        type="button"
+        title="Paste as Plain Text (replaces selected text)"
+      >
+        <FileText size={14} strokeWidth={2.5} />
+      </button>
+
+      {/* Select All */}
+      <button
+        className="rich-button"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => {
+          if (editorRef.current) {
+            editorRef.current.focus();
+            const range = document.createRange();
+            range.selectNodeContents(editorRef.current);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }
+        }}
+        type="button"
+        title="Select All"
+      >
+        <CheckSquare size={14} strokeWidth={2.5} />
+      </button>
     </div>
   );
 }
