@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { useAppStore } from "../../store/useAppStore";
+import { useAuth } from "../../contexts/AuthContext";
 import { BlockCard } from "../blocks";
 import { clsx } from "clsx";
-import { Plus, FileText, Link, Image as ImageIcon, Book, ArrowLeft, Lock, Menu, X, Settings, Trash2 } from "lucide-react";
+import { Plus, FileText, Link, Image as ImageIcon, Book, ArrowLeft, Lock, Menu, X, Settings, Trash2, KeyRound, ShieldAlert, CheckCircle2 } from "lucide-react";
 
 import { DiaryAddBlockMenu } from "./DiaryAddBlockMenu";
 
 export function DiaryView() {
+  const auth = useAuth();
   const { 
     diaryPasswordHash, 
     diaryAuthenticated, 
@@ -22,13 +24,21 @@ export function DiaryView() {
     setSettingsOpen,
     deletePage,
     sidebarHidden,
-    setSidebarHidden
+    setSidebarHidden,
+    setNotification
   } = useAppStore();
 
   const [passwordInput, setPasswordInput] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [newPageTitle, setNewPageTitle] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Forgot Password / Reset Flow States
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetStep, setResetStep] = useState("auth"); // "auth" | "new_password"
+  const [accountPassword, setAccountPassword] = useState("");
+  const [newDiaryPassword, setNewDiaryPassword] = useState("");
+  const [confirmDiaryPassword, setConfirmDiaryPassword] = useState("");
 
   const diaryPages = pages.filter((p) => p.workspaceId === "diary").sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   const activePage = diaryPages.find((p) => p.id === activeDiaryPageId) || diaryPages[0];
@@ -57,6 +67,38 @@ export function DiaryView() {
     }
   };
 
+  const handleReauthSubmit = async (e) => {
+    e.preventDefault();
+    if (auth.user?.email) {
+      if (!accountPassword) return;
+      try {
+        await auth.signIn({ email: auth.user.email, password: accountPassword });
+        setErrorMsg("");
+        setAccountPassword("");
+        setResetStep("new_password");
+      } catch (err) {
+        setErrorMsg(err?.message || "Invalid account password.");
+      }
+    } else {
+      setResetStep("new_password");
+    }
+  };
+
+  const handleNewPasswordSubmit = async (e) => {
+    e.preventDefault();
+    if (!newDiaryPassword.trim()) return;
+    if (newDiaryPassword !== confirmDiaryPassword) {
+      setErrorMsg("Passwords do not match.");
+      return;
+    }
+    await setDiaryPassword(newDiaryPassword);
+    setNotification("Diary password updated and unlocked successfully!");
+    setIsResetting(false);
+    setNewDiaryPassword("");
+    setConfirmDiaryPassword("");
+    setErrorMsg("");
+  };
+
   const handleCreatePage = (e) => {
     e.preventDefault();
     if (newPageTitle.trim()) {
@@ -77,8 +119,6 @@ export function DiaryView() {
           <h2 className="mb-2 text-2xl font-black">Set up your Diary</h2>
           <p className="mb-6 text-sm font-bold text-stone-600 dark:text-[#7a7670]">
             Your diary is private. Choose a secure password to lock it.
-            <br />
-            <strong className="text-[#ff5a5f] mt-2 block">Warning: You cannot change or recover this password later.</strong>
           </p>
           <input
             autoFocus
@@ -97,6 +137,117 @@ export function DiaryView() {
   }
 
   if (!diaryAuthenticated) {
+    if (isResetting) {
+      return (
+        <div className="flex min-h-[100dvh] items-center justify-center p-6 max-md:p-4">
+          <div className="bento-card max-w-md w-full bg-[#fff7e8] p-8 text-center dark:bg-[#0c0e11] max-md:p-6 shadow-[8px_8px_0_#111] dark:shadow-[6px_6px_0_#000]">
+            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border-[3px] border-black bg-[#ffdc4a] text-black dark:border-[#1e232a]">
+              <KeyRound size={32} />
+            </div>
+
+            {resetStep === "auth" ? (
+              <form onSubmit={handleReauthSubmit}>
+                <h2 className="mb-2 text-2xl font-black">Re-authenticate Account</h2>
+                <p className="mb-6 text-sm font-bold text-stone-600 dark:text-[#7a7670]">
+                  {auth.user?.email
+                    ? `Log in with your account password (${auth.user.email}) to reset your diary password.`
+                    : "Re-authenticate to create a new diary password."}
+                </p>
+
+                {errorMsg && <p className="mb-4 text-sm font-black text-[#ff5a5f]">{errorMsg}</p>}
+
+                {auth.user?.email && (
+                  <input
+                    autoFocus
+                    type="password"
+                    className="nb-input mb-4 w-full px-4 py-3 text-center text-lg font-black placeholder:font-bold"
+                    placeholder="Account Password"
+                    value={accountPassword}
+                    onChange={(e) => {
+                      setAccountPassword(e.target.value);
+                      setErrorMsg("");
+                    }}
+                  />
+                )}
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    className="nb-button w-full p-3 font-black"
+                    onClick={() => {
+                      setIsResetting(false);
+                      setErrorMsg("");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="nb-button action w-full p-3 font-black !bg-[#2ef2a6] dark:!bg-[#0b643e] !text-black dark:!text-white"
+                    disabled={auth.user?.email && !accountPassword}
+                  >
+                    Verify & Continue
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleNewPasswordSubmit}>
+                <h2 className="mb-2 text-2xl font-black">Create New Diary Password</h2>
+                <p className="mb-6 text-xs font-bold text-stone-600 dark:text-[#7a7670]">
+                  Enter a new password to lock and protect your diary.
+                </p>
+
+                {errorMsg && <p className="mb-4 text-sm font-black text-[#ff5a5f]">{errorMsg}</p>}
+
+                <input
+                  autoFocus
+                  type="password"
+                  className="nb-input mb-3 w-full px-4 py-3 text-center text-lg font-black tracking-widest placeholder:tracking-normal placeholder:font-bold"
+                  placeholder="New Diary Password"
+                  value={newDiaryPassword}
+                  onChange={(e) => {
+                    setNewDiaryPassword(e.target.value);
+                    setErrorMsg("");
+                  }}
+                />
+
+                <input
+                  type="password"
+                  className="nb-input mb-4 w-full px-4 py-3 text-center text-lg font-black tracking-widest placeholder:tracking-normal placeholder:font-bold"
+                  placeholder="Confirm New Password"
+                  value={confirmDiaryPassword}
+                  onChange={(e) => {
+                    setConfirmDiaryPassword(e.target.value);
+                    setErrorMsg("");
+                  }}
+                />
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    className="nb-button w-full p-3 font-black"
+                    onClick={() => {
+                      setIsResetting(false);
+                      setErrorMsg("");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="nb-button action w-full p-3 font-black !bg-[#2ef2a6] dark:!bg-[#0b643e] !text-black dark:!text-white"
+                    disabled={!newDiaryPassword.trim() || !confirmDiaryPassword.trim()}
+                  >
+                    Save & Unlock
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex min-h-[100dvh] items-center justify-center p-6 max-md:p-4">
         <form onSubmit={handleLoginSubmit} className="bento-card max-w-md w-full bg-[#f1f5ff] p-8 text-center dark:bg-[#0c0e11] max-md:p-6">
@@ -123,7 +274,7 @@ export function DiaryView() {
               setErrorMsg("");
             }}
           />
-          <div className="flex gap-3">
+          <div className="flex gap-3 mb-4">
             <button type="button" className="nb-button w-full p-3" onClick={() => setView("workspace")}>
               Go Back
             </button>
@@ -131,6 +282,18 @@ export function DiaryView() {
               Unlock
             </button>
           </div>
+
+          <button
+            type="button"
+            className="text-xs font-black text-stone-600 dark:text-[#7a7670] underline hover:text-black dark:hover:text-white transition-colors"
+            onClick={() => {
+              setIsResetting(true);
+              setResetStep("auth");
+              setErrorMsg("");
+            }}
+          >
+            Forgot Diary Password? Re-authenticate to reset
+          </button>
         </form>
       </div>
     );
