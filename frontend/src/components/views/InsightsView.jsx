@@ -244,10 +244,10 @@ export function InsightsView() {
 
   const getHeatColor = (count) => {
     if (count === 0) return "bg-[#f4efe4] dark:bg-[#0d1017] border-[1.5px] border-black/60 dark:border-[#2b3342]";
-    if (count === 1) return "bg-[#70d6ff] dark:bg-[#0c4a6e] border-[1.5px] border-black dark:border-[#1e232a]";
-    if (count === 2) return "bg-[#21caff] dark:bg-[#0284c7] border-[1.5px] border-black dark:border-[#1e232a]";
-    if (count === 3) return "bg-[#2563eb] dark:bg-[#1d4ed8] border-[1.5px] border-black dark:border-[#1e232a]";
-    return "bg-[#1e1b4b] dark:bg-[#38bdf8] border-[1.5px] border-black dark:border-[#1e232a]";
+    if (count === 1) return "bg-[#95d5b2] dark:bg-[#0e482b] border-[1.5px] border-black dark:border-[#1e232a]";
+    if (count === 2) return "bg-[#40c077] dark:bg-[#136b3f] border-[1.5px] border-black dark:border-[#1e232a]";
+    if (count === 3) return "bg-[#2d6a4f] dark:bg-[#1cb268] border-[1.5px] border-black dark:border-[#1e232a]";
+    return "bg-[#081c15] dark:bg-[#2ef2a6] border-[1.5px] border-black dark:border-[#1e232a]";
   };
 
   return (
