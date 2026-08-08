@@ -382,7 +382,7 @@ export function RecurringTasksModal({ onClose }) {
                   templates.map((template) => (
                     <div
                       key={template.id}
-                      className={`flex items-center justify-between gap-4 p-4 rounded-xl border-[3px] border-[#111111] bg-white shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[3px_3px_0_#000] border-l-[10px] ${priorityBorderColor(template.metadata?.priority)}`}
+                      className="flex items-center justify-between gap-4 p-4 rounded-xl border-[3px] border-[#111111] bg-white shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[3px_3px_0_#000]"
                     >
                       <div className="min-w-0 flex-1">
                         <h4 className="font-black text-base text-black dark:text-[#c8c3ba] truncate">
