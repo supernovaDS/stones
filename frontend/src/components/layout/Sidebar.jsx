@@ -9,6 +9,7 @@ export function Sidebar({ isOpen, onClose, isHiddenDesktop }) {
     activePageId,
     createPage,
     deletePage,
+    renamePage,
     pages,
     sections,
     createSection,
@@ -127,20 +128,45 @@ export function Sidebar({ isOpen, onClose, isHiddenDesktop }) {
         {sortedPages.filter(p => !p.sectionId).map((page) => (
           <div key={page.id} className="group relative flex items-center">
             <button
-              className={clsx("nav-button flex-1 min-w-0 pr-12", activePageId === page.id && view === "workspace" && "active")}
+              className={clsx("nav-button flex-1 min-w-0 pr-16", activePageId === page.id && view === "workspace" && "active")}
               onClick={() => handleNav(() => setActivePage(page.id))}
+              onDoubleClick={() => {
+                const newTitle = window.prompt("Rename page:", page.title);
+                if (newTitle && newTitle.trim()) {
+                  void renamePage(page.id, newTitle.trim());
+                }
+              }}
               type="button"
             >
               <span className="truncate min-w-0 flex-1">{page.title}</span>
             </button>
-            <button
-              className="absolute right-4 grid h-7 w-7 place-items-center rounded-md text-stone-500 opacity-100 md:opacity-0 transition hover:bg-[#ff5a5f] hover:text-black group-hover:opacity-100 dark:text-[#7a7670] dark:hover:bg-[#3d1215] dark:hover:text-[#e8a0a2]"
-              onClick={() => void deletePage(page.id)}
-              title="Delete page"
-              type="button"
-            >
-              <Trash2 size={14} />
-            </button>
+            <div className="absolute right-2 flex items-center gap-1 opacity-100 md:opacity-0 transition group-hover:opacity-100">
+              <button
+                className="grid h-7 w-7 place-items-center rounded-md text-stone-500 hover:bg-[#ffdc4a] hover:text-black dark:text-[#7a7670] dark:hover:bg-stone-800 dark:hover:text-white"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const newTitle = window.prompt("Rename page:", page.title);
+                  if (newTitle && newTitle.trim()) {
+                    void renamePage(page.id, newTitle.trim());
+                  }
+                }}
+                title="Rename page"
+                type="button"
+              >
+                <Edit2 size={13} />
+              </button>
+              <button
+                className="grid h-7 w-7 place-items-center rounded-md text-stone-500 hover:bg-[#ff5a5f] hover:text-black dark:text-[#7a7670] dark:hover:bg-[#3d1215] dark:hover:text-[#e8a0a2]"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void deletePage(page.id);
+                }}
+                title="Delete page"
+                type="button"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
           </div>
         ))}
 
@@ -217,20 +243,45 @@ export function Sidebar({ isOpen, onClose, isHiddenDesktop }) {
                   {sortedPages.filter(p => p.sectionId === section.id).map((page) => (
                     <div key={page.id} className="group relative flex items-center">
                       <button
-                        className={clsx("nav-button flex-1 min-w-0 pr-12", activePageId === page.id && view === "workspace" && "active")}
+                        className={clsx("nav-button flex-1 min-w-0 pr-16", activePageId === page.id && view === "workspace" && "active")}
                         onClick={() => handleNav(() => setActivePage(page.id))}
+                        onDoubleClick={() => {
+                          const newTitle = window.prompt("Rename page:", page.title);
+                          if (newTitle && newTitle.trim()) {
+                            void renamePage(page.id, newTitle.trim());
+                          }
+                        }}
                         type="button"
                       >
                         <span className="truncate min-w-0 flex-1 pl-4">{page.title}</span>
                       </button>
-                      <button
-                        className="absolute right-4 grid h-7 w-7 place-items-center rounded-md text-stone-500 opacity-100 md:opacity-0 transition hover:bg-[#ff5a5f] hover:text-black group-hover:opacity-100 dark:text-[#7a7670] dark:hover:bg-[#3d1215] dark:hover:text-[#e8a0a2]"
-                        onClick={() => void deletePage(page.id)}
-                        title="Delete page"
-                        type="button"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      <div className="absolute right-2 flex items-center gap-1 opacity-100 md:opacity-0 transition group-hover:opacity-100">
+                        <button
+                          className="grid h-7 w-7 place-items-center rounded-md text-stone-500 hover:bg-[#ffdc4a] hover:text-black dark:text-[#7a7670] dark:hover:bg-stone-800 dark:hover:text-white"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const newTitle = window.prompt("Rename page:", page.title);
+                            if (newTitle && newTitle.trim()) {
+                              void renamePage(page.id, newTitle.trim());
+                            }
+                          }}
+                          title="Rename page"
+                          type="button"
+                        >
+                          <Edit2 size={13} />
+                        </button>
+                        <button
+                          className="grid h-7 w-7 place-items-center rounded-md text-stone-500 hover:bg-[#ff5a5f] hover:text-black dark:text-[#7a7670] dark:hover:bg-[#3d1215] dark:hover:text-[#e8a0a2]"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void deletePage(page.id);
+                          }}
+                          title="Delete page"
+                          type="button"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
