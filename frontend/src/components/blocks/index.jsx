@@ -217,8 +217,18 @@ function RichToolbar({ editorRef }) {
 
       {/* Link */}
       <button className="rich-button" onMouseDown={(e) => e.preventDefault()} onClick={() => {
+        const selection = window.getSelection();
+        const selectedText = selection ? selection.toString() : "";
         const url = window.prompt("Enter link URL:", "https://");
-        if (url) exec("createLink", url);
+        if (!url || !url.trim()) return;
+        const validUrl = url.trim();
+
+        if (selectedText && selectedText.trim().length > 0) {
+          exec("createLink", validUrl);
+        } else {
+          const linkHtml = `<a href="${validUrl}" target="_blank" rel="noopener noreferrer">${validUrl}</a>`;
+          exec("insertHTML", linkHtml);
+        }
       }} type="button" title="Insert link">
         <Link size={14} strokeWidth={2.5} />
       </button>
