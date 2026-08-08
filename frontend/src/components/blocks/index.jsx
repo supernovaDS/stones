@@ -161,14 +161,39 @@ function RichToolbar({ editorRef }) {
   }, []);
 
   const exec = (command, value = null) => {
-    editorRef.current?.focus();
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    editor.focus();
+
+    const selection = window.getSelection();
+    if (!selection.rangeCount || !editor.contains(selection.anchorNode)) {
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+
     document.execCommand(command, false, value);
-    // Manually trigger update after command execution
-    setActiveFormats(prev => ({
-      ...prev,
-      [command]: command === "foreColor" ? value : document.queryCommandState(command),
-      ...(command === "foreColor" ? { foreColor: value } : {})
-    }));
+
+    // Dispatch input event so editor state persists immediately
+    editor.dispatchEvent(new Event("input", { bubbles: true }));
+
+    setTimeout(() => {
+      const currentForeColor = document.queryCommandValue("foreColor") || "#111111";
+      setActiveFormats({
+        bold: document.queryCommandState("bold"),
+        italic: document.queryCommandState("italic"),
+        underline: document.queryCommandState("underline"),
+        justifyLeft: document.queryCommandState("justifyLeft"),
+        justifyCenter: document.queryCommandState("justifyCenter"),
+        justifyRight: document.queryCommandState("justifyRight"),
+        insertOrderedList: document.queryCommandState("insertOrderedList"),
+        insertUnorderedList: document.queryCommandState("insertUnorderedList"),
+        foreColor: currentForeColor
+      });
+    }, 10);
   };
 
   return (

@@ -569,6 +569,26 @@
     overflow: auto;
   }
 
+  .rte-editor i,
+  .rte-editor em,
+  .rte-editor [style*="font-style: italic"],
+  .rte-editor [style*="font-style:italic"] {
+    font-style: italic !important;
+  }
+
+  .rte-editor b,
+  .rte-editor strong,
+  .rte-editor [style*="font-weight: bold"],
+  .rte-editor [style*="font-weight:700"] {
+    font-weight: 700 !important;
+  }
+
+  .rte-editor u,
+  .rte-editor [style*="text-decoration: underline"],
+  .rte-editor [style*="text-decoration:underline"] {
+    text-decoration: underline !important;
+  }
+
   .rte-editor:empty::before {
     content: attr(data-placeholder);
     color: #a8a29e;
