@@ -42,6 +42,40 @@ export const seedData = () => {
   return { workspace, section };
 };
 
+export const deduplicateSections = async (sections) => {
+  if (!sections || sections.length <= 1) return sections;
+  const seen = new Map();
+  const keep = [];
+  const removeIds = [];
+
+  for (const sec of sections) {
+    const key = `${sec.workspaceId || "default"}_${(sec.title || "").trim().toLowerCase()}`;
+    if (seen.has(key)) {
+      removeIds.push(sec.id);
+    } else {
+      seen.set(key, sec);
+      keep.push(sec);
+    }
+  }
+
+  if (removeIds.length > 0) {
+    await db.transaction("rw", db.sections, db.pages, async () => {
+      for (const id of removeIds) {
+        await db.sections.delete(id);
+        const orphanPages = await db.pages.where("sectionId").equals(id).toArray();
+        const primary = keep[0];
+        if (primary) {
+          for (const p of orphanPages) {
+            await db.pages.update(p.id, { sectionId: primary.id });
+          }
+        }
+      }
+    });
+  }
+
+  return keep;
+};
+
 export const addBlock = async (get, set, pageId, type, content, metadata = {}, extra = {}) => {
   if (!pageId) return;
   pushUndoSnapshot(get, set, `create ${type}`);

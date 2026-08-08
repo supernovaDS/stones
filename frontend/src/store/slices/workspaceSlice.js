@@ -4,6 +4,7 @@ import {
   checkAndEndExpiredRecurringTasks,
   createId,
   decryptDiaryData,
+  deduplicateSections,
   defaultSidebarHidden,
   defaultTheme,
   getUniquePageTitle,
@@ -76,6 +77,8 @@ export const createWorkspaceSlice = (set, get) => ({
       blocks = [];
     }
 
+    sections = await deduplicateSections(sections);
+
     let diaryHash = null;
     let sidebarHidden = defaultSidebarHidden();
     let theme = defaultTheme();
@@ -147,26 +150,9 @@ export const createWorkspaceSlice = (set, get) => ({
       db.blocks.toArray()
     ]);
 
-    if (dbWorkspaces.length === 0) {
-      const seed = seedData();
-      await db.transaction(
-        "rw",
-        db.workspaces,
-        db.sections,
-        async () => {
-          await db.workspaces.add(seed.workspace);
-          await db.sections.add(seed.section);
-        }
-      );
+    if (dbWorkspaces.length === 0) return;
 
-      [dbWorkspaces, dbSections] = await Promise.all([
-        db.workspaces.toArray(),
-        db.sections.toArray()
-      ]);
-
-      void enqueueMutation("workspace", seed.workspace.id, "upsert", seed.workspace);
-      void enqueueMutation("section", seed.section.id, "upsert", seed.section);
-    }
+    dbSections = await deduplicateSections(dbSections);
 
     const { diaryKey } = get();
     if (diaryKey) {
