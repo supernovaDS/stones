@@ -24,11 +24,17 @@ export function AuthProvider({ children }) {
       setLoading(false);
     });
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
       setLoading(false);
       setError("");
+
+      if ((event === "SIGNED_IN" || nextSession) && (window.location.hash || window.location.search)) {
+        if (window.location.hash.includes("access_token") || window.location.hash === "#" || window.location.search.includes("code=")) {
+          window.history.replaceState(null, "", window.location.pathname);
+        }
+      }
     });
 
     return () => {
