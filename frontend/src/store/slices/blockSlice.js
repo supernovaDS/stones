@@ -817,5 +817,79 @@ export const createBlockSlice = (set, get) => ({
       blocks: state.blocks.map((item) => (item.id === taskId ? updatedBlock : item))
     }));
     get().setNotification("Image removed");
+  },
+
+  addRepeatedTask: async (taskData) => {
+    pushUndoSnapshot(get, set, "create recurring task");
+    const createdAt = nowIso();
+    const templateBlock = {
+      id: createId("block"),
+      pageId: "system-recurring",
+      type: "recurring_template",
+      order: 0,
+      content: {
+        title: taskData.title,
+        notes: taskData.notes || "",
+        subtasks: taskData.subtasks || []
+      },
+      metadata: {
+        status: "active",
+        priority: taskData.priority || "medium",
+        recurrence: taskData.recurrence || "daily",
+        customInterval: taskData.customInterval,
+        customUnit: taskData.customUnit,
+        startDate: taskData.startDate || createdAt.slice(0, 10),
+        endDate: taskData.endDate || undefined,
+        deadlineTime: taskData.deadlineTime || undefined,
+        createdAt,
+        updatedAt: createdAt
+      }
+    };
+
+    await db.blocks.add(templateBlock);
+    await enqueueMutation("block", templateBlock.id, "upsert", templateBlock);
+
+    set((state) => ({
+      blocks: sortBlocks([...state.blocks, templateBlock])
+    }));
+    get().setNotification("Recurring schedule created");
+    return templateBlock;
+  },
+
+  updateRepeatedTask: async (templateId, taskData) => {
+    return get().editRepeatedTaskInstance(templateId, taskData);
+  },
+
+  deleteRepeatedTask: async (templateId, options = {}) => {
+    const template = get().blocks.find((b) => b.id === templateId && b.type === "recurring_template");
+    if (!template) return;
+
+    pushUndoSnapshot(get, set, "delete recurring task");
+
+    await db.blocks.delete(templateId);
+    await enqueueMutation("block", templateId, "delete", template);
+
+    const blocksToRemove = [templateId];
+
+    if (options.completed || options.failed || options.due) {
+      const relatedBlocks = get().blocks.filter(
+        (b) =>
+          (b.type === "completed_repeat" || b.type === "failed_repeat" || b.type === "recurring_instance") &&
+          (b.content?.templateId === templateId || b.metadata?.templateId === templateId)
+      );
+
+      for (const rel of relatedBlocks) {
+        await db.blocks.delete(rel.id);
+        await enqueueMutation("block", rel.id, "delete", rel);
+        blocksToRemove.push(rel.id);
+      }
+    }
+
+    const removeSet = new Set(blocksToRemove);
+    set((state) => ({
+      blocks: state.blocks.filter((b) => !removeSet.has(b.id))
+    }));
+
+    get().setNotification("Recurring schedule deleted");
   }
 });
