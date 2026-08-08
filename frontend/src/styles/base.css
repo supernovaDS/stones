@@ -60,12 +60,12 @@
   }
 
   ::selection {
-    background: #ffdc4a;
-    color: #111111;
+    background: #ffdc4a !important;
+    color: #111111 !important;
   }
 
   .dark ::selection {
-    background: #7a6200;
-    color: #e8e4dc;
+    background: #0284c7 !important;
+    color: #ffffff !important;
   }
 }

@@ -179,32 +179,6 @@ export function ContextMenu() {
     }
   };
 
-  const handleSelectAllText = (e) => {
-    if (e) {
-      e.stopPropagation();
-      e.preventDefault();
-    }
-    hideContextMenu();
-
-    const activeElem = document.activeElement;
-    if (activeElem && (activeElem.tagName === "INPUT" || activeElem.tagName === "TEXTAREA")) {
-      activeElem.select();
-      return;
-    }
-
-    const selection = window.getSelection();
-    const activeEditable = document.activeElement?.closest?.("[contenteditable]") ||
-      document.querySelector(`[data-block-id="${block.id}"] [contenteditable]`);
-
-    if (activeEditable) {
-      activeEditable.focus();
-      const range = document.createRange();
-      range.selectNodeContents(activeEditable);
-      selection.removeAllRanges();
-      selection.addRange(range);
-    }
-  };
-
   const isEditableBlock = ["note", "title", "link", "code", "checklist"].includes(block.type);
   const isTaskBlock = block.type === "task";
 
@@ -313,14 +287,6 @@ export function ContextMenu() {
             onClick={(e) => handlePasteText(true, e)}
           >
             <FileText size={14} /> Paste as Plain Text
-          </button>
-
-          <button
-            type="button"
-            className="block-context-menu-item"
-            onClick={(e) => handleSelectAllText(e)}
-          >
-            <CheckSquare size={14} /> Select All
           </button>
         </>
       )}

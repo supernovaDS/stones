@@ -95,7 +95,8 @@ function BlockShell({ block, children }) {
   const isCut = clipboard?.some((b) => b.id === block.id);
   return (
     <article
-      className={clsx("bento-card block-shell h-full border-l-[10px] p-4 transition-all duration-150", `block-type-${block.type}`, blockTypeRail[block.type] ?? "border-l-stone-400", isCut && "is-cut")}
+      data-block-id={block.id}
+      className={clsx("bento-card block-shell h-full p-4 transition-all duration-150", `block-type-${block.type}`, isCut && "is-cut")}
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -128,7 +129,10 @@ function RichToolbar({ editorRef }) {
   useEffect(() => {
     const updateFormatState = () => {
       const selection = window.getSelection();
-      if (!editorRef.current || !selection.anchorNode || !editorRef.current.contains(selection.anchorNode)) {
+      let node = selection.anchorNode;
+      if (node && node.nodeType === 3) node = node.parentElement;
+
+      if (!editorRef.current || !node || !editorRef.current.contains(node)) {
         setActiveFormats({
           bold: false,
           italic: false,
@@ -171,7 +175,16 @@ function RichToolbar({ editorRef }) {
     editor.focus();
 
     const selection = window.getSelection();
-    if (!selection.rangeCount || !editor.contains(selection.anchorNode)) {
+    let isInside = false;
+    if (selection && selection.rangeCount > 0 && selection.anchorNode) {
+      let node = selection.anchorNode;
+      if (node.nodeType === 3) node = node.parentElement;
+      if (node && editor.contains(node)) {
+        isInside = true;
+      }
+    }
+
+    if (!isInside) {
       const range = document.createRange();
       range.selectNodeContents(editor);
       range.collapse(false);
@@ -179,7 +192,33 @@ function RichToolbar({ editorRef }) {
       selection.addRange(range);
     }
 
-    document.execCommand(command, false, value);
+    if (command === "italic") {
+      document.execCommand("italic", false, null);
+      
+      // Fallback: If execCommand("italic") did not format selected text:
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+        const isItalicNow = document.queryCommandState("italic");
+        if (!isItalicNow) {
+          const range = sel.getRangeAt(0);
+          const em = document.createElement("em");
+          em.style.fontStyle = "italic";
+          try {
+            range.surroundContents(em);
+          } catch (e) {
+            try {
+              const fragment = range.extractContents();
+              em.appendChild(fragment);
+              range.insertNode(em);
+            } catch (err) {
+              console.error("Italic fallback failed", err);
+            }
+          }
+        }
+      }
+    } else {
+      document.execCommand(command, false, value);
+    }
 
     // Dispatch input event so editor state persists immediately
     editor.dispatchEvent(new Event("input", { bubbles: true }));
@@ -205,10 +244,6 @@ function RichToolbar({ editorRef }) {
       {/* Bold */}
       <button className={clsx("rich-button", activeFormats.bold && "rich-button--active")} onMouseDown={(e) => e.preventDefault()} onClick={() => exec("bold")} type="button" title="Bold">
         <strong>B</strong>
-      </button>
-      {/* Italic */}
-      <button className={clsx("rich-button italic", activeFormats.italic && "rich-button--active")} onMouseDown={(e) => e.preventDefault()} onClick={() => exec("italic")} type="button" title="Italic">
-        I
       </button>
       {/* Underline */}
       <button className={clsx("rich-button", activeFormats.underline && "rich-button--active")} onMouseDown={(e) => e.preventDefault()} onClick={() => exec("underline")} type="button" title="Underline" style={{ textDecoration: "underline" }}>
@@ -344,26 +379,6 @@ function RichToolbar({ editorRef }) {
         title="Paste as Plain Text (replaces selected text)"
       >
         <FileText size={14} strokeWidth={2.5} />
-      </button>
-
-      {/* Select All */}
-      <button
-        className="rich-button"
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={() => {
-          if (editorRef.current) {
-            editorRef.current.focus();
-            const range = document.createRange();
-            range.selectNodeContents(editorRef.current);
-            const selection = window.getSelection();
-            selection.removeAllRanges();
-            selection.addRange(range);
-          }
-        }}
-        type="button"
-        title="Select All"
-      >
-        <CheckSquare size={14} strokeWidth={2.5} />
       </button>
     </div>
   );
@@ -560,7 +575,7 @@ function TaskBlock({ block }) {
   const isCut = clipboard?.some((b) => b.id === block.id);
   return (
     <article
-      className={clsx("bento-card block-shell block-type-task h-full border-l-[10px] p-4 transition-all duration-150", priorityRail[block.metadata.priority ?? "medium"], isCut && "is-cut")}
+      className={clsx("bento-card block-shell block-type-task h-full p-4 transition-all duration-150", isCut && "is-cut")}
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();

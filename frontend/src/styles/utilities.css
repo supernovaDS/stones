@@ -225,11 +225,6 @@
       box-shadow: 3px 3px 0 #111111 !important;
     }
 
-    /* Thinner left accent rail on all blocks on mobile */
-    article[class*="bento-card"], .block-shell {
-      border-left-width: 5px !important;
-    }
-
     .dark .bento-card, .dark .app-card {
       box-shadow: 2px 2px 0 var(--dark-shadow) !important;
     }
