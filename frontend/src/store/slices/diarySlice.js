@@ -138,5 +138,35 @@ export const createDiarySlice = (set, get) => ({
       activeDiaryPageId: page.id
     }));
     get().setNotification(`Diary page "${title}" created`);
+  },
+
+  resetAndWipeDiary: async () => {
+    const diaryPages = await db.pages.filter(p => p.workspaceId === "diary").toArray();
+    const diaryPageIds = new Set(diaryPages.map(p => p.id));
+    const diaryBlocks = await db.blocks.filter(b => diaryPageIds.has(b.pageId)).toArray();
+
+    for (const p of diaryPages) {
+      await db.pages.delete(p.id);
+      await enqueueMutation("page", p.id, "delete");
+    }
+
+    for (const b of diaryBlocks) {
+      await db.blocks.delete(b.id);
+      await enqueueMutation("block", b.id, "delete");
+    }
+
+    await db.settings.delete("diaryPasswordHash");
+    await db.settings.delete("diarySalt");
+    setActiveDiaryKey(null);
+
+    set((state) => ({
+      diaryPasswordHash: null,
+      diaryKey: null,
+      diaryAuthenticated: false,
+      activeDiaryPageId: null,
+      pages: state.pages.filter(p => p.workspaceId !== "diary"),
+      blocks: state.blocks.filter(b => !diaryPageIds.has(b.pageId))
+    }));
+    get().setNotification("Diary data wiped and password reset.");
   }
 });
