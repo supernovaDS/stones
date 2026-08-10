@@ -14,12 +14,11 @@ export function Topbar({ onCommandOpen, onMenuToggle, activePage, view, sidebarH
   const {
     undoLastChange,
     undoStack,
-    diaryUndoStack,
     setRecurringTasksOpen,
     renamePage,
   } = useAppStore();
 
-  const activeUndoStack = view === "diary" ? diaryUndoStack : undoStack;
+  const activeUndoStack = undoStack;
 
   return (
     <header className="topbar">

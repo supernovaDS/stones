@@ -3,7 +3,6 @@ import { enqueueMutation } from "../../sync/syncQueue";
 import {
   checkAndEndExpiredRecurringTasks,
   createId,
-  decryptDiaryData,
   deduplicateSections,
   defaultSidebarHidden,
   defaultTheme,
@@ -27,18 +26,7 @@ export const createWorkspaceSlice = (set, get) => ({
   loading: true,
   taskModalParams: null,
 
-  setView: (view) => {
-    if (view !== "diary") {
-      const wasDiary = get().view === "diary";
-      const diaryUndoStack = wasDiary ? [] : get().diaryUndoStack;
-      const recentlyDeleted = wasDiary
-        ? get().recentlyDeleted.filter((s) => s.view !== "diary")
-        : get().recentlyDeleted;
-      set({ view, diaryUndoStack, recentlyDeleted });
-    } else {
-      set({ view });
-    }
-  },
+  setView: (view) => set({ view }),
 
   setActivePage: (pageId) => {
     set({ activePageId: pageId });
@@ -79,17 +67,12 @@ export const createWorkspaceSlice = (set, get) => ({
 
     sections = await deduplicateSections(sections);
 
-    let diaryHash = null;
     let sidebarHidden = defaultSidebarHidden();
     let theme = defaultTheme();
     let deletedPagesBin = [];
     let savedActivePageId = null;
-    let savedActiveDiaryPageId = null;
 
     try {
-      const hashRecord = await db.settings?.get("diaryPasswordHash");
-      if (hashRecord) diaryHash = hashRecord.value;
-
       const sidebarRecord = await db.settings?.get("sidebarHidden");
       if (sidebarRecord) sidebarHidden = sidebarRecord.value;
 
@@ -98,9 +81,6 @@ export const createWorkspaceSlice = (set, get) => ({
 
       const activePageRecord = await db.settings?.get("activePageId");
       if (activePageRecord) savedActivePageId = activePageRecord.value;
-
-      const activeDiaryPageRecord = await db.settings?.get("activeDiaryPageId");
-      if (activeDiaryPageRecord) savedActiveDiaryPageId = activeDiaryPageRecord.value;
 
       const binRecord = await db.settings?.get("deletedPagesBin");
       if (binRecord) {
@@ -120,11 +100,7 @@ export const createWorkspaceSlice = (set, get) => ({
     const pageIdSet = new Set(pages.map(p => p.id));
     const resolvedActivePageId = (savedActivePageId && pageIdSet.has(savedActivePageId))
       ? savedActivePageId
-      : pages.find(p => p.workspaceId !== "diary")?.id || pages[0]?.id;
-    const diaryPages = pages.filter(p => p.workspaceId === "diary");
-    const resolvedActiveDiaryPageId = (savedActiveDiaryPageId && pageIdSet.has(savedActiveDiaryPageId))
-      ? savedActiveDiaryPageId
-      : diaryPages[0]?.id || null;
+      : pages[0]?.id;
 
     const processedBlocks = await checkAndEndExpiredRecurringTasks(blocks);
     set({
@@ -133,9 +109,7 @@ export const createWorkspaceSlice = (set, get) => ({
       pages,
       blocks: sortBlocks(processedBlocks.map(normalizeBlock)),
       activePageId: resolvedActivePageId,
-      activeDiaryPageId: resolvedActiveDiaryPageId,
       loading: false,
-      diaryPasswordHash: diaryHash,
       sidebarHidden,
       theme,
       deletedPagesBin
@@ -153,13 +127,6 @@ export const createWorkspaceSlice = (set, get) => ({
     if (dbWorkspaces.length === 0) return;
 
     dbSections = await deduplicateSections(dbSections);
-
-    const { diaryKey } = get();
-    if (diaryKey) {
-      const decrypted = await decryptDiaryData(dbPages, dbBlocks, diaryKey);
-      dbPages = decrypted.pages;
-      dbBlocks = decrypted.blocks;
-    }
 
     dbBlocks = await checkAndEndExpiredRecurringTasks(dbBlocks);
 
@@ -344,18 +311,9 @@ export const createWorkspaceSlice = (set, get) => ({
       await enqueueMutation("block", block.id, "delete", block);
     }
 
-    const isDiary = page.workspaceId === "diary";
     const currentPages = get().pages;
     const remainingPages = currentPages.filter((item) => item.id !== pageId);
-    let nextActiveId = null;
-
-    if (isDiary) {
-      const remainingDiary = remainingPages.filter(p => p.workspaceId === "diary");
-      nextActiveId = remainingDiary[0]?.id || null;
-    } else {
-      const remainingNormal = remainingPages.filter(p => p.workspaceId !== "diary");
-      nextActiveId = remainingNormal[0]?.id || null;
-    }
+    const nextActiveId = remainingPages[0]?.id || null;
 
     const deletedItem = makeDeletedItem(
       "page",
@@ -377,8 +335,7 @@ export const createWorkspaceSlice = (set, get) => ({
     set((state) => ({
       pages: remainingPages,
       blocks: state.blocks.filter((item) => item.pageId !== pageId),
-      activePageId: isDiary ? state.activePageId : (nextActiveId ?? undefined),
-      activeDiaryPageId: isDiary ? nextActiveId : state.activeDiaryPageId,
+      activePageId: nextActiveId ?? undefined,
       recentlyDeleted: [deletedItem, ...state.recentlyDeleted],
       deletedPagesBin: newBin
     }));

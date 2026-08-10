@@ -30,11 +30,6 @@ With the recent integration of **Supabase**, Stones now features robust, multi-d
 - Automated browser-level task reminders and notifications.
 - Daily dashboard to focus purely on today's tasks.
 
-### 🔒 True Privacy & Security (Diary Mode)
-- **End-to-End Encrypted Diary:** Your personal thoughts are secured using AES-GCM 256-bit encryption.
-- **Zero-Knowledge Architecture:** The encryption key is derived dynamically using your password and a deterministic salt. The backend only ever stores unreadable ciphertexts.
-- **Auto-Lock:** Clearing your browser cache immediately wipes your local encryption state without losing remote data.
-
 ### 📊 Insights & Analytics
 - Track your task completion rates, analyze fail rates, and maintain productivity streaks.
 - Visualize your monthly progress with an interactive GitHub-style heatmap.

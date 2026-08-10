@@ -10,11 +10,7 @@ export function RecycleBinModal() {
     view
   } = useAppStore();
 
-  const isDiary = view === "diary";
-  const filteredBin = deletedPagesBin.filter((item) => {
-    const isItemDiary = item.workspaceId === "diary" || item.type === "diary";
-    return isDiary ? isItemDiary : !isItemDiary;
-  });
+  const filteredBin = deletedPagesBin.filter((item) => item.workspaceId !== "diary" && item.type !== "diary");
 
   return (
     <div className="modal-backdrop animate-fade-in" onClick={() => setRecycleBinOpen(false)}>
@@ -26,7 +22,7 @@ export function RecycleBinModal() {
           <div className="flex items-center gap-2">
             <Trash2 size={24} className="text-[#ff5a5f]" />
             <h2 className="text-2xl font-black text-black dark:text-[#c8c3ba]">
-              {isDiary ? "Diary Recycle Bin" : "Workspace Recycle Bin"}
+              Workspace Recycle Bin
             </h2>
           </div>
           <button
@@ -40,9 +36,7 @@ export function RecycleBinModal() {
         </div>
 
         <p className="text-sm font-bold text-stone-600 dark:text-[#7a7670] mb-6">
-          {isDiary 
-            ? "Deleted diary entries are stored here for 30 days before getting permanently deleted."
-            : "Deleted workspace pages and sections are stored here for 30 days before getting permanently deleted."}
+          Deleted workspace pages and sections are stored here for 30 days before getting permanently deleted.
         </p>
 
         {filteredBin.length === 0 ? (

@@ -1,10 +1,9 @@
-import { db, setActiveDiaryKey, activeDiaryKey as getActiveDiaryKey, originalPagesBulkAdd, originalBlocksBulkPut, setBypassEncryption } from "../db/schema";
+import { db } from "../db/schema";
 import { enqueueMutation } from "../sync/syncQueue";
 export { enqueueMutation };
 
 import { nextRecurringDate, todayIso } from "../utils/date";
 import { createUuid } from "../utils/ids";
-import { decryptString, decryptObject, encryptString, encryptObject, isEncryptedObject, isEncryptedString } from "../utils/crypto";
 
 export const createId = (prefix) => `${prefix}_${createUuid()}`;
 export const nowIso = () => new Date().toISOString();
@@ -188,8 +187,6 @@ export const pushUndoSnapshot = (get, set, label) => {
   _lastUndoTime = now;
 
   const state = get();
-  const isDiary = state.view === "diary";
-  const stackKey = isDiary ? "diaryUndoStack" : "undoStack";
   const snapshot = {
     id: createId("undo"),
     label,
@@ -204,7 +201,7 @@ export const pushUndoSnapshot = (get, set, label) => {
     }
   };
   set((current) => ({
-    [stackKey]: [snapshot, ...current[stackKey]].slice(0, 30)
+    undoStack: [snapshot, ...(current.undoStack || [])].slice(0, 30)
   }));
 };
 
@@ -214,65 +211,41 @@ export const resetUndoDebounce = () => {
 };
 
 export const replaceWorkspaceData = async (data) => {
-  const diaryKey = getActiveDiaryKey;
   let pagesToWrite = data.pages ?? [];
   let blocksToWrite = data.blocks ?? [];
 
-  if (diaryKey) {
-    const diaryPageIds = new Set(pagesToWrite.filter(p => p.workspaceId === "diary").map(p => p.id));
+  await db.transaction(
+    "rw",
+    db.workspaces,
+    db.sections,
+    db.pages,
+    db.blocks,
+    async () => {
+      const currentBlocks = await db.blocks.toArray();
+      const snapshotBlockIds = new Set(blocksToWrite.map((b) => b.id));
 
-    pagesToWrite = await Promise.all(pagesToWrite.map(async (p) => {
-      if (p.workspaceId === "diary" && !isEncryptedString(p.title)) {
-        return { ...p, title: await encryptString(p.title, diaryKey) };
+      const blocksToDelete = currentBlocks
+        .filter(
+          (b) =>
+            !snapshotBlockIds.has(b.id) &&
+            !["recurring_template", "recurring_instance", "completed_repeat", "failed_repeat"].includes(b.type)
+        )
+        .map((b) => b.id);
+
+      if (blocksToDelete.length > 0) {
+        await db.blocks.bulkDelete(blocksToDelete);
       }
-      return p;
-    }));
 
-    blocksToWrite = await Promise.all(blocksToWrite.map(async (b) => {
-      if (diaryPageIds.has(b.pageId) && !isEncryptedObject(b.content)) {
-        return { ...b, content: await encryptObject(b.content, diaryKey) };
-      }
-      return b;
-    }));
-  }
-
-  setBypassEncryption(true);
-  try {
-    await db.transaction(
-      "rw",
-      db.workspaces,
-      db.sections,
-      db.pages,
-      db.blocks,
-      async () => {
-        const currentBlocks = await db.blocks.toArray();
-        const snapshotBlockIds = new Set(blocksToWrite.map((b) => b.id));
-
-        const blocksToDelete = currentBlocks
-          .filter(
-            (b) =>
-              !snapshotBlockIds.has(b.id) &&
-              !["recurring_template", "recurring_instance", "completed_repeat", "failed_repeat"].includes(b.type)
-          )
-          .map((b) => b.id);
-
-        if (blocksToDelete.length > 0) {
-          await db.blocks.bulkDelete(blocksToDelete);
-        }
-
-        await db.workspaces.clear();
-        await db.sections.clear();
-        await db.pages.clear();
-        
-        await db.workspaces.bulkAdd(data.workspaces ?? []);
-        await db.sections.bulkAdd(data.sections ?? []);
-        await originalPagesBulkAdd(pagesToWrite);
-        await originalBlocksBulkPut(blocksToWrite);
-      }
-    );
-  } finally {
-    setBypassEncryption(false);
-  }
+      await db.workspaces.clear();
+      await db.sections.clear();
+      await db.pages.clear();
+      
+      await db.workspaces.bulkAdd(data.workspaces ?? []);
+      await db.sections.bulkAdd(data.sections ?? []);
+      await db.pages.bulkAdd(pagesToWrite);
+      await db.blocks.bulkPut(blocksToWrite);
+    }
+  );
 };
 
 export const parseVirtualTaskId = (taskId) => {
@@ -329,33 +302,6 @@ export const upsertRecurringInstance = async (templateId, dateStr, subtasksPatch
   }));
 };
 
-export const decryptDiaryData = async (pages, blocks, key) => {
-  const newPages = await Promise.all(pages.map(async (p) => {
-    if (p.workspaceId === "diary" && isEncryptedString(p.title)) {
-      try {
-        return { ...p, title: await decryptString(p.title, key) };
-      } catch (e) {
-        console.error("Failed to decrypt page title", e);
-        return p;
-      }
-    }
-    return p;
-  }));
-  
-  const diaryPageIds = new Set(newPages.filter(p => p.workspaceId === "diary").map(p => p.id));
-  const newBlocks = await Promise.all(blocks.map(async (b) => {
-    if (diaryPageIds.has(b.pageId) && isEncryptedObject(b.content)) {
-      try {
-        return { ...b, content: await decryptObject(b.content, key) };
-      } catch (e) {
-        console.error("Failed to decrypt block content", e);
-        return b;
-      }
-    }
-    return b;
-  }));
-  return { pages: newPages, blocks: newBlocks };
-};
 
 export const fileToDataUrl = (file) =>
   new Promise((resolve, reject) => {

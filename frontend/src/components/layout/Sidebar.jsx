@@ -32,7 +32,6 @@ export function Sidebar({ isOpen, onClose, isHiddenDesktop }) {
   };
 
   const sortedPages = [...pages]
-    .filter(p => p.workspaceId !== "diary")
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   return (

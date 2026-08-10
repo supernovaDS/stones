@@ -14,15 +14,12 @@ import {
 
 export const createRecoverySlice = (set, get) => ({
   undoStack: [],
-  diaryUndoStack: [],
   recentlyDeleted: [],
   deletedPagesBin: [],
   clipboard: [],
 
   undoLastChange: async () => {
-    const isDiary = get().view === "diary";
-    const stackKey = isDiary ? "diaryUndoStack" : "undoStack";
-    const stack = get()[stackKey];
+    const stack = get().undoStack;
     const [snapshot, ...rest] = stack;
     if (!snapshot) return;
 
@@ -32,7 +29,7 @@ export const createRecoverySlice = (set, get) => ({
         ...snapshot.data,
         blocks: sortBlocks((snapshot.data.blocks ?? []).map(normalizeBlock)),
         sections: sortSections(snapshot.data.sections ?? []),
-        [stackKey]: rest,
+        undoStack: rest,
         selectedTaskId: undefined
       });
       resetUndoDebounce();

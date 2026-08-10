@@ -9,7 +9,7 @@ import { Toaster, toast } from "sonner";
 import { AuthPage } from "./components/auth/AuthPage";
 import { Sidebar } from "./components/layout/Sidebar";
 import { Topbar } from "./components/layout/Topbar";
-import { WorkspaceView, TaskListView, CalendarView, InsightsView, DiaryView } from "./components/views";
+import { WorkspaceView, TaskListView, CalendarView, InsightsView } from "./components/views";
 import { TaskDetailPanel, TaskModal, CommandPalette, SettingsModal, RecurringTasksModal, RecoveryModal, RecycleBinModal } from "./components/modals";
 import { ContextMenu } from "./components/ui";
 
@@ -304,37 +304,33 @@ function App() {
   // ── Main render ─────────────────────────────────────────────
   return (
     <main className="app-shell">
-      {view === "diary" ? (
-        <DiaryView />
-      ) : (
-        <div className={`layout-grid ${sidebarHidden ? 'layout-grid-collapsed' : ''}`}>
-          <div
-            className={`sidebar-backdrop${sidebarOpen ? " sidebar-backdrop-visible" : ""}`}
-            onClick={() => setSidebarOpen(false)}
-          />
-          <Sidebar
-            isOpen={sidebarOpen}
-            onClose={() => setSidebarOpen(false)}
-            isHiddenDesktop={sidebarHidden}
-          />
+      <div className={`layout-grid ${sidebarHidden ? 'layout-grid-collapsed' : ''}`}>
+        <div
+          className={`sidebar-backdrop${sidebarOpen ? " sidebar-backdrop-visible" : ""}`}
+          onClick={() => setSidebarOpen(false)}
+        />
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          isHiddenDesktop={sidebarHidden}
+        />
 
-          <section className="content-shell">
-            <Topbar
-              onCommandOpen={() => setCommandOpen(true)}
-              onMenuToggle={handleMenuToggle}
-              activePage={activePage}
-              view={view}
-              sidebarHidden={sidebarHidden}
-            />
-            {view === "workspace" && activePage ? (
-              <WorkspaceView pageId={activePage.id} />
-            ) : null}
-            {view === "tasks" ? <TaskListView /> : null}
-            {view === "calendar" ? <CalendarView /> : null}
-            {view === "insights" ? <InsightsView /> : null}
-          </section>
-        </div>
-      )}
+        <section className="content-shell">
+          <Topbar
+            onCommandOpen={() => setCommandOpen(true)}
+            onMenuToggle={handleMenuToggle}
+            activePage={activePage}
+            view={view}
+            sidebarHidden={sidebarHidden}
+          />
+          {view === "workspace" && activePage ? (
+            <WorkspaceView pageId={activePage.id} />
+          ) : null}
+          {view === "tasks" ? <TaskListView /> : null}
+          {view === "calendar" ? <CalendarView /> : null}
+          {view === "insights" ? <InsightsView /> : null}
+        </section>
+      </div>
 
       {selectedTaskId ? <TaskDetailPanel /> : null}
       {taskModalParams ? (

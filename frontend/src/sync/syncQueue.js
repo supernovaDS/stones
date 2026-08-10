@@ -1,5 +1,4 @@
-import { db, activeDiaryKey } from "../db/schema";
-import { encryptString, encryptObject, isEncryptedString, isEncryptedObject } from "../utils/crypto";
+import { db } from "../db/schema";
 
 const nowIso = () => new Date().toISOString();
 
@@ -22,18 +21,6 @@ export async function enqueueMutation(entity, entityId, operation, payload) {
     deleted: operation === "delete" ? true : Boolean(payload?.deleted)
   };
 
-  if (activeDiaryKey) {
-    if (entity === "page" && finalPayload.workspaceId === "diary") {
-      if (!isEncryptedString(finalPayload.title)) {
-        finalPayload.title = await encryptString(finalPayload.title, activeDiaryKey);
-      }
-    } else if (entity === "block") {
-      const page = await db.pages.get(finalPayload.pageId);
-      if (page?.workspaceId === "diary" && !isEncryptedObject(finalPayload.content)) {
-        finalPayload.content = await encryptObject(finalPayload.content, activeDiaryKey);
-      }
-    }
-  }
 
   // Look for an existing pending entry for the same entity+entityId
   const existing = await db.sync_queue
