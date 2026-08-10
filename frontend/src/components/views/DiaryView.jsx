@@ -2,17 +2,12 @@ import { useState, useEffect } from "react";
 import { useAppStore } from "../../store/useAppStore";
 import { BlockCard } from "../blocks";
 import { clsx } from "clsx";
-import { Plus, FileText, Link, Image as ImageIcon, Book, ArrowLeft, Lock, Menu, X, Settings, Trash2, AlertTriangle } from "lucide-react";
+import { Plus, Book, ArrowLeft, Menu, X, Settings, Trash2 } from "lucide-react";
 
 import { DiaryAddBlockMenu } from "./DiaryAddBlockMenu";
 
 export function DiaryView() {
   const { 
-    diaryPasswordHash, 
-    diaryAuthenticated, 
-    setDiaryPassword, 
-    authenticateDiary, 
-    resetAndWipeDiary,
     pages, 
     blocks, 
     activeDiaryPageId, 
@@ -26,11 +21,8 @@ export function DiaryView() {
     setSidebarHidden
   } = useAppStore();
 
-  const [passwordInput, setPasswordInput] = useState("");
-  const [errorMsg, setErrorMsg] = useState("");
   const [newPageTitle, setNewPageTitle] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isWipeConfirmOpen, setIsWipeConfirmOpen] = useState(false);
 
   const diaryPages = pages.filter((p) => p.workspaceId === "diary").sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   const activePage = diaryPages.find((p) => p.id === activeDiaryPageId) || diaryPages[0];
@@ -41,24 +33,6 @@ export function DiaryView() {
     }
   }, [diaryPages, activeDiaryPageId, setActiveDiaryPage]);
 
-  const handleSetupSubmit = async (e) => {
-    e.preventDefault();
-    if (!passwordInput.trim()) return;
-    await setDiaryPassword(passwordInput);
-    setPasswordInput("");
-  };
-
-  const handleLoginSubmit = async (e) => {
-    e.preventDefault();
-    const ok = await authenticateDiary(passwordInput);
-    if (!ok) {
-      setErrorMsg("Incorrect password.");
-    } else {
-      setErrorMsg("");
-      setPasswordInput("");
-    }
-  };
-
   const handleCreatePage = (e) => {
     e.preventDefault();
     if (newPageTitle.trim()) {
@@ -66,118 +40,6 @@ export function DiaryView() {
       setNewPageTitle("");
     }
   };
-
-  const hasSyncedDiary = diaryPages.length > 0;
-
-  if (!diaryPasswordHash && !hasSyncedDiary) {
-    return (
-      <div className="flex min-h-[100dvh] items-center justify-center p-6 max-md:p-4">
-        <form onSubmit={handleSetupSubmit} className="bento-card max-w-md w-full bg-[#f1f5ff] p-8 text-center dark:bg-[#0c0e11] max-md:p-6">
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border-[3px] border-black bg-[#ffb45c] dark:border-[#1e232a] dark:bg-[#3d2800]">
-            <Book size={32} />
-          </div>
-          <h2 className="mb-2 text-2xl font-black">Set up your Diary</h2>
-          <p className="mb-6 text-sm font-bold text-stone-600 dark:text-[#7a7670]">
-            Your diary is private. Choose a secure password to lock it.
-          </p>
-          <input
-            autoFocus
-            type="password"
-            className="nb-input mb-4 w-full px-4 py-3 text-center text-lg font-black tracking-widest placeholder:tracking-normal placeholder:font-bold"
-            placeholder="Enter a secure password"
-            value={passwordInput}
-            onChange={(e) => setPasswordInput(e.target.value)}
-          />
-          <button type="submit" className="nb-button action w-full p-3 text-lg" disabled={!passwordInput.trim()}>
-            Lock Diary
-          </button>
-        </form>
-      </div>
-    );
-  }
-
-  if (!diaryAuthenticated) {
-    if (isWipeConfirmOpen) {
-      return (
-        <div className="flex min-h-[100dvh] items-center justify-center p-6 max-md:p-4">
-          <div className="bento-card max-w-md w-full bg-[#fff0f0] p-8 text-center dark:bg-[#1a0c0e] max-md:p-6 shadow-[8px_8px_0_#111] dark:shadow-[6px_6px_0_#000]">
-            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border-[3px] border-black bg-[#ff5a5f] text-white dark:border-[#1e232a]">
-              <AlertTriangle size={32} />
-            </div>
-            <h2 className="mb-2 text-2xl font-black text-black dark:text-white">Wipe Diary & Reset Password?</h2>
-            <p className="mb-6 text-sm font-bold text-stone-700 dark:text-stone-300 leading-relaxed">
-              This will <strong className="text-[#ff5a5f]">permanently delete all locked diary entries</strong> and clear your diary password so you can set up a new password and start fresh.
-            </p>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                className="nb-button w-full p-3 font-black"
-                onClick={() => setIsWipeConfirmOpen(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="nb-button action w-full p-3 font-black !bg-[#ff5a5f] !text-white"
-                onClick={async () => {
-                  await resetAndWipeDiary();
-                  setIsWipeConfirmOpen(false);
-                }}
-              >
-                Yes, Wipe & Reset
-              </button>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="flex min-h-[100dvh] items-center justify-center p-6 max-md:p-4">
-        <form onSubmit={handleLoginSubmit} className="bento-card max-w-md w-full bg-[#f1f5ff] p-8 text-center dark:bg-[#0c0e11] max-md:p-6">
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border-[3px] border-black bg-[#c4a8ff] dark:border-[#1e232a] dark:bg-[#1a1040]">
-            <Lock size={32} />
-          </div>
-          <h2 className="mb-2 text-2xl font-black">
-            {!diaryPasswordHash ? "Unlock Synced Diary" : "Unlock Diary"}
-          </h2>
-          <p className="mb-6 text-sm font-bold text-stone-600 dark:text-[#7a7670]">
-            {!diaryPasswordHash
-              ? "It looks like you have a synced diary from another device. Enter your password to access your entries."
-              : "Enter your password to access your private entries."}
-          </p>
-          {errorMsg && <p className="mb-4 text-sm font-black text-[#ff5a5f]">{errorMsg}</p>}
-          <input
-            autoFocus
-            type="password"
-            className="nb-input mb-4 w-full px-4 py-3 text-center text-lg font-black tracking-widest placeholder:tracking-normal placeholder:font-bold"
-            placeholder="Password"
-            value={passwordInput}
-            onChange={(e) => {
-              setPasswordInput(e.target.value);
-              setErrorMsg("");
-            }}
-          />
-          <div className="flex gap-3 mb-4">
-            <button type="button" className="nb-button w-full p-3" onClick={() => setView("workspace")}>
-              Go Back
-            </button>
-            <button type="submit" className="nb-button action w-full p-3" disabled={!passwordInput}>
-              Unlock
-            </button>
-          </div>
-
-          <button
-            type="button"
-            className="text-xs font-black text-[#ff5a5f] hover:underline transition-colors mt-2"
-            onClick={() => setIsWipeConfirmOpen(true)}
-          >
-            Forgot Password? Wipe Diary Data & Set New Password
-          </button>
-        </form>
-      </div>
-    );
-  }
 
   const pageBlocks = activePage
     ? blocks

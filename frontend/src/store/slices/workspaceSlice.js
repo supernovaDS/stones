@@ -34,7 +34,7 @@ export const createWorkspaceSlice = (set, get) => ({
       const recentlyDeleted = wasDiary
         ? get().recentlyDeleted.filter((s) => s.view !== "diary")
         : get().recentlyDeleted;
-      set({ view, diaryAuthenticated: false, diaryUndoStack, recentlyDeleted });
+      set({ view, diaryUndoStack, recentlyDeleted });
     } else {
       set({ view });
     }

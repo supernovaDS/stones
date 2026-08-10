@@ -14,7 +14,7 @@ import {
 export const createDiarySlice = (set, get) => ({
   diaryPasswordHash: null,
   diaryKey: null,
-  diaryAuthenticated: false,
+  diaryAuthenticated: true,
   activeDiaryPageId: null,
 
   setDiaryPassword: async (password) => {
@@ -162,7 +162,7 @@ export const createDiarySlice = (set, get) => ({
     set((state) => ({
       diaryPasswordHash: null,
       diaryKey: null,
-      diaryAuthenticated: false,
+      diaryAuthenticated: true,
       activeDiaryPageId: null,
       pages: state.pages.filter(p => p.workspaceId !== "diary"),
       blocks: state.blocks.filter(b => !diaryPageIds.has(b.pageId))
