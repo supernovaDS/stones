@@ -3,7 +3,7 @@ import { clsx } from "clsx";
 import { useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
 import { formatShortDate } from "../../utils/date";
-import { priorityRail, priorityClasses } from "../../utils/constants";
+import { priorityClasses } from "../../utils/constants";
 import { Checkbox } from "../ui";
 import { useFilteredTasks } from "../../hooks/useFilteredTasks";
 
@@ -32,7 +32,7 @@ export function TaskListView() {
 
   return (
     <div className="bento-grid">
-      <section className="bento-card span-12 bg-white border-l-[10px] border-l-[#21caff] p-4 text-black dark:bg-[#12151a] dark:border-l-[#002535] dark:text-[#c8c3ba]">
+      <section className="bento-card span-12 bg-white p-4 text-black dark:bg-[#12151a] dark:text-[#c8c3ba]">
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <select 
             className="nb-select h-11 px-3 text-sm font-black capitalize" 
@@ -81,7 +81,7 @@ function TaskListCard({ task }) {
   };
 
   return (
-    <article className={clsx("bento-card grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 border-l-[10px] p-3 max-sm:grid-cols-[auto_1fr_auto]", priorityRail[task.metadata.priority ?? "medium"])}>
+    <article className="bento-card grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 p-3 max-sm:grid-cols-[auto_1fr_auto]">
       <Checkbox checked={task.metadata.completed} onChange={() => void toggleTask(task.id)} />
       {task.isVirtual ? (
         <div className="min-w-0 text-left select-none">

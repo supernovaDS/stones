@@ -32,7 +32,7 @@ import { clsx } from "clsx";
 import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
 import { formatShortDate, toDateInput } from "../../utils/date";
-import { priorityClasses, priorityRail, blockTypeRail } from "../../utils/constants";
+import { priorityClasses } from "../../utils/constants";
 import { getEmbedUrl } from "../../utils/helpers";
 import { useIsBlocked } from "../../hooks/useIsBlocked";
 import { IconButton, Badge, Checkbox } from "../ui";

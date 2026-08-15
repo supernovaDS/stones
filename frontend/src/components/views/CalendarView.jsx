@@ -5,7 +5,6 @@ import { useAppStore } from "../../store/useAppStore";
 import { formatShortDate, todayIso, toDateInput, toLocalDateString } from "../../utils/date";
 import { shiftMonth, getCalendarDays, priorityDot } from "../../utils/helpers";
 import { Checkbox } from "../ui";
-import { priorityRail } from "../../utils/constants";
 import { getVirtualTasksForDate } from "../../utils/recurrence";
 
 export function CalendarView() {
