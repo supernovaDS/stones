@@ -1,96 +1,25 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
 import { BlockCard } from "../blocks";
 import { clsx } from "clsx";
 import { Archive, ChevronDown, ChevronUp, ClipboardPaste, Plus, FileText, CheckSquare, List, Code2, Link, Image, Heading, X } from "lucide-react";
 
-function WeatherWidget() {
-// ... keeping weather widget ...
-
-  const [time, setTime] = useState(new Date());
-  const [weather, setWeather] = useState({ temp: null, desc: "Locating...", icon: "" });
-
-  useEffect(() => {
-    const timer = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          try {
-            const { latitude, longitude } = position.coords;
-            
-            const cachedWeather = sessionStorage.getItem("stones_weather");
-            if (cachedWeather) {
-              try {
-                const parsed = JSON.parse(cachedWeather);
-                if (Date.now() - parsed.timestamp < 15 * 60 * 1000) {
-                  setWeather(parsed.data);
-                  return;
-                }
-              } catch (err) {
-                // Ignore parse error and fetch fresh
-              }
-            }
-
-            const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code`);
-            if (!res.ok) throw new Error("Network response was not ok");
-            const data = await res.json();
-            const temp = Math.round(data.current.temperature_2m);
-            const code = data.current.weather_code;
-            let desc = "Clear";
-            let icon = "☀️";
-            if (code >= 1 && code <= 3) { desc = "Cloudy"; icon = "☁️"; }
-            else if (code >= 45 && code <= 48) { desc = "Fog"; icon = "🌫️"; }
-            else if (code >= 51 && code <= 67) { desc = "Rain"; icon = "🌧️"; }
-            else if (code >= 71 && code <= 77) { desc = "Snow"; icon = "❄️"; }
-            else if (code >= 80 && code <= 82) { desc = "Showers"; icon = "🚿"; }
-            else if (code >= 95 && code <= 99) { desc = "Storm"; icon = "⛈️"; }
-            
-            const weatherData = { temp, desc, icon };
-            setWeather(weatherData);
-            sessionStorage.setItem("stones_weather", JSON.stringify({ data: weatherData, timestamp: Date.now() }));
-          } catch (e) {
-            setWeather({ temp: null, desc: "Unavailable", icon: "⚠️" });
-          }
-        },
-        () => {
-          setWeather({ temp: null, desc: "No location", icon: "📍" });
-        }
-      );
-    } else {
-      setWeather({ temp: null, desc: "No geolocation", icon: "🚫" });
-    }
-  }, []);
-
-  return (
-    <section className="bento-card span-4 bg-[#21caff] p-5 dark:bg-[#001a25] flex flex-col justify-center">
-      <div className="weather-layout flex h-full items-center justify-between gap-4">
-        <div className="min-w-0">
-          <h2 className="weather-time text-5xl font-black tracking-tight">{time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</h2>
-          <p className="text-sm font-black text-black/70 dark:text-[#7a7670] mt-1 uppercase tracking-wide">
-            {time.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}
-          </p>
-        </div>
-        <div className="weather-meta flex min-w-0 items-center gap-3">
-          <span className="shrink-0 text-4xl leading-none">{weather.icon}</span>
-          <div className="min-w-0 text-right">
-            <p className="weather-temp text-4xl font-black">{weather.temp !== null ? `${weather.temp}°C` : "--"}</p>
-            <p className="text-sm font-black text-black/70 dark:text-[#7a7670] uppercase tracking-wide">
-              {weather.desc}
-            </p>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function AddBlockMenu({ pageId }) {
-  const { addTitleBlock, addNoteBlock, openTaskModal, addChecklistBlock, addCodeBlock, addLinkBlock, addImageBlock, theme, colorProfile } = useAppStore();
+  const { addTitleBlock, addNoteBlock, openTaskModal, addChecklistBlock, addCodeBlock, addLinkBlock, addImageBlock, theme } = useAppStore();
   const [isOpen, setIsOpen] = useState(false);
+  const [position, setPosition] = useState("above");
+
+  const handleToggle = (e) => {
+    if (!isOpen) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      if (rect.top < 320) {
+        setPosition("below");
+      } else {
+        setPosition("above");
+      }
+    }
+    setIsOpen((prev) => !prev);
+  };
 
   const handleImageClick = () => {
     const input = document.createElement("input");
@@ -167,7 +96,10 @@ function AddBlockMenu({ pageId }) {
       )}
 
       {isOpen && (
-        <div className="absolute bottom-20 z-50 grid w-64 grid-cols-2 gap-2 rounded-xl border-[3px] border-black bg-white p-3 shadow-[6px_6px_0_#111] animate-in fade-in slide-in-from-bottom-2 duration-150 dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[4px_4px_0_#000]">
+        <div className={clsx(
+          "absolute z-50 grid w-64 grid-cols-2 gap-2 rounded-xl border-[3px] border-black bg-white p-3 shadow-[6px_6px_0_#111] animate-in fade-in duration-150 dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[4px_4px_0_#000]",
+          position === "above" ? "bottom-20 slide-in-from-bottom-2" : "top-20 slide-in-from-top-2"
+        )}>
           <button
             className="nb-button col-span-2 flex items-center gap-3 p-2.5 transition hover:-translate-y-0.5 hover:shadow-[3px_3px_0_#111]"
             onClick={() => {
@@ -204,9 +136,9 @@ function AddBlockMenu({ pageId }) {
       <button
         className={clsx(
           "nb-button flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-black !p-0 shadow-[4px_4px_0_#111] transition-all hover:scale-105 active:scale-95 dark:border-[#1e232a] dark:shadow-[3px_3px_0_#000]",
-          isOpen ? "bg-[#ff5a5f] rotate-45 text-black" : (theme === "dark" && colorProfile === "neo" ? "bg-[#21caff] text-black" : "bg-[#2ef2a6] text-black")
+          isOpen ? "bg-[#ff5a5f] rotate-45 text-black" : (theme === "dark" ? "bg-[#21caff] text-black" : "bg-[#2ef2a6] text-black")
         )}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleToggle}
         title="Add block"
         type="button"
       >
@@ -217,7 +149,7 @@ function AddBlockMenu({ pageId }) {
 }
 
 export function WorkspaceView({ pageId }) {
-  const { blocks, pages, renamePage, clipboard, pasteBlock, clearClipboard } = useAppStore();
+  const { blocks, pages, clipboard, pasteBlock, clearClipboard } = useAppStore();
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
 
   const page = pages.find((item) => item.id === pageId);
@@ -230,15 +162,6 @@ export function WorkspaceView({ pageId }) {
 
   return (
     <div className="bento-grid">
-      <section className="bento-card span-8 bg-[#ffdc4a] p-5 dark:bg-[#1a1500]">
-        <p className="mb-2 text-xs font-black uppercase tracking-wide text-black/70 dark:text-[#7a7670]">Active page</p>
-        <input
-          className="hero-title w-full bg-transparent outline-none"
-          onChange={(event) => page && void renamePage(page.id, event.target.value)}
-          value={page?.title ?? ""}
-        />
-      </section>
-      <WeatherWidget />
       <section className="span-12 flex flex-col gap-8">
         {activeBlocks.length ? (
           activeBlocks.map((block) => (

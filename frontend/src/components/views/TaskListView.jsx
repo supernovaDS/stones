@@ -2,74 +2,71 @@ import { Trash2, XCircle } from "lucide-react";
 import { clsx } from "clsx";
 import { useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
-import { formatShortDate, isOverdue, isToday } from "../../utils/date";
-import { priorityRail, priorityClasses } from "../../utils/constants";
-import { taskMatchesFilter, compareTasksByDate, groupTasks } from "../../utils/helpers";
-import { InsightCard, Checkbox } from "../ui";
-import { getVirtualTasksForFilter, getHistoryVirtualTasks } from "../../utils/recurrence";
+import { formatShortDate } from "../../utils/date";
+import { priorityClasses } from "../../utils/constants";
+import { Checkbox } from "../ui";
+import { useFilteredTasks } from "../../hooks/useFilteredTasks";
 
 export function TaskListView() {
   const { blocks, setRecurringTasksOpen, setEditingRepeatedTaskId } = useAppStore();
-  const [filter, setFilter] = useState("open");
-  const [groupMode, setGroupMode] = useState("none");
-  const allTasks = blocks.filter((b) => b.type === "task");
+  const [filter, setFilter] = useState(() => localStorage.getItem("stones-task-filter") || "open");
+  const [sortBy, setSortBy] = useState(() => localStorage.getItem("stones-task-sortby") || "date_scheduled");
+  const [sortOrder, setSortOrder] = useState(() => localStorage.getItem("stones-task-sortorder") || "asc");
 
-  const virtualTasks = getVirtualTasksForFilter(filter, blocks);
-  const tasks = [
-    ...allTasks.filter((t) => taskMatchesFilter(t, filter)),
-    ...virtualTasks
-  ].sort(compareTasksByDate);
+  const handleFilterChange = (val) => {
+    setFilter(val);
+    localStorage.setItem("stones-task-filter", val);
+  };
 
-  const groups = groupTasks(tasks, groupMode);
+  const handleSortByChange = (val) => {
+    setSortBy(val);
+    localStorage.setItem("stones-task-sortby", val);
+  };
 
-  const historyVirtual = getHistoryVirtualTasks(blocks, 30);
-  const virtualHigh = getVirtualTasksForFilter("high", blocks);
-  const virtualToday = getVirtualTasksForFilter("today", blocks).filter((t) => !t.metadata.completed);
-  const virtualOverdue = getVirtualTasksForFilter("overdue", blocks);
+  const handleSortOrderChange = (val) => {
+    setSortOrder(val);
+    localStorage.setItem("stones-task-sortorder", val);
+  };
 
-  const totalTasksCount = allTasks.length + historyVirtual.length;
-  const totalCompletedCount =
-    allTasks.filter((t) => t.metadata.completed).length +
-    historyVirtual.filter((t) => t.metadata.completed).length;
-  const completionPercent = totalTasksCount ? Math.round((totalCompletedCount / totalTasksCount) * 100) : 0;
-
-  const highCount =
-    allTasks.filter((t) => t.metadata.priority === "high" && !t.metadata.completed && !t.metadata.failed).length +
-    virtualHigh.length;
-  const overdueCount =
-    allTasks.filter((t) => !t.metadata.completed && !t.metadata.failed && isOverdue(t.metadata.deadline)).length +
-    virtualOverdue.length;
-  const todayCount =
-    allTasks.filter((t) => !t.metadata.completed && !t.metadata.failed && isToday(t.metadata.deadline)).length +
-    virtualToday.length;
+  const tasks = useFilteredTasks(blocks, filter, sortBy, sortOrder);
 
   return (
     <div className="bento-grid">
-      <section className="span-12 grid grid-cols-4 gap-4 max-lg:grid-cols-2">
-        <InsightCard color="green" label="Completion" value={`${completionPercent}%`} />
-        <InsightCard color="orange" label="High Priority" value={highCount.toString()} />
-        <InsightCard color="blue" label="Today" value={todayCount.toString()} />
-        <InsightCard color="purple" label="Overdue" value={overdueCount.toString()} />
-      </section>
-      <section className="bento-card span-12 bg-white border-l-[10px] border-l-[#21caff] p-4 text-black dark:bg-[#12151a] dark:border-l-[#002535] dark:text-[#c8c3ba]">
+      <section className="bento-card span-12 bg-white p-4 text-black dark:bg-[#12151a] dark:text-[#c8c3ba]">
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          {["open","today","overdue","upcoming","failed","done","all"].map((item) => (
-            <button className={clsx("nb-button min-h-0 px-3 py-2 text-sm capitalize", filter === item ? "primary" : "bg-white dark:bg-[#12151a]")} key={item} onClick={() => setFilter(item)} type="button">{item}</button>
-          ))}
-          <select className="nb-select ml-auto h-11 px-3 text-sm font-black" onChange={(e) => setGroupMode(e.target.value)} value={groupMode}>
-            <option value="none">Sort by date</option>
-            <option value="day">Group by day</option>
-            <option value="week">Group by week</option>
-            <option value="month">Group by month</option>
+          <select 
+            className="nb-select h-11 px-3 text-sm font-black capitalize" 
+            onChange={(e) => handleFilterChange(e.target.value)} 
+            value={filter}
+          >
+            <option value="open">Open</option>
+            <option value="today">Today</option>
+            <option value="overdue">Overdue</option>
+            <option value="upcoming">Upcoming</option>
+            <option value="failed">Failed</option>
+            <option value="done">Done</option>
+            <option value="all">All</option>
           </select>
+          <div className="ml-auto flex items-center gap-2 max-sm:w-full max-sm:mt-2">
+            <select className="nb-select h-11 px-3 text-sm font-black max-sm:flex-1" onChange={(e) => handleSortByChange(e.target.value)} value={sortBy}>
+              <option value="priority">Sort by priority</option>
+              <option value="date_completed">Sort by date completed</option>
+              <option value="date_scheduled">Sort by date scheduled</option>
+            </select>
+            <select className="nb-select h-11 px-3 text-sm font-black max-sm:flex-1" onChange={(e) => handleSortOrderChange(e.target.value)} value={sortOrder}>
+              <option value="asc">Ascending</option>
+              <option value="desc">Descending</option>
+            </select>
+          </div>
         </div>
-        <div className="grid gap-4">
-          {groups.map((group) => (
-            <section key={group.label}>
-              {groupMode !== "none" ? <h3 className="mb-2 text-sm font-semibold text-stone-500 dark:text-[#5a5650]">{group.label}</h3> : null}
-              <div className="grid gap-3">{group.tasks.map((task) => <TaskListCard key={task.id} task={task} />)}</div>
-            </section>
-          ))}
+        <div className="grid gap-3">
+          {tasks.length ? (
+            tasks.map((task) => <TaskListCard key={task.id} task={task} />)
+          ) : (
+            <p className="rounded-lg border-[3px] border-dashed border-black px-3 py-8 text-center text-sm font-black text-stone-600 dark:border-[#1e232a] dark:text-[#5a5650]">
+              No tasks found.
+            </p>
+          )}
         </div>
       </section>
     </div>
@@ -77,30 +74,40 @@ export function TaskListView() {
 }
 
 function TaskListCard({ task }) {
-  const { deleteBlock, setSelectedTask, toggleTask, toggleFailTask, setRecurringTasksOpen, setEditingRepeatedTaskId } = useAppStore();
+  const { deleteBlock, setSelectedTask, toggleTask, toggleFailTask } = useAppStore();
   
   const handleTitleClick = () => {
-    if (task.isVirtual) {
-      setEditingRepeatedTaskId(task.templateId);
-      setRecurringTasksOpen(true);
-    } else {
-      setSelectedTask(task.id);
-    }
+    setSelectedTask(task.id);
   };
 
   return (
-    <article className={clsx("bento-card grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 border-l-[10px] p-3 max-sm:grid-cols-[auto_1fr_auto]", priorityRail[task.metadata.priority ?? "medium"])}>
+    <article className="bento-card grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 p-3 max-sm:grid-cols-[auto_1fr_auto]">
       <Checkbox checked={task.metadata.completed} onChange={() => void toggleTask(task.id)} />
-      <button className="min-w-0 text-left" onClick={handleTitleClick} type="button">
-        <span className={clsx("block truncate font-semibold", task.metadata.completed && "text-stone-400 line-through dark:text-[#5a5650]", task.metadata.failed && "text-red-500 line-through dark:text-red-400")}>{task.content.title || "Untitled task"}</span>
-        <span className="text-xs text-stone-500 dark:text-[#5a5650]">
-          {task.metadata.priority ?? "medium"} priority - {formatShortDate(task.metadata.deadline)}
-          {task.isVirtual && " (Repeating)"}
-        </span>
-      </button>
+      {task.isVirtual ? (
+        <div className="min-w-0 text-left select-none">
+          <span className={clsx("block truncate font-semibold", task.metadata.completed && "text-stone-400 line-through dark:text-[#5a5650]", task.metadata.failed && "text-red-500 line-through dark:text-red-400")}>{task.content.title || "Untitled task"}</span>
+          <span className="text-xs text-stone-500 dark:text-[#5a5650]">
+            {task.metadata.priority ?? "medium"} priority - {formatShortDate(task.metadata.deadline)}
+            {task.metadata.completed && task.metadata.completedAt && (
+              ` - Completed: ${new Date(task.metadata.completedAt).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}`
+            )}
+            {" (Repeating)"}
+          </span>
+        </div>
+      ) : (
+        <button className="min-w-0 text-left" onClick={handleTitleClick} data-prevent-outside-close="true" type="button">
+          <span className={clsx("block truncate font-semibold", task.metadata.completed && "text-stone-400 line-through dark:text-[#5a5650]", task.metadata.failed && "text-red-500 line-through dark:text-red-400")}>{task.content.title || "Untitled task"}</span>
+          <span className="text-xs text-stone-500 dark:text-[#5a5650]">
+            {task.metadata.priority ?? "medium"} priority - {formatShortDate(task.metadata.deadline)}
+            {task.metadata.completed && task.metadata.completedAt && (
+              ` - Completed: ${new Date(task.metadata.completedAt).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}`
+            )}
+          </span>
+        </button>
+      )}
       <span className={clsx("rounded-md border px-2 py-1 text-xs font-semibold", priorityClasses[task.metadata.priority ?? "medium"])}>{task.metadata.priority ?? "medium"}</span>
       <div className="flex gap-1 max-sm:col-start-3">
-        {!task.isVirtual && (
+        {(!task.metadata.completed || task.metadata.failed) && (
           <button 
             className={clsx(
               "icon-button", 

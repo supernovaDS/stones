@@ -39,7 +39,36 @@ class StonesDatabase extends Dexie {
         "++id, entity, entityId, operation, status, createdAt, nextAttemptAt, attempts",
       sync_meta: "id, entity, synced_at"
     });
+    this.version(5).stores({
+      workspaces: "id, createdAt",
+      sections: "id, workspaceId, order, createdAt",
+      pages: "id, workspaceId, sectionId, createdAt, updatedAt",
+      blocks:
+        "id, pageId, type, order, sourceBlockId, metadata.deadline, metadata.completed, metadata.completedAt",
+      tasks:
+        "id, remote_id, user_id, sync_status, updated_at, deleted, local_only",
+      sync_queue:
+        "++id, entity, entityId, operation, status, createdAt, nextAttemptAt, attempts",
+      sync_meta: "id, entity, synced_at",
+      settings: "key"
+    });
+    this.version(6).stores({
+      tasks: null
+    });
   }
 }
 
 export const db = new StonesDatabase();
+
+export async function clearLocalWorkspaceData() {
+  const tables = db.tables;
+  if (tables && tables.length > 0) {
+    await db.transaction("rw", tables, async () => {
+      for (const table of tables) {
+        await table.clear();
+      }
+    });
+  }
+  localStorage.removeItem("stones-active-page-id");
+  localStorage.removeItem("stones-current-user-id");
+}

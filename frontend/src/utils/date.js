@@ -89,7 +89,7 @@ export const normalizeDateText = (value) => {
   return undefined;
 };
 
-export const addDays = (dateValue, days) => {
+const addDays = (dateValue, days) => {
   const date = new Date(`${dateValue}T00:00:00`);
   date.setDate(date.getDate() + days);
   return toLocalDateString(date);
@@ -132,3 +132,15 @@ export const nextRecurringDate = (deadline, recurrence, interval = 1) => {
 
   return undefined;
 };
+
+export const toLocalDateFromIso = (completedAt) => {
+  if (!completedAt) return "";
+  if (completedAt.includes("T")) {
+    const date = new Date(completedAt);
+    if (!Number.isNaN(date.getTime())) {
+      return toLocalDateString(date);
+    }
+  }
+  return completedAt.slice(0, 10);
+};
+

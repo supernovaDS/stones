@@ -16,10 +16,11 @@ export async function enqueueMutation(entity, entityId, operation, payload) {
   if (!entity || !entityId) return;
 
   const now = nowIso();
-  const finalPayload = {
+  let finalPayload = {
     ...payload,
     deleted: operation === "delete" ? true : Boolean(payload?.deleted)
   };
+
 
   // Look for an existing pending entry for the same entity+entityId
   const existing = await db.sync_queue

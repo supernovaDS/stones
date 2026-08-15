@@ -7,7 +7,7 @@ const nowIso = () => new Date().toISOString();
 
 // ── Local → Remote ─────────────────────────────────────────────
 
-export function toRemoteWorkspace(local, userId) {
+function toRemoteWorkspace(local, userId) {
   return {
     id: local.id,
     user_id: userId,
@@ -18,7 +18,7 @@ export function toRemoteWorkspace(local, userId) {
   };
 }
 
-export function toRemoteSection(local, userId) {
+function toRemoteSection(local, userId) {
   return {
     id: local.id,
     user_id: userId,
@@ -31,7 +31,7 @@ export function toRemoteSection(local, userId) {
   };
 }
 
-export function toRemotePage(local, userId) {
+function toRemotePage(local, userId) {
   return {
     id: local.id,
     user_id: userId,
@@ -44,7 +44,7 @@ export function toRemotePage(local, userId) {
   };
 }
 
-export function toRemoteBlock(local, userId) {
+function toRemoteBlock(local, userId) {
   return {
     id: local.id,
     user_id: userId,
@@ -62,7 +62,7 @@ export function toRemoteBlock(local, userId) {
 
 // ── Remote → Local ─────────────────────────────────────────────
 
-export function fromRemoteWorkspace(remote) {
+function fromRemoteWorkspace(remote) {
   return {
     id: remote.id,
     title: remote.title ?? "",
@@ -71,7 +71,7 @@ export function fromRemoteWorkspace(remote) {
   };
 }
 
-export function fromRemoteSection(remote) {
+function fromRemoteSection(remote) {
   return {
     id: remote.id,
     workspaceId: remote.workspace_id,
@@ -82,7 +82,7 @@ export function fromRemoteSection(remote) {
   };
 }
 
-export function fromRemotePage(remote) {
+function fromRemotePage(remote) {
   return {
     id: remote.id,
     workspaceId: remote.workspace_id,
@@ -93,7 +93,7 @@ export function fromRemotePage(remote) {
   };
 }
 
-export function fromRemoteBlock(remote) {
+function fromRemoteBlock(remote) {
   return {
     id: remote.id,
     pageId: remote.page_id,
@@ -130,7 +130,6 @@ export function fromRemoteRecord(entity, remoteRecord) {
   return converter.fromRemote(remoteRecord);
 }
 
-/** Supabase table name for a given entity type */
 export function tableName(entity) {
   const map = {
     workspace: "workspaces",

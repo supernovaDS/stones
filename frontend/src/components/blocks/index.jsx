@@ -20,16 +20,61 @@ import {
   ZoomIn,
   ZoomOut,
   Archive,
-  ArchiveRestore
+  ArchiveRestore,
+  Eye,
+  EyeOff,
+  Copy,
+  Clipboard,
+  FileText,
+  CheckSquare
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
 import { formatShortDate, toDateInput } from "../../utils/date";
-import { priorityClasses, priorityRail, blockTypeRail } from "../../utils/constants";
+import { priorityClasses } from "../../utils/constants";
 import { getEmbedUrl } from "../../utils/helpers";
 import { useIsBlocked } from "../../hooks/useIsBlocked";
 import { IconButton, Badge, Checkbox } from "../ui";
+
+// ── Auto-resizing Textarea for vertical expansion ───────────────
+
+function AutoResizingTextarea({ value, onChange, className, placeholder, disabled, ...props }) {
+  const textareaRef = useRef(null);
+
+  const adjustHeight = () => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  };
+
+  useEffect(() => {
+    adjustHeight();
+  }, [value]);
+
+  return (
+    <textarea
+      ref={textareaRef}
+      value={value ?? ""}
+      onChange={(e) => {
+        onChange(e);
+        adjustHeight();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          e.currentTarget.blur();
+        }
+      }}
+      className={clsx("resize-none overflow-hidden bg-transparent outline-none w-full", className)}
+      placeholder={placeholder}
+      disabled={disabled}
+      rows={1}
+      {...props}
+    />
+  );
+}
 
 // ── Block dispatcher ────────────────────────────────────────────
 
@@ -45,22 +90,19 @@ export function BlockCard({ block }) {
 
 // ── Block shell ─────────────────────────────────────────────────
 
-function BlockShell({ block, label, children, actions }) {
-  const { deleteBlock, moveBlock, toggleArchiveBlock, cutBlock, clipboard } = useAppStore();
+function BlockShell({ block, children }) {
+  const { clipboard, showContextMenu } = useAppStore();
   const isCut = clipboard?.some((b) => b.id === block.id);
   return (
-    <article className={clsx("bento-card block-shell h-full border-l-[10px] p-4 transition-all duration-150", `block-type-${block.type}`, blockTypeRail[block.type] ?? "border-l-stone-400", isCut && "is-cut")}>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <p className="text-xs font-black uppercase tracking-wide text-stone-700 dark:text-[#7a7670]">{label}</p>
-        <div className="block-actions flex flex-wrap gap-2">
-          <IconButton icon={ArrowUp} title="Move up" onClick={() => void moveBlock(block.id, "up")} />
-          <IconButton icon={ArrowDown} title="Move down" onClick={() => void moveBlock(block.id, "down")} />
-          {actions}
-          <IconButton icon={Scissors} title="Cut block" onClick={() => cutBlock(block.id)} />
-          <IconButton icon={block.metadata.archived ? ArchiveRestore : Archive} title={block.metadata.archived ? "Unarchive block" : "Archive block"} onClick={() => void toggleArchiveBlock(block.id)} />
-          <IconButton danger icon={Trash2} title="Delete block" onClick={() => void deleteBlock(block.id)} />
-        </div>
-      </div>
+    <article
+      data-block-id={block.id}
+      className={clsx("bento-card block-shell h-full p-4 transition-all duration-150", `block-type-${block.type}`, isCut && "is-cut")}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showContextMenu(e.clientX, e.clientY, block.id);
+      }}
+    >
       {children}
     </article>
   );
@@ -87,7 +129,10 @@ function RichToolbar({ editorRef }) {
   useEffect(() => {
     const updateFormatState = () => {
       const selection = window.getSelection();
-      if (!editorRef.current || !selection.anchorNode || !editorRef.current.contains(selection.anchorNode)) {
+      let node = selection.anchorNode;
+      if (node && node.nodeType === 3) node = node.parentElement;
+
+      if (!editorRef.current || !node || !editorRef.current.contains(node)) {
         setActiveFormats({
           bold: false,
           italic: false,
@@ -124,14 +169,74 @@ function RichToolbar({ editorRef }) {
   }, []);
 
   const exec = (command, value = null) => {
-    editorRef.current?.focus();
-    document.execCommand(command, false, value);
-    // Manually trigger update after command execution
-    setActiveFormats(prev => ({
-      ...prev,
-      [command]: command === "foreColor" ? value : document.queryCommandState(command),
-      ...(command === "foreColor" ? { foreColor: value } : {})
-    }));
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    editor.focus();
+
+    const selection = window.getSelection();
+    let isInside = false;
+    if (selection && selection.rangeCount > 0 && selection.anchorNode) {
+      let node = selection.anchorNode;
+      if (node.nodeType === 3) node = node.parentElement;
+      if (node && editor.contains(node)) {
+        isInside = true;
+      }
+    }
+
+    if (!isInside) {
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+
+    if (command === "italic") {
+      document.execCommand("italic", false, null);
+      
+      // Fallback: If execCommand("italic") did not format selected text:
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+        const isItalicNow = document.queryCommandState("italic");
+        if (!isItalicNow) {
+          const range = sel.getRangeAt(0);
+          const em = document.createElement("em");
+          em.style.fontStyle = "italic";
+          try {
+            range.surroundContents(em);
+          } catch (e) {
+            try {
+              const fragment = range.extractContents();
+              em.appendChild(fragment);
+              range.insertNode(em);
+            } catch (err) {
+              console.error("Italic fallback failed", err);
+            }
+          }
+        }
+      }
+    } else {
+      document.execCommand(command, false, value);
+    }
+
+    // Dispatch input event so editor state persists immediately
+    editor.dispatchEvent(new Event("input", { bubbles: true }));
+
+    setTimeout(() => {
+      const currentForeColor = document.queryCommandValue("foreColor") || "#111111";
+      setActiveFormats({
+        bold: document.queryCommandState("bold"),
+        italic: document.queryCommandState("italic"),
+        underline: document.queryCommandState("underline"),
+        justifyLeft: document.queryCommandState("justifyLeft"),
+        justifyCenter: document.queryCommandState("justifyCenter"),
+        justifyRight: document.queryCommandState("justifyRight"),
+        insertOrderedList: document.queryCommandState("insertOrderedList"),
+        insertUnorderedList: document.queryCommandState("insertUnorderedList"),
+        foreColor: currentForeColor
+      });
+    }, 10);
   };
 
   return (
@@ -140,10 +245,6 @@ function RichToolbar({ editorRef }) {
       <button className={clsx("rich-button", activeFormats.bold && "rich-button--active")} onMouseDown={(e) => e.preventDefault()} onClick={() => exec("bold")} type="button" title="Bold">
         <strong>B</strong>
       </button>
-      {/* Italic */}
-      <button className={clsx("rich-button italic", activeFormats.italic && "rich-button--active")} onMouseDown={(e) => e.preventDefault()} onClick={() => exec("italic")} type="button" title="Italic">
-        I
-      </button>
       {/* Underline */}
       <button className={clsx("rich-button", activeFormats.underline && "rich-button--active")} onMouseDown={(e) => e.preventDefault()} onClick={() => exec("underline")} type="button" title="Underline" style={{ textDecoration: "underline" }}>
         U
@@ -151,8 +252,18 @@ function RichToolbar({ editorRef }) {
 
       {/* Link */}
       <button className="rich-button" onMouseDown={(e) => e.preventDefault()} onClick={() => {
+        const selection = window.getSelection();
+        const selectedText = selection ? selection.toString() : "";
         const url = window.prompt("Enter link URL:", "https://");
-        if (url) exec("createLink", url);
+        if (!url || !url.trim()) return;
+        const validUrl = url.trim();
+
+        if (selectedText && selectedText.trim().length > 0) {
+          exec("createLink", validUrl);
+        } else {
+          const linkHtml = `<a href="${validUrl}" target="_blank" rel="noopener noreferrer">${validUrl}</a>`;
+          exec("insertHTML", linkHtml);
+        }
       }} type="button" title="Insert link">
         <Link size={14} strokeWidth={2.5} />
       </button>
@@ -205,6 +316,70 @@ function RichToolbar({ editorRef }) {
           </div>
         ) : null}
       </div>
+
+      <span className="rte-sep" />
+
+      {/* Copy */}
+      <button
+        className="rich-button"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={async () => {
+          const selection = window.getSelection();
+          const selText = selection ? selection.toString() : "";
+          const textToCopy = selText || editorRef.current?.innerText || "";
+          if (textToCopy) {
+            await navigator.clipboard.writeText(textToCopy);
+            useAppStore.getState().setNotification(selText ? "Selected text copied" : "Note text copied");
+          }
+        }}
+        type="button"
+        title="Copy (selected text or full note)"
+      >
+        <Copy size={14} strokeWidth={2.5} />
+      </button>
+
+      {/* Paste */}
+      <button
+        className="rich-button"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={async () => {
+          try {
+            const text = await navigator.clipboard.readText();
+            if (text) {
+              exec("insertText", text);
+              useAppStore.getState().setNotification("Pasted text");
+            }
+          } catch (err) {
+            console.error("Paste failed", err);
+          }
+        }}
+        type="button"
+        title="Paste (replaces selected text)"
+      >
+        <Clipboard size={14} strokeWidth={2.5} />
+      </button>
+
+      {/* Paste Plain */}
+      <button
+        className="rich-button"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={async () => {
+          try {
+            const raw = await navigator.clipboard.readText();
+            const clean = (raw || "").replace(/<[^>]*>/g, "");
+            if (clean) {
+              exec("insertText", clean);
+              useAppStore.getState().setNotification("Pasted plain text");
+            }
+          } catch (err) {
+            console.error("Paste plain failed", err);
+          }
+        }}
+        type="button"
+        title="Paste as Plain Text (replaces selected text)"
+      >
+        <FileText size={14} strokeWidth={2.5} />
+      </button>
     </div>
   );
 }
@@ -215,26 +390,63 @@ function NoteBlock({ block }) {
   const [activeLink, setActiveLink] = useState(null);
   const linkedTasks = blocks.filter((task) => task.type === "task" && task.sourceBlockId === block.id);
   const isInitializing = useRef(false);
+  // Track the last html/text we sent to the store from user input,
+  // so we can detect external changes (e.g. undo) and re-sync the DOM.
+  const lastPushedHtml = useRef(null);
 
-  // Initialize editor content from stored HTML or plain text
+  const popoverTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (popoverTimeoutRef.current) {
+        clearTimeout(popoverTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const showPopover = (url, top, left) => {
+    if (popoverTimeoutRef.current) {
+      clearTimeout(popoverTimeoutRef.current);
+      popoverTimeoutRef.current = null;
+    }
+    setActiveLink({ url, top, left });
+  };
+
+  const hidePopover = () => {
+    if (popoverTimeoutRef.current) clearTimeout(popoverTimeoutRef.current);
+    popoverTimeoutRef.current = setTimeout(() => {
+      setActiveLink(null);
+      popoverTimeoutRef.current = null;
+    }, 200);
+  };
+
+  // Sync editor DOM whenever the store content changes externally
+  // (undo, sync, block switch, etc.)
   useEffect(() => {
     if (!editorRef.current) return;
+    const storeHtml = block.content.html ?? "";
+    const storeText = block.content.text ?? "";
+
+    // If the store content matches what we last pushed from user input,
+    // the change originated here — skip to avoid cursor jumps.
+    if (lastPushedHtml.current !== null && storeHtml === lastPushedHtml.current) {
+      return;
+    }
+
     isInitializing.current = true;
-    const html = block.content.html ?? "";
-    const text = block.content.text ?? "";
-    // Prefer stored HTML; fall back to plain text (wrap lines in <p> tags)
-    if (html) {
-      editorRef.current.innerHTML = html;
-    } else if (text) {
-      editorRef.current.innerHTML = text
+    if (storeHtml) {
+      editorRef.current.innerHTML = storeHtml;
+    } else if (storeText) {
+      editorRef.current.innerHTML = storeText
         .split("\n")
         .map((line) => `<p>${line || "<br>"}</p>`)
         .join("");
     } else {
       editorRef.current.innerHTML = "";
     }
+    lastPushedHtml.current = null;
     isInitializing.current = false;
-  }, [block.id]); // only re-init when block changes
+  }, [block.id, block.content.html, block.content.text]);
 
   const handleInput = () => {
     if (isInitializing.current) return;
@@ -242,6 +454,9 @@ function NoteBlock({ block }) {
     if (!editor) return;
     const html = editor.innerHTML;
     const text = editor.innerText;
+    // Remember what we're pushing so the sync effect can skip
+    // re-writing the DOM for our own changes (avoids cursor jumps).
+    lastPushedHtml.current = html;
     void updateBlockContent(block.id, { html, text });
   };
 
@@ -260,24 +475,29 @@ function NoteBlock({ block }) {
             if (e.target.tagName === "A") {
               const editorRect = editorRef.current.getBoundingClientRect();
               const linkRect = e.target.getBoundingClientRect();
-              setActiveLink({
-                url: e.target.href,
-                top: linkRect.bottom - editorRect.top + 8,
-                left: Math.max(0, linkRect.left - editorRect.left),
-              });
+              showPopover(
+                e.target.href,
+                linkRect.bottom - editorRect.top + 8,
+                Math.max(0, linkRect.left - editorRect.left)
+              );
             } else {
-              setActiveLink(null);
+              hidePopover();
             }
           }}
           onMouseOver={(e) => {
             if (e.target.tagName === "A") {
               const editorRect = editorRef.current.getBoundingClientRect();
               const linkRect = e.target.getBoundingClientRect();
-              setActiveLink({
-                url: e.target.href,
-                top: linkRect.bottom - editorRect.top + 8,
-                left: Math.max(0, linkRect.left - editorRect.left),
-              });
+              showPopover(
+                e.target.href,
+                linkRect.bottom - editorRect.top + 8,
+                Math.max(0, linkRect.left - editorRect.left)
+              );
+            }
+          }}
+          onMouseOut={(e) => {
+            if (e.target.tagName === "A") {
+              hidePopover();
             }
           }}
           ref={editorRef}
@@ -288,6 +508,13 @@ function NoteBlock({ block }) {
           <div
             className="absolute z-10 flex items-center gap-3 rounded-md border-[2px] border-black bg-white px-3 py-2 shadow-[3px_3px_0_#111] dark:border-[#1e232a] dark:bg-[#0c0e11] dark:shadow-[2px_2px_0_#000]"
             style={{ top: activeLink.top, left: activeLink.left }}
+            onMouseEnter={() => {
+              if (popoverTimeoutRef.current) {
+                clearTimeout(popoverTimeoutRef.current);
+                popoverTimeoutRef.current = null;
+              }
+            }}
+            onMouseLeave={hidePopover}
           >
             <span className="max-w-[200px] truncate text-xs text-stone-500 dark:text-[#7a7670]">{activeLink.url}</span>
             <a
@@ -311,6 +538,7 @@ function NoteBlock({ block }) {
                 className="nb-button justify-between bg-white text-left dark:bg-[#12151a]"
                 key={task.id}
                 onClick={() => setSelectedTask(task.id)}
+                data-prevent-outside-close="true"
                 type="button"
               >
                 <span className={clsx("truncate", task.metadata.completed && "text-stone-400 line-through dark:text-[#5a5650]")}>{task.content.title}</span>
@@ -329,7 +557,7 @@ function TitleBlock({ block }) {
   const { updateBlockContent } = useAppStore();
   return (
     <BlockShell block={block} label="Heading">
-      <input
+      <AutoResizingTextarea
         className="w-full bg-transparent text-3xl font-black tracking-tight text-black outline-none dark:text-[#c8c3ba]"
         onChange={(event) => void updateBlockContent(block.id, { text: event.target.value })}
         placeholder="Header / Section Title..."
@@ -342,38 +570,27 @@ function TitleBlock({ block }) {
 // ── Task block ──────────────────────────────────────────────────
 
 function TaskBlock({ block }) {
-  const { deleteBlock, setSelectedTask, toggleTask, toggleFailTask, updateTask, moveBlock, updateSubtask, deleteSubtask, addSubtask, toggleArchiveBlock, cutBlock, clipboard } = useAppStore();
+  const { deleteBlock, setSelectedTask, toggleTask, toggleFailTask, updateTask, moveBlock, updateSubtask, deleteSubtask, addSubtask, toggleArchiveBlock, cutBlock, clipboard, showContextMenu } = useAppStore();
   const blocked = useIsBlocked(block);
   const isCut = clipboard?.some((b) => b.id === block.id);
   return (
-    <article className={clsx("bento-card block-shell block-type-task h-full border-l-[10px] p-4 transition-all duration-150", priorityRail[block.metadata.priority ?? "medium"], isCut && "is-cut")}>
+    <article
+      className={clsx("bento-card block-shell block-type-task h-full p-4 transition-all duration-150", isCut && "is-cut")}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showContextMenu(e.clientX, e.clientY, block.id);
+      }}
+    >
       <div className="grid gap-3">
         <div className="task-block-header flex items-start gap-3">
           <Checkbox checked={block.metadata.completed} onChange={() => void toggleTask(block.id)} className="mt-1" />
-          <input
+          <AutoResizingTextarea
             className={clsx("min-w-0 flex-1 bg-transparent text-xl font-black outline-none", block.metadata.completed && "text-stone-400 line-through dark:text-[#5a5650]", block.metadata.failed && "text-red-500 line-through dark:text-red-400")}
             onChange={(event) => void updateTask(block.id, { title: event.target.value })}
             placeholder="Task title"
             value={block.content.title}
           />
-          <div className="task-block-actions flex shrink-0 flex-wrap gap-2">
-            <IconButton icon={ArrowUp} title="Move up" onClick={() => void moveBlock(block.id, "up")} />
-            <IconButton icon={ArrowDown} title="Move down" onClick={() => void moveBlock(block.id, "down")} />
-            <IconButton 
-              icon={XCircle} 
-              title={block.metadata.failed ? "Unfail task" : "Fail task"} 
-              onClick={() => void toggleFailTask(block.id)} 
-              className={clsx(
-                block.metadata.failed 
-                  ? "!bg-[#ff5a5f] !text-black border-black dark:!bg-[#5c1a1d] dark:!text-[#e8a0a2] dark:border-[#1e232a]" 
-                  : "bg-white text-stone-600 dark:bg-[#12151a] dark:text-[#7a7670]"
-              )}
-            />
-            <IconButton icon={PanelRight} title="Open details" onClick={() => setSelectedTask(block.id)} />
-            <IconButton icon={Scissors} title="Cut task" onClick={() => cutBlock(block.id)} />
-            <IconButton icon={block.metadata.archived ? ArchiveRestore : Archive} title={block.metadata.archived ? "Unarchive task" : "Archive task"} onClick={() => void toggleArchiveBlock(block.id)} />
-            <IconButton danger icon={Trash2} title="Delete task" onClick={() => void deleteBlock(block.id)} />
-          </div>
         </div>
         <div className="task-block-controls flex flex-wrap items-center gap-2 pl-8">
           <select className={clsx("nb-select h-10 px-2 text-sm font-black", priorityClasses[block.metadata.priority ?? "medium"])} onChange={(event) => void updateTask(block.id, { priority: event.target.value })} value={block.metadata.priority ?? "medium"}>
@@ -382,27 +599,7 @@ function TaskBlock({ block }) {
             <option value="low">Low</option>
           </select>
           <input className="nb-input h-10 px-2 text-sm" onChange={(event) => void updateTask(block.id, { deadline: event.target.value })} type="date" value={toDateInput(block.metadata.deadline)} />
-          <select className="nb-select h-10 px-2 text-sm" onChange={(event) => void updateTask(block.id, { recurrence: event.target.value })} value={block.metadata.recurrence ?? "none"}>
-            <option value="none">No repeat</option>
-            <option value="daily">Daily</option>
-            <option value="weekdays">Weekdays</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-            <option value="custom">Custom</option>
-          </select>
-          {block.metadata.recurrence === "custom" ? (
-            <label className="nb-input inline-flex h-10 items-center gap-2 px-2 text-sm">
-              Every
-              <input
-                className="w-12 bg-transparent text-center outline-none"
-                min="1"
-                onChange={(event) => void updateTask(block.id, { customRecurrenceInterval: event.target.value })}
-                type="number"
-                value={block.metadata.customRecurrenceInterval ?? 1}
-              />
-              days
-            </label>
-          ) : null}
+
           <button
             className="nb-button h-10 px-3 text-xs font-black bg-white hover:bg-stone-50 text-stone-700 dark:bg-[#12151a] dark:text-[#7a7670]"
             onClick={() => void addSubtask(block.id)}
@@ -429,7 +626,7 @@ function TaskBlock({ block }) {
                     checked={subtask.completed} 
                     onChange={(event) => void updateSubtask(block.id, subtask.id, { completed: event.target.checked })} 
                   />
-                  <input 
+                  <AutoResizingTextarea 
                     className={clsx(
                       "min-w-0 flex-1 bg-transparent text-sm font-bold outline-none", 
                       subtask.completed && "text-stone-400 line-through dark:text-[#5a5650]"
@@ -474,7 +671,7 @@ function ChecklistBlock({ block }) {
         <span className="text-xs font-black text-stone-500 dark:text-[#5a5650]">{progress}%</span>
       </div>
       <div className="grid gap-2">
-        {items.map((item) => (
+        {items.map((item, index) => (
           <div 
             className={clsx(
               "flex items-center gap-3 rounded-lg border-[3px] p-2 transition-all duration-150",
@@ -485,7 +682,8 @@ function ChecklistBlock({ block }) {
             key={item.id}
           >
             <Checkbox checked={item.completed} onChange={(event) => updateItems(items.map((entry) => entry.id === item.id ? { ...entry, completed: event.target.checked } : entry))} />
-            <input 
+            <span className="text-sm font-black text-stone-500 dark:text-[#7a7670] shrink-0 select-none">{index + 1}.</span>
+            <AutoResizingTextarea 
               className={clsx(
                 "min-w-0 flex-1 bg-transparent font-bold outline-none transition-all duration-150",
                 item.completed ? "text-stone-500 line-through dark:text-stone-600 font-medium" : "text-black dark:text-[#c8c3ba]"
@@ -562,6 +760,13 @@ function LinkBlock({ block }) {
                   >
                     <Link size={12} /> Open
                   </a>
+                  {embedUrl && (
+                    <IconButton
+                      icon={link.hidePreview ? EyeOff : Eye}
+                      onClick={() => updateLinks(links.map((item, i) => i === index ? { ...item, hidePreview: !item.hidePreview } : item))}
+                      title={link.hidePreview ? "Show preview" : "Hide preview"}
+                    />
+                  )}
                   {links.length > 1 && (
                     <IconButton
                       danger
@@ -578,7 +783,7 @@ function LinkBlock({ block }) {
                 placeholder="URL (https://...)"
                 value={link.url ?? ""}
               />
-              {embedUrl ? (
+              {embedUrl && !link.hidePreview ? (
                 <iframe
                   className="mt-2 w-full max-w-[560px] aspect-video h-auto rounded-lg border-[3px] border-black shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:shadow-[3px_3px_0_#000]"
                   src={embedUrl}

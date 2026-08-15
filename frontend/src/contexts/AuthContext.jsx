@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { clearLocalWorkspaceData } from "../db/schema";
 import { hasSupabaseConfig, supabase } from "../lib/supabaseClient";
+import { useAppStore } from "../store/useAppStore";
 
 const AuthContext = createContext(null);
 
@@ -21,14 +23,39 @@ export function AuthProvider({ children }) {
       if (sessionError) setError(sessionError.message);
       setSession(data.session);
       setUser(data.session?.user ?? null);
+      if (data.session?.user?.id) {
+        localStorage.setItem("stones-current-user-id", data.session.user.id);
+      }
       setLoading(false);
     });
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
+      const nextUser = nextSession?.user ?? null;
+      const currentUserId = localStorage.getItem("stones-current-user-id");
+
+      if (nextUser?.id) {
+        if (currentUserId && currentUserId !== nextUser.id) {
+          // Account switched: purge previous user's local database completely
+          await clearLocalWorkspaceData();
+          if (useAppStore.getState().initialize) {
+            await useAppStore.getState().initialize({ skipSeed: true });
+          }
+        }
+        localStorage.setItem("stones-current-user-id", nextUser.id);
+      } else {
+        localStorage.removeItem("stones-current-user-id");
+      }
+
       setSession(nextSession);
-      setUser(nextSession?.user ?? null);
+      setUser(nextUser);
       setLoading(false);
       setError("");
+
+      if ((event === "SIGNED_IN" || nextSession) && (window.location.hash || window.location.search)) {
+        if (window.location.hash.includes("access_token") || window.location.hash === "#" || window.location.search.includes("code=")) {
+          window.history.replaceState(null, "", window.location.pathname);
+        }
+      }
     });
 
     return () => {
@@ -47,10 +74,6 @@ export function AuthProvider({ children }) {
       throw authError;
     }
 
-    // Supabase returns a fake user with no session when the email is
-    // already registered (to prevent user enumeration). Detect this:
-    // - If there's a user but no session, and the user has no identities,
-    //   or identities is an empty array, the email is already taken.
     if (
       data?.user &&
       !data.session &&
@@ -78,10 +101,30 @@ export function AuthProvider({ children }) {
     return data;
   }, []);
 
+  const signInWithGoogle = useCallback(async () => {
+    if (!supabase) throw new Error("Supabase is not configured.");
+    setError("");
+    const { data, error: authError } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin
+      }
+    });
+    if (authError) {
+      setError(authError.message);
+      throw authError;
+    }
+    return data;
+  }, []);
+
   const signOut = useCallback(async () => {
     if (!supabase) return;
     setError("");
+    await clearLocalWorkspaceData();
     const { error: authError } = await supabase.auth.signOut();
+    if (useAppStore.getState().initialize) {
+      await useAppStore.getState().initialize({ skipSeed: false });
+    }
     if (authError) {
       setError(authError.message);
       throw authError;
@@ -97,9 +140,10 @@ export function AuthProvider({ children }) {
       error,
       signUp,
       signIn,
+      signInWithGoogle,
       signOut
     }),
-    [error, loading, session, signIn, signOut, signUp, user]
+    [error, loading, session, signIn, signInWithGoogle, signOut, signUp, user]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

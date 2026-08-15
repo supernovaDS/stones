@@ -18,38 +18,31 @@ export function IconButton({ danger, icon: Icon, onClick, title, className }) {
 
 export function Metric({ label, value, color }) {
   const colors = {
-    green: "bg-white border-l-[10px] border-l-[#2ef2a6] dark:bg-[#12151a] dark:border-l-[#0a3d28]",
-    orange: "bg-white border-l-[10px] border-l-[#ffb84d] dark:bg-[#12151a] dark:border-l-[#3d2800]",
-    red: "bg-white border-l-[10px] border-l-[#ff5a5f] dark:bg-[#12151a] dark:border-l-[#3d1215]",
-    blue: "bg-white border-l-[10px] border-l-[#21caff] dark:bg-[#12151a] dark:border-l-[#002535]",
-    purple: "bg-white border-l-[10px] border-l-[#c4a8ff] dark:bg-[#12151a] dark:border-l-[#1a1040]",
-    pink: "bg-white border-l-[10px] border-l-[#ff5ec4] dark:bg-[#12151a] dark:border-l-[#3d0030]",
-    teal: "bg-white border-l-[10px] border-l-[#00e0c6] dark:bg-[#12151a] dark:border-l-[#002e28]"
+    yellow: "bg-[#ffdc4a] dark:bg-[#523600]",
+    amber: "bg-[#fde047] dark:bg-[#483a00]",
+    gold: "bg-[#fef9c3] dark:bg-[#39340b]",
+    lemon: "bg-[#fef08a] dark:bg-[#3f3500]",
+    cream: "bg-[#fef3c7] dark:bg-[#3b2d08]",
+    sunshine: "bg-[#fed7aa] dark:bg-[#402208]",
+    mustard: "bg-[#fde68a] dark:bg-[#423105]",
+
+    // Aliases to ensure all color references resolve to yellow shades
+    blue: "bg-[#fef9c3] dark:bg-[#39340b]",
+    green: "bg-[#fde047] dark:bg-[#483a00]",
+    red: "bg-[#fde68a] dark:bg-[#423105]",
+    purple: "bg-[#ffdc4a] dark:bg-[#523600]",
+    pink: "bg-[#fef08a] dark:bg-[#3f3500]",
+    teal: "bg-[#fef3c7] dark:bg-[#3b2d08]",
+    orange: "bg-[#fed7aa] dark:bg-[#402208]"
   };
   return (
-    <div className={clsx("bento-card p-3 text-black dark:text-[#c8c3ba]", colors[color] ?? "bg-white dark:bg-[#12151a]")}>
+    <div className={clsx("bento-card p-3 text-black dark:text-[#c8c3ba]", colors[color] ?? "bg-[#ffdc4a] dark:bg-[#523600]")}>
       <p className="text-xs font-black uppercase tracking-wide text-black/60 dark:text-[#7a7670]">{label}</p>
       <p className="mt-1 text-3xl font-black">{value}</p>
     </div>
   );
 }
 
-export function InsightCard({ color, label, value }) {
-  const colorClasses = {
-    green: "bg-white border-l-[10px] border-l-[#2ef2a6] dark:bg-[#12151a] dark:border-l-[#0a3d28]",
-    orange: "bg-white border-l-[10px] border-l-[#ffb84d] dark:bg-[#12151a] dark:border-l-[#3d2800]",
-    purple: "bg-white border-l-[10px] border-l-[#c4a8ff] dark:bg-[#12151a] dark:border-l-[#1a1040]",
-    blue: "bg-white border-l-[10px] border-l-[#21caff] dark:bg-[#12151a] dark:border-l-[#002535]",
-    red: "bg-white border-l-[10px] border-l-[#ff5a5f] dark:bg-[#12151a] dark:border-l-[#3d1215]",
-    pink: "bg-white border-l-[10px] border-l-[#ff5ec4] dark:bg-[#12151a] dark:border-l-[#3d0030]"
-  };
-  return (
-    <div className={clsx("bento-card p-4 text-black dark:text-[#c8c3ba]", colorClasses[color] ?? "bg-white dark:bg-[#12151a]")}>
-      <p className="text-sm font-black uppercase tracking-wide text-black/65 dark:text-[#7a7670]">{label}</p>
-      <p className="mt-3 text-4xl font-black">{value}</p>
-    </div>
-  );
-}
 
 export function Badge({ children, tone }) {
   return (
@@ -63,3 +56,6 @@ export function Badge({ children, tone }) {
 }
 
 export { Checkbox } from "./Checkbox";
+export { ContextMenu } from "./ContextMenu";
+export { BentoCard } from "./BentoCard";
+export { PriorityBadge } from "./PriorityBadge";

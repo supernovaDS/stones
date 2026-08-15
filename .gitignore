@@ -5,6 +5,8 @@ node_modules/
 # Build output
 dist/
 **/dist/
+dev-dist/
+**/dev-dist/
 coverage/
 **/coverage/
 
@@ -32,4 +34,12 @@ Thumbs.db
 # Local-only planning/documentation files
 *.md
 !README.md
+!worklog.md
+codebase_guide.md
+stones_interview_qa.md
+info.md
+interview_guide.md
+techstack_interview.md
+
+
 

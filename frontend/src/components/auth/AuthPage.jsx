@@ -4,18 +4,23 @@ import { toast } from "sonner";
 import { useAuth } from "../../contexts/AuthContext";
 
 export function AuthPage() {
-  const { error, signIn, signUp } = useAuth();
+  const { error, signIn, signUp, signInWithGoogle } = useAuth();
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
 
-  useEffect(() => {
-    const root = document.documentElement;
-    root.classList.remove("profile-minimal");
-    root.classList.add("profile-neo");
-  }, []);
+  const handleGoogleSignIn = async () => {
+    setSubmitting(true);
+    try {
+      await signInWithGoogle();
+    } catch (authError) {
+      toast.error(authError.message || "Google Sign-In failed.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const validatePassword = (pwd) => {
     const minLength = 8;
@@ -98,6 +103,27 @@ export function AuthPage() {
               Sign in to sync your workspace.
             </p>
           </div>
+        </div>
+
+        <button
+          className="nb-button w-full mb-4 flex items-center justify-center gap-3 bg-white hover:bg-stone-50 text-black dark:bg-[#12151a] dark:hover:bg-[#1c222c] dark:text-[#c8c3ba] border-[3px] border-black dark:border-[#1e232a] py-2.5 shadow-[4px_4px_0_#111] dark:shadow-[3px_3px_0_#000] font-black"
+          disabled={submitting}
+          onClick={handleGoogleSignIn}
+          type="button"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24">
+            <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.2 9 5 12 5z" />
+            <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z" />
+            <path fill="#FBBC05" d="M5.6 14.8c-.3-.8-.4-1.8-.4-2.8s.1-2 .4-2.8L1.9 6.3C.7 8.7 0 10.3 0 12s.7 3.3 1.9 5.7l3.7-2.9z" />
+            <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.2-6.4-5.2L1.9 16C3.7 19.7 7.5 23 12 23z" />
+          </svg>
+          Continue with Google
+        </button>
+
+        <div className="mb-4 flex items-center gap-3">
+          <hr className="flex-1 border-stone-300 dark:border-[#1e232a]" />
+          <span className="text-xs font-black uppercase text-stone-400 dark:text-[#5a5650]">OR</span>
+          <hr className="flex-1 border-stone-300 dark:border-[#1e232a]" />
         </div>
 
         <div className="mb-4 grid grid-cols-2 gap-2">

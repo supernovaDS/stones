@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { X, Repeat, Pencil, Trash2, Plus, ArrowLeft, Clock, Calendar } from "lucide-react";
+import { X, Repeat, Pencil, Trash2, Plus, ArrowLeft, Clock, Calendar, ListChecks, Pause, Play, StopCircle } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { todayIso, formatShortDate } from "../../utils/date";
+import { Checkbox } from "../ui";
 
 export function RecurringTasksModal({ onClose }) {
   const {
@@ -9,11 +10,20 @@ export function RecurringTasksModal({ onClose }) {
     addRepeatedTask,
     updateRepeatedTask,
     deleteRepeatedTask,
+    pauseRepeatedTask,
+    resumeRepeatedTask,
+    endRepeatedTask,
     editingRepeatedTaskId,
     setEditingRepeatedTaskId
   } = useAppStore();
 
-  const templates = blocks.filter((b) => b.type === "recurring_template" && !b.deleted);
+  const [activeTab, setActiveTab] = useState("active");
+
+  const templates = blocks.filter((b) => {
+    if (b.type !== "recurring_template" || b.deleted || b.metadata?.isArchived) return false;
+    const status = b.metadata?.status || "active";
+    return status === activeTab;
+  });
 
   // Form states
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -24,7 +34,13 @@ export function RecurringTasksModal({ onClose }) {
   const [customInterval, setCustomInterval] = useState(1);
   const [customUnit, setCustomUnit] = useState("days");
   const [startDate, setStartDate] = useState(todayIso());
+  const [endDate, setEndDate] = useState("");
   const [deadlineTime, setDeadlineTime] = useState("");
+  const [subtasks, setSubtasks] = useState([]);
+
+  // Delete modal states
+  const [deletingTemplateId, setDeletingTemplateId] = useState(null);
+  const [deleteMode, setDeleteMode] = useState("future_only");
 
   // Handle opening form for edit or create
   useEffect(() => {
@@ -38,7 +54,9 @@ export function RecurringTasksModal({ onClose }) {
         setCustomInterval(template.metadata?.customInterval || 1);
         setCustomUnit(template.metadata?.customUnit || "days");
         setStartDate(template.metadata?.startDate || todayIso());
+        setEndDate(template.metadata?.endDate || "");
         setDeadlineTime(template.metadata?.deadlineTime || "");
+        setSubtasks(template.content?.subtasks || []);
         setIsFormOpen(true);
       }
     } else {
@@ -50,7 +68,9 @@ export function RecurringTasksModal({ onClose }) {
       setCustomInterval(1);
       setCustomUnit("days");
       setStartDate(todayIso());
+      setEndDate("");
       setDeadlineTime("");
+      setSubtasks([]);
     }
   }, [editingRepeatedTaskId, isFormOpen]);
 
@@ -62,6 +82,18 @@ export function RecurringTasksModal({ onClose }) {
   const handleCloseForm = () => {
     setIsFormOpen(false);
     setEditingRepeatedTaskId(null);
+  };
+
+  const handleAddSubtask = () => {
+    setSubtasks([...subtasks, { id: `sub_${Date.now()}`, text: "", completed: false }]);
+  };
+
+  const handleUpdateSubtask = (id, text) => {
+    setSubtasks(subtasks.map((s) => (s.id === id ? { ...s, text } : s)));
+  };
+
+  const handleDeleteSubtask = (id) => {
+    setSubtasks(subtasks.filter((s) => s.id !== id));
   };
 
   const handleSubmit = async (e) => {
@@ -76,7 +108,9 @@ export function RecurringTasksModal({ onClose }) {
       customInterval: recurrence === "custom" ? Number(customInterval) : undefined,
       customUnit: recurrence === "custom" ? customUnit : undefined,
       startDate,
-      deadlineTime: deadlineTime || undefined
+      endDate: endDate || undefined,
+      deadlineTime: deadlineTime || undefined,
+      subtasks: subtasks
     };
 
     if (editingRepeatedTaskId) {
@@ -87,10 +121,9 @@ export function RecurringTasksModal({ onClose }) {
     handleCloseForm();
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this repeating task template? This will also delete all of its past completion records.")) {
-      await deleteRepeatedTask(id);
-    }
+  const handleDelete = (id) => {
+    setDeleteMode("future_only");
+    setDeletingTemplateId(id);
   };
 
   // Helper to format nice recurrence schedule labels
@@ -126,11 +159,10 @@ export function RecurringTasksModal({ onClose }) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
-        className="modal-card w-[min(90vw,720px)] max-h-[85vh] flex flex-col p-6"
+        className="modal-card w-[min(90vw,720px)] p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Modal Header */}
-        <div className="mb-5 flex items-center justify-between shrink-0">
+        <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Repeat className="text-[#21caff] dark:text-[#00c0ff]" size={24} />
             <h2 className="text-2xl font-black">
@@ -142,11 +174,9 @@ export function RecurringTasksModal({ onClose }) {
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div className="flex-1 overflow-auto pr-1">
-          {isFormOpen ? (
-            /* CREATE / EDIT FORM VIEW */
-            <form onSubmit={handleSubmit} className="grid gap-4">
+        {isFormOpen ? (
+          /* CREATE / EDIT FORM VIEW */
+          <form id="recurring-form" onSubmit={handleSubmit} className="grid gap-4">
               <label className="grid gap-1 text-sm font-black">
                 Title
                 <input
@@ -231,13 +261,26 @@ export function RecurringTasksModal({ onClose }) {
                 <label className="grid gap-1 text-sm font-black">
                   Starts On
                   <input
-                    className="nb-input w-full px-3 py-2 font-bold"
+                    className="nb-input w-full px-3 py-2 font-bold disabled:opacity-75 disabled:cursor-not-allowed"
                     onChange={(e) => setStartDate(e.target.value)}
                     required
                     type="date"
                     value={startDate}
+                    disabled={!!editingRepeatedTaskId}
                   />
                 </label>
+                <label className="grid gap-1 text-sm font-black">
+                  Ends On (optional)
+                  <input
+                    className="nb-input w-full px-3 py-2 font-bold"
+                    onChange={(e) => setEndDate(e.target.value)}
+                    type="date"
+                    value={endDate}
+                  />
+                </label>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
                 <label className="grid gap-1 text-sm font-black">
                   Due Time (optional)
                   <input
@@ -249,7 +292,45 @@ export function RecurringTasksModal({ onClose }) {
                 </label>
               </div>
 
-              <div className="mt-4 flex gap-2 shrink-0">
+              <div className="grid gap-2 border-t-2 border-dashed border-black dark:border-[#1e232a] pt-4 mt-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-black uppercase">Subtasks</h4>
+                  <button
+                    className="nb-button min-h-0 px-3 py-1 text-xs"
+                    onClick={handleAddSubtask}
+                    type="button"
+                  >
+                    Add Subtask
+                  </button>
+                </div>
+                <div className="grid gap-2 max-h-[160px] overflow-y-auto overflow-x-hidden pb-3 pr-2">
+                  {subtasks.map((sub, idx) => (
+                    <div className="flex items-center gap-2" key={sub.id}>
+                      <span className="text-xs font-black text-stone-500 dark:text-[#7a7670]">{idx + 1}.</span>
+                      <input
+                        className="nb-input min-w-0 flex-1 px-3 py-1.5 text-sm font-bold"
+                        onChange={(e) => handleUpdateSubtask(sub.id, e.target.value)}
+                        placeholder="e.g. Check list, Send report"
+                        required
+                        type="text"
+                        value={sub.text}
+                      />
+                      <button
+                        className="icon-button danger !h-8 !w-8 shrink-0"
+                        onClick={() => handleDeleteSubtask(sub.id)}
+                        title="Delete subtask"
+                        type="button"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  ))}
+                  {subtasks.length === 0 && (
+                    <p className="text-xs text-stone-400 dark:text-[#5a5650] font-black italic">No subtasks defined yet.</p>
+                  )}
+                </div>
+              </div>
+              <div className="mt-4 flex gap-2 pt-4 border-t-2 border-dashed border-stone-200 dark:border-[#1e232a]">
                 <button className="nb-button flex-1" onClick={handleCloseForm} type="button">
                   <ArrowLeft size={16} /> Back
                 </button>
@@ -260,13 +341,48 @@ export function RecurringTasksModal({ onClose }) {
             </form>
           ) : (
             /* LIST VIEW */
-            <div className="flex flex-col h-full gap-4">
-              <div className="grid gap-3 max-h-[50vh] overflow-auto pr-1">
+            <div className="grid gap-4">
+              <div className="flex gap-2 mb-2 shrink-0">
+                <button
+                  className={`nb-button px-4 py-2 flex-1 text-xs font-black transition-all ${activeTab === "active" ? "action" : "bg-white dark:bg-[#12151a]"}`}
+                  onClick={() => setActiveTab("active")}
+                  type="button"
+                >
+                  Active
+                </button>
+                <button
+                  className={`nb-button px-4 py-2 flex-1 text-xs font-black transition-all ${activeTab === "paused" ? "action" : "bg-white dark:bg-[#12151a]"}`}
+                  onClick={() => setActiveTab("paused")}
+                  type="button"
+                >
+                  Paused
+                </button>
+                <button
+                  className={`nb-button px-4 py-2 flex-1 text-xs font-black transition-all ${activeTab === "ended" ? "action" : "bg-white dark:bg-[#12151a]"}`}
+                  onClick={() => setActiveTab("ended")}
+                  type="button"
+                >
+                  Ended
+                </button>
+              </div>
+
+              {activeTab === "active" && (
+                <button
+                  className="nb-button action w-full py-3 flex items-center justify-center gap-2 font-black"
+                  onClick={handleOpenCreate}
+                  style={{ animation: "none" }}
+                  type="button"
+                >
+                  <Plus size={18} /> Create New Repeating Task
+                </button>
+              )}
+
+              <div className="grid gap-3">
                 {templates.length > 0 ? (
                   templates.map((template) => (
                     <div
                       key={template.id}
-                      className={`flex items-center justify-between gap-4 p-4 rounded-xl border-[3px] border-[#111111] bg-white shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[3px_3px_0_#000] border-l-[10px] ${priorityBorderColor(template.metadata?.priority)}`}
+                      className="flex items-center justify-between gap-4 p-4 rounded-xl border-[3px] border-[#111111] bg-white shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[3px_3px_0_#000]"
                     >
                       <div className="min-w-0 flex-1">
                         <h4 className="font-black text-base text-black dark:text-[#c8c3ba] truncate">
@@ -281,53 +397,158 @@ export function RecurringTasksModal({ onClose }) {
                             <Calendar size={12} />
                             Started {formatShortDate(template.metadata?.startDate)}
                           </span>
+                          {template.metadata?.endDate && (
+                            <span className="flex items-center gap-1 text-[#ff5a5f] font-black">
+                              <Calendar size={12} />
+                              {activeTab === "ended" ? "Ended" : "Ends"} {formatShortDate(template.metadata.endDate)}
+                            </span>
+                          )}
                           {template.metadata?.deadlineTime && (
                             <span className="flex items-center gap-1">
                               <Clock size={12} />
                               At {template.metadata.deadlineTime}
                             </span>
                           )}
+                          {template.content?.subtasks && template.content.subtasks.length > 0 && (
+                            <span className="flex items-center gap-1 text-[#ffb84d] font-black">
+                              <ListChecks size={12} />
+                              {template.content.subtasks.length} subtasks
+                            </span>
+                          )}
                         </div>
                       </div>
 
-                      <div className="flex gap-2 shrink-0">
-                        <button
-                          className="icon-button"
-                          onClick={() => setEditingRepeatedTaskId(template.id)}
-                          title="Edit template"
-                          type="button"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          className="icon-button danger"
-                          onClick={() => void handleDelete(template.id)}
-                          title="Delete template"
-                          type="button"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                      <div className="flex gap-1.5 shrink-0">
+                        {activeTab !== "ended" && (
+                          <button
+                            className="icon-button"
+                            onClick={() => {
+                              setEditingRepeatedTaskId(template.id);
+                            }}
+                            title="Edit template"
+                            type="button"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                        )}
+                        {activeTab === "active" && (
+                          <button
+                            className="icon-button"
+                            onClick={() => void pauseRepeatedTask(template.id)}
+                            title="Pause task"
+                            type="button"
+                          >
+                            <Pause size={14} />
+                          </button>
+                        )}
+                        {activeTab === "paused" && (
+                          <button
+                            className="icon-button"
+                            onClick={() => void resumeRepeatedTask(template.id)}
+                            title="Resume task"
+                            type="button"
+                          >
+                            <Play size={14} />
+                          </button>
+                        )}
+                        {activeTab !== "ended" && (
+                          <button
+                            className="icon-button danger"
+                            onClick={() => void endRepeatedTask(template.id)}
+                            title="End task"
+                            type="button"
+                          >
+                            <StopCircle size={14} />
+                          </button>
+                        )}
+                        {activeTab === "ended" && (
+                          <button
+                            className="icon-button danger"
+                            onClick={() => void handleDelete(template.id)}
+                            title="Delete permanently"
+                            type="button"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))
                 ) : (
                   <div className="rounded-lg border-[3px] border-dashed border-black dark:border-[#1e232a] px-4 py-12 text-center text-stone-600 dark:text-[#7a7670] font-black">
-                    No repeating task schedules configured yet.
+                    No {activeTab} repeating task schedules configured yet.
                   </div>
                 )}
               </div>
-
-              <button
-                className="nb-button action w-full py-3 flex items-center justify-center gap-2 font-black shrink-0"
-                onClick={handleOpenCreate}
-                type="button"
-              >
-                <Plus size={18} /> Create New Repeating Task
-              </button>
             </div>
           )}
-        </div>
       </div>
+
+      {deletingTemplateId && (
+        <div className="modal-backdrop z-40 bg-black/60 backdrop-blur-sm flex items-center justify-center animate-in fade-in duration-200" onClick={() => setDeletingTemplateId(null)}>
+          <div className="modal-card max-w-md p-6 border-[3px] border-black bg-[#fff7e8] dark:bg-[#0c0e11] dark:border-[#1e232a] shadow-[6px_6px_0_#111] dark:shadow-[4px_4px_0_#000] animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-xl font-black text-red-500 dark:text-red-400 mb-2">Delete Repeating Task?</h3>
+            <p className="text-sm font-bold mb-4 text-stone-700 dark:text-[#7a7670]">
+              Are you sure you want to delete this repeating task template?
+            </p>
+            <div className="rounded-lg border-2 border-black dark:border-[#1e232a] bg-stone-50 dark:bg-[#12151a] p-4 grid gap-3 mb-5">
+              <label className="flex items-start gap-3 text-sm font-bold cursor-pointer">
+                <input 
+                  type="radio"
+                  name="deleteMode"
+                  className="mt-1"
+                  checked={deleteMode === "all"} 
+                  onChange={() => setDeleteMode("all")} 
+                />
+                <span className="flex-1">
+                  <span className="block text-black dark:text-[#c8c3ba]">Delete everything</span>
+                  <span className="block text-xs text-stone-500 dark:text-[#7a7670] mt-0.5">This will delete all tasks past, future and present.</span>
+                </span>
+              </label>
+              
+              <hr className="border-stone-300 dark:border-stone-850" />
+              
+              <label className="flex items-start gap-3 text-sm font-bold cursor-pointer">
+                <input 
+                  type="radio"
+                  name="deleteMode"
+                  className="mt-1"
+                  checked={deleteMode === "future_only"} 
+                  onChange={() => setDeleteMode("future_only")} 
+                />
+                <span className="flex-1">
+                  <span className="block text-black dark:text-[#c8c3ba]">Delete only future tasks</span>
+                  <span className="block text-xs text-stone-500 dark:text-[#7a7670] mt-0.5">This will delete only future tasks and will not delete past and present.</span>
+                </span>
+              </label>
+            </div>
+            <div className="flex gap-2 font-black">
+              <button 
+                type="button" 
+                className="nb-button flex-1"
+                onClick={() => setDeletingTemplateId(null)}
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                className="nb-button danger flex-1"
+                onClick={async () => {
+                  const isAll = deleteMode === "all";
+                  await deleteRepeatedTask(deletingTemplateId, {
+                    completed: isAll,
+                    failed: isAll,
+                    due: isAll
+                  });
+                  setDeletingTemplateId(null);
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -5,7 +5,6 @@ import { useAppStore } from "../../store/useAppStore";
 import { formatShortDate, todayIso, toDateInput, toLocalDateString } from "../../utils/date";
 import { shiftMonth, getCalendarDays, priorityDot } from "../../utils/helpers";
 import { Checkbox } from "../ui";
-import { priorityRail } from "../../utils/constants";
 import { getVirtualTasksForDate } from "../../utils/recurrence";
 
 export function CalendarView() {
@@ -20,6 +19,7 @@ export function CalendarView() {
   } = useAppStore();
   const [cursor, setCursor] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(todayIso());
+  const [taskPage, setTaskPage] = useState(0);
   const tasks = blocks.filter((block) => block.type === "task");
   const days = getCalendarDays(cursor);
   const monthLabel = cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
@@ -33,14 +33,18 @@ export function CalendarView() {
   const allCalendarTasks = [...tasks, ...virtualTasks];
   const selectedTasks = allCalendarTasks.filter((task) => toDateInput(task.metadata.deadline) === selectedDay);
 
+  const PAGE_SIZE = 4;
+  const totalPages = Math.ceil(selectedTasks.length / PAGE_SIZE);
+  const paginatedTasks = selectedTasks.slice(taskPage * PAGE_SIZE, (taskPage + 1) * PAGE_SIZE);
+
   return (
     <div className="bento-grid">
-      <div className="calendar-header bento-card span-12 flex items-center justify-between gap-3 bg-white border-l-[10px] border-l-[#21caff] p-4 text-black dark:bg-[#12151a] dark:border-l-[#001a25] dark:text-[#c8c3ba]">
+      <div className="calendar-header bento-card hover-static span-12 flex items-center justify-between gap-3 bg-white p-4 text-black dark:bg-[#12151a] dark:text-[#c8c3ba]">
         <button className="icon-button" onClick={() => setCursor(shiftMonth(cursor, -1))} type="button"><ChevronLeft size={16} /></button>
         <h3 className="min-w-0 truncate text-center text-3xl font-black max-sm:text-xl">{monthLabel}</h3>
         <button className="icon-button" onClick={() => setCursor(shiftMonth(cursor, 1))} type="button"><ChevronRight size={16} /></button>
       </div>
-      <section className="bento-card span-8 grid grid-cols-7 gap-2 p-4 max-sm:gap-1">
+      <section className="bento-card hover-static span-8 grid grid-cols-7 gap-2 p-4 max-sm:gap-1">
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => <div className="text-center text-xs font-black uppercase text-stone-700 dark:text-[#7a7670]" key={day}>{day}</div>)}
         {days.map((day) => {
           const key = toLocalDateString(day);
@@ -52,14 +56,14 @@ export function CalendarView() {
             <button className={clsx(
               "calendar-cell min-h-24 rounded-lg border-[3px] border-black p-2 text-left font-black shadow-[3px_3px_0_#111] transition hover:-translate-y-1 hover:shadow-[5px_5px_0_#111] dark:border-[#1e232a] dark:shadow-[2px_2px_0_#000] dark:hover:shadow-[3px_3px_0_#000] max-sm:min-h-16",
               selectedDay === key 
-                ? "calendar-day-selected bg-white border-l-[8px] border-l-[#ffdc4a] text-black dark:bg-[#12151a] dark:border-l-[#3d2800] dark:text-[#c8c3ba]" 
+                ? "calendar-day-selected bg-[#fff6cc] text-black hover:bg-[#ffeb99] dark:bg-[#2b1c00] dark:text-[#c8c3ba] dark:hover:bg-[#3d2800]" 
                 : isToday
-                  ? "calendar-day-today bg-white border-l-[8px] border-l-[#21caff] text-black dark:bg-[#12151a] dark:border-l-[#003d52] dark:text-[#c8c3ba]"
+                  ? "calendar-day-today bg-[#ffdc4a] text-black hover:bg-[#ffcf11] dark:bg-[#523600] dark:text-[#c8c3ba] dark:hover:bg-[#664300]"
                   : isPast
                     ? "calendar-day-past bg-stone-100 hover:bg-stone-200 text-stone-400 dark:bg-[#0a0c0f] dark:hover:bg-[#12151a] dark:text-[#5a5650]"
                     : "calendar-day-default bg-white hover:bg-[#fff1b8] dark:bg-[#12151a] dark:hover:bg-[#1a1f26]",
               !inMonth && "opacity-45"
-            )} key={key} onClick={() => setSelectedDay(key)} type="button">
+            )} key={key} onClick={() => { setSelectedDay(key); setTaskPage(0); }} type="button">
               <span className="text-sm">{day.getDate()}</span>
               <div className="calendar-dots mt-2 flex flex-wrap gap-1">
                 {dayTasks.slice(0, 4).map((task) => {
@@ -96,84 +100,141 @@ export function CalendarView() {
           );
         })}
       </section>
-      <aside className="bento-card span-4 bg-white p-4 text-black dark:bg-[#12151a] dark:text-[#c8c3ba]">
+      <aside className="bento-card hover-static span-4 bg-white p-4 text-black dark:bg-[#12151a] dark:text-[#c8c3ba] flex flex-col min-h-0 md:h-full">
         <h3 className="mb-3 text-2xl font-black">{formatShortDate(selectedDay)}</h3>
         <div className="flex flex-col gap-2 mb-4">
-          {selectedDay >= todayIso() && (
-            <button className="nb-button action w-full" onClick={() => void openTaskModal({ deadline: selectedDay, pageId: "system-calendar" })} type="button">
-              <Plus size={16} /> Add task for day
-            </button>
-          )}
+          <button className="nb-button action w-full" onClick={() => void openTaskModal({ deadline: selectedDay, pageId: "system-calendar" })} type="button">
+            <Plus size={16} /> Add task for day
+          </button>
         </div>
-        <div className="grid gap-2">
-          {selectedTasks.length ? selectedTasks.map((task) => {
-            const isCompleted = task.metadata.completed;
-            const isFailed = task.metadata.failed;
-            return (
-              <div 
-                className={clsx(
-                  "bento-card flex items-center justify-between gap-3 p-3 transition-all",
-                  isCompleted
-                    ? "bg-emerald-50/50 hover:bg-emerald-50 dark:bg-emerald-950/10 dark:hover:bg-emerald-950/20"
-                    : isFailed
-                      ? "bg-red-50/50 hover:bg-red-50 dark:bg-red-950/10 dark:hover:bg-red-950/20"
-                      : "",
-                  "bg-white dark:bg-[#12151a]"
-                )} 
-                key={task.id}
-              >
-                <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <Checkbox 
-                    checked={isCompleted} 
-                    onChange={() => void toggleTask(task.id)} 
-                  />
-                  <button 
-                    className="min-w-0 flex-1 text-left" 
-                    onClick={() => {
-                      if (task.isVirtual) {
-                        setEditingRepeatedTaskId(task.templateId);
-                        setRecurringTasksOpen(true);
-                      } else {
-                        setSelectedTask(task.id);
-                      }
-                    }} 
+        <div className="flex-1 flex flex-col justify-between pr-1 min-h-0">
+          {selectedTasks.length ? (
+            <>
+              <div className="grid gap-2">
+                {paginatedTasks.map((task) => {
+                  const isCompleted = task.metadata.completed;
+                  const isFailed = task.metadata.failed;
+                  return (
+                    <div 
+                      className={clsx(
+                        "bento-card hover-static flex items-center justify-between gap-3 p-3 transition-all",
+                        isCompleted
+                          ? "bg-emerald-50/50 hover:bg-emerald-50 dark:bg-emerald-950/10 dark:hover:bg-emerald-950/20"
+                          : isFailed
+                            ? "bg-red-50/50 hover:bg-red-50 dark:bg-red-950/10 dark:hover:bg-red-950/20"
+                            : "",
+                        "bg-white dark:bg-[#12151a]"
+                      )} 
+                      key={task.id}
+                    >
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <Checkbox 
+                          checked={isCompleted} 
+                          onChange={() => void toggleTask(task.id)} 
+                        />
+                        {task.isVirtual ? (
+                          <div className="min-w-0 flex-1 text-left select-none">
+                            <span 
+                              className={clsx(
+                                "block truncate font-black text-sm text-black dark:text-[#c8c3ba]",
+                                isCompleted && "text-stone-400 line-through dark:text-[#5a5650]",
+                                isFailed && "text-red-500 line-through dark:text-red-400"
+                              )}
+                            >
+                              {task.content.title || "Untitled task"}
+                              {" (Repeating)"}
+                            </span>
+                            <span className="text-xs text-stone-500 dark:text-[#7a7670] capitalize">
+                              {task.metadata.priority ?? "medium"} Priority
+                            </span>
+                          </div>
+                        ) : (
+                          <button 
+                            className="min-w-0 flex-1 text-left" 
+                            onClick={() => {
+                              setSelectedTask(task.id);
+                            }} 
+                            data-prevent-outside-close="true"
+                            type="button"
+                          >
+                            <span 
+                              className={clsx(
+                                "block truncate font-black text-sm text-black dark:text-[#c8c3ba]",
+                                isCompleted && "text-stone-400 line-through dark:text-[#5a5650]",
+                                isFailed && "text-red-500 line-through dark:text-red-400"
+                              )}
+                            >
+                              {task.content.title || "Untitled task"}
+                            </span>
+                            <span className="text-xs text-stone-500 dark:text-[#7a7670] capitalize">
+                              {task.metadata.priority ?? "medium"} Priority
+                            </span>
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex flex-shrink-0 items-center gap-1">
+                        {(!isCompleted || isFailed) && (
+                          <button 
+                            className={clsx(
+                              "icon-button !h-8 !w-8", 
+                              isFailed 
+                                ? "!bg-[#ff5a5f] !text-black border-black dark:!bg-[#5c1a1d] dark:!text-[#e8a0a2] dark:border-[#1e232a]" 
+                                : "bg-white text-stone-600 dark:bg-[#12151a] dark:text-[#7a7670]"
+                            )} 
+                            onClick={() => void toggleFailTask(task.id)} 
+                            title={isFailed ? "Unfail task" : "Fail task"} 
+                            type="button"
+                          >
+                            <XCircle size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4 border-t-2 border-black pt-3 dark:border-[#1e232a] shrink-0">
+                  <button
+                    className="icon-button"
+                    disabled={taskPage === 0}
+                    onClick={() => setTaskPage(taskPage - 1)}
                     type="button"
                   >
-                    <span 
-                      className={clsx(
-                        "block truncate font-black text-sm text-black dark:text-[#c8c3ba]",
-                        isCompleted && "text-stone-400 line-through dark:text-[#5a5650]",
-                        isFailed && "text-red-500 line-through dark:text-red-400"
-                      )}
-                    >
-                      {task.content.title || "Untitled task"}
-                      {task.isVirtual && " (Repeating)"}
-                    </span>
-                    <span className="text-xs text-stone-500 dark:text-[#7a7670] capitalize">
-                      {task.metadata.priority ?? "medium"} Priority
-                    </span>
+                    <ChevronLeft size={16} />
+                  </button>
+                  <div className="flex flex-wrap gap-1.5 justify-center max-w-[200px]">
+                      {Array.from({ length: totalPages }).map((_, i) => (
+                        <button
+                          key={i}
+                          className="p-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-black dark:focus-visible:ring-[#c8c3ba] rounded-full"
+                          onClick={() => setTaskPage(i)}
+                          type="button"
+                          aria-label={`Page ${i + 1}`}
+                        >
+                          <div
+                            className={clsx(
+                              "h-3 w-3 rounded-full border-2 border-black transition-all dark:border-[#c8c3ba]",
+                              taskPage === i
+                                ? "bg-[#ffdc4a] dark:bg-[#21caff] scale-125"
+                                : "bg-white dark:bg-[#12151a] hover:bg-stone-200 dark:hover:bg-stone-800"
+                            )}
+                          />
+                        </button>
+                      ))}
+                  </div>
+                  <button
+                    className="icon-button"
+                    disabled={taskPage === totalPages - 1}
+                    onClick={() => setTaskPage(taskPage + 1)}
+                    type="button"
+                  >
+                    <ChevronRight size={16} />
                   </button>
                 </div>
-                <div className="flex flex-shrink-0 items-center gap-1">
-                  {!task.isVirtual && (
-                    <button 
-                      className={clsx(
-                        "icon-button !h-8 !w-8", 
-                        isFailed 
-                          ? "!bg-[#ff5a5f] !text-black border-black dark:!bg-[#5c1a1d] dark:!text-[#e8a0a2] dark:border-[#1e232a]" 
-                          : "bg-white text-stone-600 dark:bg-[#12151a] dark:text-[#7a7670]"
-                      )} 
-                      onClick={() => void toggleFailTask(task.id)} 
-                      title={isFailed ? "Unfail task" : "Fail task"} 
-                      type="button"
-                    >
-                      <XCircle size={14} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          }) : (
+              )}
+            </>
+          ) : (
             <p className="rounded-lg border-[3px] border-black bg-white p-4 text-sm font-black shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[2px_2px_0_#000]">
               No tasks scheduled.
             </p>
