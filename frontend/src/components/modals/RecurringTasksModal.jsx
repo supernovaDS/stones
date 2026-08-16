@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { X, Repeat, Pencil, Trash2, Plus, ArrowLeft, Clock, Calendar, ListChecks, Pause, Play, StopCircle } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { todayIso, formatShortDate } from "../../utils/date";
-import { Checkbox } from "../ui";
 
 export function RecurringTasksModal({ onClose }) {
   const {

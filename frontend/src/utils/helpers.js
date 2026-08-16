@@ -61,11 +61,25 @@ export function calculateStreak(tasks) {
       .map((task) => toLocalDateFromIso(task.metadata.completedAt))
       .filter(Boolean)
   );
+  if (completedDays.size === 0) return 0;
+
   let streak = 0;
   const cursor = new Date();
-  while (completedDays.has(toLocalDateString(cursor))) {
-    streak += 1;
+  const todayStr = toLocalDateString(cursor);
+
+  // If today is completed, count starting from today
+  // If today is not completed yet, check if yesterday was completed to keep streak alive
+  if (completedDays.has(todayStr)) {
+    while (completedDays.has(toLocalDateString(cursor))) {
+      streak += 1;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+  } else {
     cursor.setDate(cursor.getDate() - 1);
+    while (completedDays.has(toLocalDateString(cursor))) {
+      streak += 1;
+      cursor.setDate(cursor.getDate() - 1);
+    }
   }
   return streak;
 }

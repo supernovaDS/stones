@@ -371,44 +371,210 @@ export const createBlockSlice = (set, get) => ({
     const block = get().blocks.find((item) => item.id === blockId);
     if (!block) return;
 
-    const pageBlocks = get()
+    const isArchived = Boolean(block.metadata?.archived);
+    const allPageBlocks = get()
       .blocks.filter((item) => item.pageId === block.pageId)
       .sort((a, b) => a.order - b.order);
-    const index = pageBlocks.findIndex((item) => item.id === blockId);
+
+    const targetGroup = allPageBlocks.filter(
+      (item) => Boolean(item.metadata?.archived) === isArchived
+    );
+    const otherGroup = allPageBlocks.filter(
+      (item) => Boolean(item.metadata?.archived) !== isArchived
+    );
+
+    const index = targetGroup.findIndex((item) => item.id === blockId);
+    if (index === -1) return;
+
     const targetIndex = direction === "up" ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= pageBlocks.length) return;
+    if (targetIndex < 0 || targetIndex >= targetGroup.length) return;
 
     pushUndoSnapshot(get, set, "move block");
-    const targetBlock = pageBlocks[targetIndex];
+
+    const reorderedGroup = [...targetGroup];
+    const [moved] = reorderedGroup.splice(index, 1);
+    reorderedGroup.splice(targetIndex, 0, moved);
+
+    const combined = isArchived
+      ? [...otherGroup, ...reorderedGroup]
+      : [...reorderedGroup, ...otherGroup];
+
     const updatedAt = nowIso();
-    const updatedBlock = {
-      ...block,
-      order: targetBlock.order,
-      metadata: { ...block.metadata, updatedAt }
-    };
-    const updatedTarget = {
-      ...targetBlock,
-      order: block.order,
-      metadata: { ...targetBlock.metadata, updatedAt }
-    };
+    const updatedBlocks = combined.map((b, idx) => ({
+      ...b,
+      order: idx + 1,
+      metadata: { ...b.metadata, updatedAt }
+    }));
 
     await db.transaction("rw", db.blocks, async () => {
-      await db.blocks.put(updatedBlock);
-      await db.blocks.put(updatedTarget);
+      for (const b of updatedBlocks) {
+        await db.blocks.put(b);
+      }
     });
+
+    for (const b of updatedBlocks) {
+      await enqueueMutation("block", b.id, "upsert", b);
+    }
+
+    set((state) => {
+      const updatedMap = new Map(updatedBlocks.map((b) => [b.id, b]));
+      return {
+        blocks: sortBlocks(state.blocks.map((b) => updatedMap.get(b.id) || b))
+      };
+    });
+    get().setNotification(`Block moved ${direction}`);
+  },
+
+  toggleArchiveBlock: async (blockId) => {
+    const block = get().blocks.find((item) => item.id === blockId);
+    if (!block) return;
+
+    const isArchived = !block.metadata?.archived;
+    pushUndoSnapshot(get, set, isArchived ? "archive block" : "unarchive block");
+    const updatedAt = nowIso();
+
+    const updatedBlock = {
+      ...block,
+      metadata: {
+        ...block.metadata,
+        archived: isArchived,
+        archivedAt: isArchived ? updatedAt : undefined,
+        updatedAt
+      }
+    };
+
+    await db.blocks.put(updatedBlock);
     await enqueueMutation("block", updatedBlock.id, "upsert", updatedBlock);
-    await enqueueMutation("block", updatedTarget.id, "upsert", updatedTarget);
 
     set((state) => ({
       blocks: sortBlocks(
-        state.blocks.map((item) => {
-          if (item.id === updatedBlock.id) return updatedBlock;
-          if (item.id === updatedTarget.id) return updatedTarget;
-          return item;
-        })
+        state.blocks.map((item) => (item.id === blockId ? updatedBlock : item))
       )
     }));
+
+    get().setNotification(isArchived ? "Block archived" : "Block unarchived");
   },
+
+  duplicateBlock: async (blockId) => {
+    const block = get().blocks.find((item) => item.id === blockId);
+    if (!block) return;
+
+    pushUndoSnapshot(get, set, `duplicate ${block.type}`);
+    const pageBlocks = get()
+      .blocks.filter((item) => item.pageId === block.pageId)
+      .sort((a, b) => a.order - b.order);
+
+    const index = pageBlocks.findIndex((item) => item.id === blockId);
+    const createdAt = nowIso();
+    const newBlock = {
+      ...block,
+      id: createId("block"),
+      order: block.order + 1,
+      metadata: {
+        ...block.metadata,
+        createdAt,
+        updatedAt: createdAt
+      }
+    };
+
+    const reordered = [...pageBlocks];
+    reordered.splice(index + 1, 0, newBlock);
+
+    const updatedBlocks = reordered.map((b, idx) => ({
+      ...b,
+      order: idx + 1,
+      metadata: { ...b.metadata, updatedAt: createdAt }
+    }));
+
+    await db.transaction("rw", db.blocks, async () => {
+      for (const b of updatedBlocks) {
+        await db.blocks.put(b);
+      }
+    });
+
+    for (const b of updatedBlocks) {
+      await enqueueMutation("block", b.id, "upsert", b);
+    }
+
+    set((state) => {
+      const updatedMap = new Map(updatedBlocks.map((b) => [b.id, b]));
+      return {
+        blocks: sortBlocks(
+          state.blocks
+            .filter((b) => b.pageId !== block.pageId)
+            .concat(updatedBlocks)
+        )
+      };
+    });
+
+    get().setNotification("Block duplicated");
+  },
+
+  cutBlock: (blockId) => {
+    const block = get().blocks.find((item) => item.id === blockId);
+    if (!block) return;
+
+    const currentClipboard = get().clipboard || [];
+    const isCut = currentClipboard.some((b) => b.id === block.id);
+
+    if (isCut) {
+      const nextClipboard = currentClipboard.filter((b) => b.id !== block.id);
+      set({ clipboard: nextClipboard });
+      get().setNotification(
+        `${block.type.charAt(0).toUpperCase() + block.type.slice(1)} removed from clipboard`
+      );
+    } else {
+      const nextClipboard = [...currentClipboard, block];
+      set({ clipboard: nextClipboard });
+      get().setNotification(`${nextClipboard.length} block(s) cut to clipboard`);
+    }
+  },
+
+  pasteBlock: async (targetPageId) => {
+    const clipboard = get().clipboard || [];
+    if (clipboard.length === 0 || !targetPageId) return;
+
+    pushUndoSnapshot(get, set, `paste ${clipboard.length} blocks`);
+    const updatedAt = nowIso();
+    const state = get();
+
+    let baseOrder = Math.max(
+      0,
+      ...state.blocks
+        .filter((b) => b.pageId === targetPageId)
+        .map((b) => b.order)
+    );
+
+    const movedBlocks = clipboard.map((block, index) => ({
+      ...block,
+      pageId: targetPageId,
+      order: baseOrder + index + 1,
+      metadata: { ...block.metadata, updatedAt }
+    }));
+
+    await db.transaction("rw", db.blocks, async () => {
+      for (const b of movedBlocks) {
+        await db.blocks.put(b);
+      }
+    });
+
+    for (const b of movedBlocks) {
+      await enqueueMutation("block", b.id, "upsert", b);
+    }
+
+    set((current) => ({
+      blocks: sortBlocks(
+        current.blocks.map((item) => {
+          const moved = movedBlocks.find((mb) => mb.id === item.id);
+          return moved ? moved : item;
+        })
+      ),
+      clipboard: []
+    }));
+    get().setNotification(`${clipboard.length} block(s) pasted`);
+  },
+
+  clearClipboard: () => set({ clipboard: [] }),
 
   reorderBlock: async (pageId, sourceIndex, destinationIndex) => {
     if (sourceIndex === destinationIndex) return;

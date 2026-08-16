@@ -4,6 +4,7 @@ import {
   RotateCcw,
   Repeat,
   Edit2,
+  Archive
 } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { viewTitle } from "../../utils/helpers";
@@ -16,6 +17,7 @@ export function Topbar({ onCommandOpen, onMenuToggle, activePage, view, sidebarH
     undoStack,
     setRecurringTasksOpen,
     renamePage,
+    archivePage
   } = useAppStore();
 
   const activeUndoStack = undoStack;
@@ -45,19 +47,31 @@ export function Topbar({ onCommandOpen, onMenuToggle, activePage, view, sidebarH
               {view === "workspace" ? (activePage?.title || "Workspace") : viewTitle(view)}
             </h2>
             {view === "workspace" && activePage && (
-              <button
-                className="icon-button !h-7 !w-7 shrink-0"
-                onClick={() => {
-                  const newTitle = window.prompt("Rename page:", activePage.title);
-                  if (newTitle && newTitle.trim()) {
-                    void renamePage(activePage.id, newTitle.trim());
-                  }
-                }}
-                title="Rename page"
-                type="button"
-              >
-                <Edit2 size={14} />
-              </button>
+              <>
+                <button
+                  className="icon-button !h-7 !w-7 shrink-0"
+                  onClick={() => {
+                    const newTitle = window.prompt("Rename page:", activePage.title);
+                    if (newTitle && newTitle.trim()) {
+                      void renamePage(activePage.id, newTitle.trim());
+                    }
+                  }}
+                  title="Rename page"
+                  type="button"
+                >
+                  <Edit2 size={14} />
+                </button>
+                <button
+                  className="icon-button !h-7 !w-7 shrink-0 hover:!bg-[#2ef2a6] hover:text-black dark:hover:!bg-[#0a3d28] dark:hover:text-[#2ef2a6]"
+                  onClick={() => {
+                    void archivePage(activePage.id);
+                  }}
+                  title="Archive page"
+                  type="button"
+                >
+                  <Archive size={14} />
+                </button>
+              </>
             )}
           </div>
         </div>

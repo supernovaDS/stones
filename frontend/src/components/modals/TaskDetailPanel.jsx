@@ -1,4 +1,4 @@
-import { Check, Workflow, X, XCircle } from "lucide-react";
+import { Check, Trash2, Workflow, X, XCircle } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useAppStore } from "../../store/useAppStore";
 import { toInputDate } from "../../utils/date";
@@ -6,7 +6,7 @@ import { IconButton, Checkbox } from "../ui";
 import { getVirtualTasksForDate } from "../../utils/recurrence";
 
 export function TaskDetailPanel() {
-  const { addSubtask, blocks, deleteSubtask, pages, selectedTaskId, setActivePage, setSelectedTask, setTaskDependencies, toggleTask, toggleFailTask, updateSubtask, updateTask } = useAppStore();
+  const { addSubtask, blocks, deleteBlock, deleteSubtask, pages, selectedTaskId, setActivePage, setSelectedTask, setTaskDependencies, toggleTask, toggleFailTask, updateSubtask, updateTask } = useAppStore();
   const panelRef = useRef(null);
 
   useEffect(() => {
@@ -164,6 +164,18 @@ export function TaskDetailPanel() {
             <button className="nb-button flex-1" onClick={() => void toggleFailTask(task.id)} type="button"><XCircle size={16} />{task.metadata.failed ? "Unfail Task" : "Fail Task"}</button>
           )}
         </div>
+        {!isVirtual && (
+          <button
+            className="nb-button danger w-full flex items-center justify-center gap-2"
+            onClick={() => {
+              void deleteBlock(task.id);
+              setSelectedTask(undefined);
+            }}
+            type="button"
+          >
+            <Trash2 size={16} /> Delete Task
+          </button>
+        )}
         {source?.type === "note" ? <div className="rounded-lg border-[3px] border-black bg-[#fff1b8] p-3 shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[3px_3px_0_#000]"><p className="mb-1 text-xs font-black uppercase tracking-wide text-stone-600 dark:text-[#7a7670]">Source note</p><p className="line-clamp-4 text-sm font-bold text-stone-700 dark:text-[#7a7670]">{source.content.text}</p></div> : null}
         {!isVirtual && task.pageId !== "system-calendar" && (
           <button className="nb-button" onClick={() => { setActivePage(task.pageId); setSelectedTask(undefined); }} type="button"><Workflow size={16} />Open Page</button>

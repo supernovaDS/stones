@@ -138,6 +138,13 @@ export const createRecoverySlice = (set, get) => ({
     get().setNotification("Page permanently deleted");
   },
 
+  permanentlyDeletePageFromBin: async (binId) => {
+    const newBin = (get().deletedPagesBin || []).filter((b) => b.id !== binId);
+    await db.settings.put({ key: "deletedPagesBin", value: newBin });
+    set({ deletedPagesBin: newBin });
+    get().setNotification("Page permanently deleted");
+  },
+
   exportBackup: () => {
     const payload = {
       workspaces: get().workspaces,

@@ -11,6 +11,8 @@ export const createUiSlice = (set, get) => ({
   recurringTasksOpen: false,
   recycleBinOpen: false,
   recoveryOpen: false,
+  archivedPagesOpen: false,
+  unarchiveModalPage: null,
   contextMenu: { visible: false, x: 0, y: 0, blockId: null },
   notification: undefined,
   error: undefined,
@@ -20,6 +22,8 @@ export const createUiSlice = (set, get) => ({
   setRecurringTasksOpen: (recurringTasksOpen) => set({ recurringTasksOpen }),
   setRecycleBinOpen: (recycleBinOpen) => set({ recycleBinOpen }),
   setRecoveryOpen: (recoveryOpen) => set({ recoveryOpen }),
+  setArchivedPagesOpen: (archivedPagesOpen) => set({ archivedPagesOpen }),
+  setUnarchiveModalPage: (unarchiveModalPage) => set({ unarchiveModalPage }),
   showContextMenu: (x, y, blockId) => set({ contextMenu: { visible: true, x, y, blockId } }),
   hideContextMenu: () => set({ contextMenu: { visible: false, x: 0, y: 0, blockId: null } }),
 

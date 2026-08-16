@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { clsx } from "clsx";
-import { Moon, Sun, Trash2, Settings, X, Plus, ChevronDown, ChevronRight, Edit2 } from "lucide-react";
+import { Moon, Sun, Trash2, Settings, X, Plus, ChevronDown, ChevronRight, Edit2, Archive } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { navItems } from "../../utils/constants";
 
@@ -9,6 +9,7 @@ export function Sidebar({ isOpen, onClose, isHiddenDesktop }) {
     activePageId,
     createPage,
     deletePage,
+    archivePage,
     renamePage,
     pages,
     sections,
@@ -32,6 +33,7 @@ export function Sidebar({ isOpen, onClose, isHiddenDesktop }) {
   };
 
   const sortedPages = [...pages]
+    .filter((p) => !p.archived)
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   return (
@@ -127,7 +129,7 @@ export function Sidebar({ isOpen, onClose, isHiddenDesktop }) {
         {sortedPages.filter(p => !p.sectionId).map((page) => (
           <div key={page.id} className="group relative flex items-center">
             <button
-              className={clsx("nav-button flex-1 min-w-0 pr-16", activePageId === page.id && view === "workspace" && "active")}
+              className={clsx("nav-button flex-1 min-w-0 pr-24", activePageId === page.id && view === "workspace" && "active")}
               onClick={() => handleNav(() => setActivePage(page.id))}
               onDoubleClick={() => {
                 const newTitle = window.prompt("Rename page:", page.title);
@@ -153,6 +155,17 @@ export function Sidebar({ isOpen, onClose, isHiddenDesktop }) {
                 type="button"
               >
                 <Edit2 size={13} />
+              </button>
+              <button
+                className="grid h-7 w-7 place-items-center rounded-md text-stone-500 hover:bg-[#2ef2a6] hover:text-black dark:text-[#7a7670] dark:hover:bg-[#0a3d28] dark:hover:text-[#2ef2a6]"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void archivePage(page.id);
+                }}
+                title="Archive page"
+                type="button"
+              >
+                <Archive size={13} />
               </button>
               <button
                 className="grid h-7 w-7 place-items-center rounded-md text-stone-500 hover:bg-[#ff5a5f] hover:text-black dark:text-[#7a7670] dark:hover:bg-[#3d1215] dark:hover:text-[#e8a0a2]"
@@ -242,7 +255,7 @@ export function Sidebar({ isOpen, onClose, isHiddenDesktop }) {
                   {sortedPages.filter(p => p.sectionId === section.id).map((page) => (
                     <div key={page.id} className="group relative flex items-center">
                       <button
-                        className={clsx("nav-button flex-1 min-w-0 pr-16", activePageId === page.id && view === "workspace" && "active")}
+                        className={clsx("nav-button flex-1 min-w-0 pr-24", activePageId === page.id && view === "workspace" && "active")}
                         onClick={() => handleNav(() => setActivePage(page.id))}
                         onDoubleClick={() => {
                           const newTitle = window.prompt("Rename page:", page.title);
@@ -268,6 +281,17 @@ export function Sidebar({ isOpen, onClose, isHiddenDesktop }) {
                           type="button"
                         >
                           <Edit2 size={13} />
+                        </button>
+                        <button
+                          className="grid h-7 w-7 place-items-center rounded-md text-stone-500 hover:bg-[#2ef2a6] hover:text-black dark:text-[#7a7670] dark:hover:bg-[#0a3d28] dark:hover:text-[#2ef2a6]"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void archivePage(page.id);
+                          }}
+                          title="Archive page"
+                          type="button"
+                        >
+                          <Archive size={13} />
                         </button>
                         <button
                           className="grid h-7 w-7 place-items-center rounded-md text-stone-500 hover:bg-[#ff5a5f] hover:text-black dark:text-[#7a7670] dark:hover:bg-[#3d1215] dark:hover:text-[#e8a0a2]"

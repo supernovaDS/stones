@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight, Plus, XCircle } from "lucide-react";
 import { clsx } from "clsx";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useAppStore } from "../../store/useAppStore";
 import { formatShortDate, todayIso, toDateInput, toLocalDateString } from "../../utils/date";
 import { shiftMonth, getCalendarDays, priorityDot } from "../../utils/helpers";
@@ -20,18 +20,36 @@ export function CalendarView() {
   const [cursor, setCursor] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(todayIso());
   const [taskPage, setTaskPage] = useState(0);
-  const tasks = blocks.filter((block) => block.type === "task");
-  const days = getCalendarDays(cursor);
-  const monthLabel = cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
 
-  // Compute virtual tasks for all calendar days
-  const virtualTasks = days.flatMap((day) => {
-    const key = toLocalDateString(day);
-    return getVirtualTasksForDate(key, blocks);
-  });
+  const days = useMemo(() => getCalendarDays(cursor), [cursor]);
+  const monthLabel = useMemo(
+    () => cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" }),
+    [cursor]
+  );
 
-  const allCalendarTasks = [...tasks, ...virtualTasks];
-  const selectedTasks = allCalendarTasks.filter((task) => toDateInput(task.metadata.deadline) === selectedDay);
+  // Compute and group tasks by day
+  const { allCalendarTasks, tasksByDay } = useMemo(() => {
+    const tasks = blocks.filter((block) => block.type === "task");
+    const virtualTasks = days.flatMap((day) => {
+      const key = toLocalDateString(day);
+      return getVirtualTasksForDate(key, blocks);
+    });
+    const all = [...tasks, ...virtualTasks];
+    const map = new Map();
+    for (const t of all) {
+      const dateKey = toDateInput(t.metadata.deadline);
+      if (dateKey) {
+        if (!map.has(dateKey)) map.set(dateKey, []);
+        map.get(dateKey).push(t);
+      }
+    }
+    return { allCalendarTasks: all, tasksByDay: map };
+  }, [blocks, days]);
+
+  const selectedTasks = useMemo(
+    () => tasksByDay.get(selectedDay) || [],
+    [tasksByDay, selectedDay]
+  );
 
   const PAGE_SIZE = 4;
   const totalPages = Math.ceil(selectedTasks.length / PAGE_SIZE);
@@ -48,7 +66,7 @@ export function CalendarView() {
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => <div className="text-center text-xs font-black uppercase text-stone-700 dark:text-[#7a7670]" key={day}>{day}</div>)}
         {days.map((day) => {
           const key = toLocalDateString(day);
-          const dayTasks = allCalendarTasks.filter((task) => toDateInput(task.metadata.deadline) === key);
+          const dayTasks = tasksByDay.get(key) || [];
           const inMonth = day.getMonth() === cursor.getMonth();
           const isToday = key === todayIso();
           const isPast = key < todayIso();

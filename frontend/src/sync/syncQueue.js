@@ -18,6 +18,7 @@ export async function enqueueMutation(entity, entityId, operation, payload) {
   const now = nowIso();
   let finalPayload = {
     ...payload,
+    id: payload?.id || entityId,
     deleted: operation === "delete" ? true : Boolean(payload?.deleted)
   };
 
