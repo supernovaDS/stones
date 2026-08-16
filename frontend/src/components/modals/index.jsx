@@ -5,3 +5,5 @@ export { SettingsModal } from "./SettingsModal";
 export { RecurringTasksModal } from "./RecurringTasksModal";
 export { RecoveryModal } from "./RecoveryModal";
 export { RecycleBinModal } from "./RecycleBinModal";
+export { ArchivedPagesModal } from "./ArchivedPagesModal";
+export { UnarchivePageModal } from "./UnarchivePageModal";

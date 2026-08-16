@@ -8,23 +8,6 @@ const pad = (value) => String(value).padStart(2, "0");
 export const toLocalDateString = (date) =>
   `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 
-const toLocalDateTimeString = (date) =>
-  `${toLocalDateString(date)}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-
-const applyTimeText = (date, value) => {
-  const timeMatch = value.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
-  if (!timeMatch) return toLocalDateString(date);
-
-  let hours = Number(timeMatch[1]);
-  const minutes = Number(timeMatch[2] ?? 0);
-  const period = timeMatch[3]?.toLowerCase();
-  if (period === "pm" && hours < 12) hours += 12;
-  if (period === "am" && hours === 12) hours = 0;
-
-  date.setHours(hours, minutes, 0, 0);
-  return toLocalDateTimeString(date);
-};
-
 export const todayIso = () => toLocalDateString(new Date());
 
 export const formatShortDate = (value) => {
@@ -63,39 +46,11 @@ export const toDateInput = (value) => {
   return value.slice(0, 10);
 };
 
-export const normalizeDateText = (value) => {
-  if (!value) {
-    return undefined;
-  }
-
-  const lower = value.toLowerCase();
-  const now = new Date();
-
-  if (lower.includes("tomorrow")) {
-    const tomorrow = new Date(now);
-    tomorrow.setDate(now.getDate() + 1);
-    return applyTimeText(tomorrow, value);
-  }
-
-  if (lower.includes("today") || lower.includes("tonight")) {
-    return applyTimeText(now, value);
-  }
-
-  const parsed = new Date(value);
-  if (!Number.isNaN(parsed.getTime())) {
-    return parsed.toISOString().slice(0, 16);
-  }
-
-  return undefined;
-};
-
 const addDays = (dateValue, days) => {
   const date = new Date(`${dateValue}T00:00:00`);
   date.setDate(date.getDate() + days);
   return toLocalDateString(date);
 };
-
-export const todayPageTitle = () => `Daily - ${todayIso()}`;
 
 export const nextRecurringDate = (deadline, recurrence, interval = 1) => {
   if (!deadline || recurrence === "none") {

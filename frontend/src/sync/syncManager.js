@@ -58,15 +58,16 @@ async function processQueue(userId) {
       // Get the latest local version of the entity
       const localTable = dexieTable(item.entity);
       const currentLocal = localTable ? await localTable.get(item.entityId) : null;
-      const payload = currentLocal || item.payload;
+      const payload = currentLocal || item.payload || {};
 
-      // Mark delete if operation is delete
+      // Mark delete if operation is delete and ensure id is always set
       const finalPayload = {
         ...payload,
+        id: payload.id || item.entityId,
         deleted: item.operation === "delete" ? true : Boolean(payload?.deleted)
       };
 
-      const record = toRemoteRecord(item.entity, finalPayload, userId);
+      const record = toRemoteRecord(item.entity, finalPayload, userId, item.entityId);
       const table = tableName(item.entity);
 
       const { error } = await supabase.from(table).upsert(record, { onConflict: "id" });

@@ -34,10 +34,14 @@ export function ContextMenu() {
   } = useAppStore();
 
   const menuRef = useRef(null);
-  const [adjustedPos, setAdjustedPos] = useState({ x: 0, y: 0 });
-
   const { visible, x, y, blockId } = contextMenu;
   const block = blocks.find((b) => b.id === blockId);
+  const [adjustedPos, setAdjustedPos] = useState({ x, y });
+
+  useEffect(() => {
+    if (!visible) return;
+    setAdjustedPos({ x, y });
+  }, [x, y, visible]);
 
   useEffect(() => {
     if (!visible || !menuRef.current) return;
@@ -248,7 +252,7 @@ export function ContextMenu() {
             className="block-context-menu-item"
             onClick={(e) => handleAction(() => toggleTask(block.id), e)}
           >
-            <Check size={14} /> {block.metadata.completed ? "Mark Incomplete" : "Mark Complete"}
+            <Check size={14} /> {block.metadata?.completed ? "Mark Incomplete" : "Mark Complete"}
           </button>
 
           <button
@@ -256,7 +260,7 @@ export function ContextMenu() {
             className="block-context-menu-item"
             onClick={(e) => handleAction(() => toggleFailTask(block.id), e)}
           >
-            <XCircle size={14} /> {block.metadata.failed ? "Restore Task" : "Fail Task"}
+            <XCircle size={14} /> {block.metadata?.failed ? "Restore Task" : "Fail Task"}
           </button>
         </>
       )}
@@ -296,7 +300,7 @@ export function ContextMenu() {
         className="block-context-menu-item"
         onClick={(e) => handleAction(() => toggleArchiveBlock(block.id), e)}
       >
-        <Archive size={14} /> {block.metadata.archived ? "Unarchive" : "Archive"}
+        {block.metadata?.archived ? <ArchiveRestore size={14} /> : <Archive size={14} />} {block.metadata?.archived ? "Unarchive" : "Archive"}
       </button>
 
       <div className="h-[2px] bg-dashed border-t-2 border-dashed border-stone-200 dark:border-[#1e232a] my-1" />
@@ -306,7 +310,7 @@ export function ContextMenu() {
         className="block-context-menu-item danger"
         onClick={(e) => handleAction(() => deleteBlock(block.id), e)}
       >
-        <Trash2 size={14} /> Delete Block
+        <Trash2 size={14} /> {isTaskBlock ? "Delete Task" : "Delete Block"}
       </button>
     </div>
   );

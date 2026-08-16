@@ -256,12 +256,24 @@ function RichToolbar({ editorRef }) {
         const selectedText = selection ? selection.toString() : "";
         const url = window.prompt("Enter link URL:", "https://");
         if (!url || !url.trim()) return;
-        const validUrl = url.trim();
+        let validUrl = url.trim();
+
+        // Ensure safe protocol
+        if (!/^https?:\/\/|^mailto:/i.test(validUrl)) {
+          validUrl = `https://${validUrl}`;
+        }
+
+        const safeUrl = validUrl
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
 
         if (selectedText && selectedText.trim().length > 0) {
           exec("createLink", validUrl);
         } else {
-          const linkHtml = `<a href="${validUrl}" target="_blank" rel="noopener noreferrer">${validUrl}</a>`;
+          const linkHtml = `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeUrl}</a>`;
           exec("insertHTML", linkHtml);
         }
       }} type="button" title="Insert link">

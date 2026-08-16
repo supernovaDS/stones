@@ -7,9 +7,9 @@ const nowIso = () => new Date().toISOString();
 
 // ── Local → Remote ─────────────────────────────────────────────
 
-function toRemoteWorkspace(local, userId) {
+function toRemoteWorkspace(local, userId, fallbackId) {
   return {
-    id: local.id,
+    id: local.id || fallbackId,
     user_id: userId,
     title: local.title ?? "",
     created_at: local.createdAt ?? nowIso(),
@@ -18,9 +18,9 @@ function toRemoteWorkspace(local, userId) {
   };
 }
 
-function toRemoteSection(local, userId) {
+function toRemoteSection(local, userId, fallbackId) {
   return {
-    id: local.id,
+    id: local.id || fallbackId,
     user_id: userId,
     workspace_id: local.workspaceId,
     title: local.title ?? "",
@@ -31,9 +31,9 @@ function toRemoteSection(local, userId) {
   };
 }
 
-function toRemotePage(local, userId) {
+function toRemotePage(local, userId, fallbackId) {
   return {
-    id: local.id,
+    id: local.id || fallbackId,
     user_id: userId,
     workspace_id: local.workspaceId,
     section_id: local.sectionId ?? null,
@@ -44,11 +44,11 @@ function toRemotePage(local, userId) {
   };
 }
 
-function toRemoteBlock(local, userId) {
+function toRemoteBlock(local, userId, fallbackId) {
   return {
-    id: local.id,
+    id: local.id || fallbackId,
     user_id: userId,
-    page_id: local.pageId,
+    page_id: local.pageId || null,
     type: local.type ?? "note",
     order: local.order ?? 0,
     content: local.content ?? {},
@@ -118,10 +118,10 @@ const converters = {
   block: { toRemote: toRemoteBlock, fromRemote: fromRemoteBlock }
 };
 
-export function toRemoteRecord(entity, localRecord, userId) {
+export function toRemoteRecord(entity, localRecord, userId, fallbackId) {
   const converter = converters[entity];
   if (!converter) throw new Error(`Unknown entity type: ${entity}`);
-  return converter.toRemote(localRecord, userId);
+  return converter.toRemote(localRecord || {}, userId, fallbackId || localRecord?.id);
 }
 
 export function fromRemoteRecord(entity, remoteRecord) {

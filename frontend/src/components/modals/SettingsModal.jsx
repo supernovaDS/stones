@@ -1,4 +1,4 @@
-import { X, LogOut, User, Moon, Sun, Trash2 } from "lucide-react";
+import { X, LogOut, User, Moon, Sun, Trash2, Archive } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useAppStore } from "../../store/useAppStore";
 import { clsx } from "clsx";
@@ -9,9 +9,13 @@ export function SettingsModal({ syncStatus }) {
     theme,
     setTheme,
     setSettingsOpen,
-    setRecycleBinOpen
+    setRecycleBinOpen,
+    setArchivedPagesOpen,
+    pages
   } = useAppStore();
   const { user, signOut } = useAuth();
+
+  const archivedCount = pages.filter((p) => p.archived).length;
 
   return (
     <div className="modal-backdrop" onClick={() => setSettingsOpen(false)}>
@@ -81,23 +85,51 @@ export function SettingsModal({ syncStatus }) {
           <p className="mb-4 text-sm font-black uppercase tracking-wide text-stone-700 dark:text-[#7a7670]">
             Data & Storage
           </p>
-          <div className="flex items-center justify-between rounded-xl border-[3px] border-[#111111] bg-white p-4 shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[3px_3px_0_#000]">
-            <div>
-              <p className="text-base font-black">Recycle Bin</p>
-              <p className="text-xs font-bold text-stone-500 dark:text-[#7a7670]">View and restore recently deleted pages</p>
+          <div className="grid gap-3">
+            <div className="flex items-center justify-between rounded-xl border-[3px] border-[#111111] bg-white p-4 shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[3px_3px_0_#000]">
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="text-base font-black">Archived Pages</p>
+                  {archivedCount > 0 && (
+                    <span className="px-2 py-0.5 rounded-full border border-black bg-[#ffdc4a] text-[10px] font-black dark:border-[#1e232a] dark:bg-[#3d2800] dark:text-[#ffdc4a]">
+                      {archivedCount}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs font-bold text-stone-500 dark:text-[#7a7670]">View and restore archived pages</p>
+              </div>
+              <button
+                className="nb-button px-4 py-2 flex items-center gap-1.5"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setArchivedPagesOpen(true);
+                  setSettingsOpen(false);
+                }}
+                type="button"
+              >
+                <Archive size={16} /> Open Archive
+              </button>
             </div>
-            <button
-              className="nb-button px-4 py-2 flex items-center gap-1.5"
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                setRecycleBinOpen(true);
-                setSettingsOpen(false);
-              }}
-              type="button"
-            >
-              <Trash2 size={16} /> Open Bin
-            </button>
+
+            <div className="flex items-center justify-between rounded-xl border-[3px] border-[#111111] bg-white p-4 shadow-[4px_4px_0_#111] dark:border-[#1e232a] dark:bg-[#12151a] dark:shadow-[3px_3px_0_#000]">
+              <div>
+                <p className="text-base font-black">Recycle Bin</p>
+                <p className="text-xs font-bold text-stone-500 dark:text-[#7a7670]">View and restore recently deleted pages</p>
+              </div>
+              <button
+                className="nb-button px-4 py-2 flex items-center gap-1.5"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setRecycleBinOpen(true);
+                  setSettingsOpen(false);
+                }}
+                type="button"
+              >
+                <Trash2 size={16} /> Open Bin
+              </button>
+            </div>
           </div>
         </div>
       </div>

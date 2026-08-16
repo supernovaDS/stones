@@ -3,6 +3,7 @@ import {
   History,
   Repeat,
   Workflow,
+  Archive,
   X
 } from "lucide-react";
 import { useState } from "react";
@@ -10,19 +11,21 @@ import { useAppStore } from "../../store/useAppStore";
 import { slugify, downloadText } from "../../utils/helpers";
 
 export function CommandPalette({ onClose }) {
-  const { activePageId, openTaskModal, pages, setActivePage, setRecurringTasksOpen, setRecoveryOpen, setTheme, setView, theme, view } = useAppStore();
+  const { activePageId, openTaskModal, pages, setActivePage, setRecurringTasksOpen, setRecoveryOpen, setArchivedPagesOpen, archivePage, setTheme, setView, theme, view } = useAppStore();
   const [query, setQuery] = useState("");
   const isWorkspace = view === "workspace" && activePageId;
   const normalized = query.trim().toLowerCase();
   const actions = [
     ["/recurring", "Recurring Tasks", Repeat, () => setRecurringTasksOpen(true)],
     ["/recovery", "Recovery & Deletions", History, () => { setRecoveryOpen(true); onClose(); }],
+    ["/archived-pages", "Archived Pages", Archive, () => { setArchivedPagesOpen(true); onClose(); }],
+    ...(isWorkspace ? [["/archive-page", "Archive Current Page", Archive, () => { void archivePage(activePageId); onClose(); }]] : [])
   ].filter(([shortcut, label]) => {
     if (!normalized) return true;
     return shortcut.includes(normalized) || label.toLowerCase().includes(normalized);
   });
   const pageResults = pages
-    .filter((page) => !normalized || page.title.toLowerCase().includes(normalized))
+    .filter((page) => !page.archived && (!normalized || page.title.toLowerCase().includes(normalized)))
     .slice(0, 6);
     
   return (

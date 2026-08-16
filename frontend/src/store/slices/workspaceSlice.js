@@ -97,10 +97,10 @@ export const createWorkspaceSlice = (set, get) => ({
       console.warn("Failed to load settings:", err);
     }
 
-    const pageIdSet = new Set(pages.map(p => p.id));
-    const resolvedActivePageId = (savedActivePageId && pageIdSet.has(savedActivePageId))
+    const activePages = pages.filter((p) => !p.archived);
+    const resolvedActivePageId = (savedActivePageId && activePages.some((p) => p.id === savedActivePageId))
       ? savedActivePageId
-      : pages[0]?.id;
+      : activePages[0]?.id;
 
     const processedBlocks = await checkAndEndExpiredRecurringTasks(blocks);
     set({
@@ -166,12 +166,13 @@ export const createWorkspaceSlice = (set, get) => ({
         return normalizeBlock(dbB);
       });
 
+      const activeMergedPages = mergedPages.filter((p) => !p.archived);
       return {
         workspaces: mergedWorkspaces,
         sections: sortSections(mergedSections),
         pages: mergedPages,
         blocks: sortBlocks(mergedBlocks),
-        activePageId: state.activePageId || mergedPages[0]?.id
+        activePageId: state.activePageId || activeMergedPages[0]?.id
       };
     });
   },
@@ -292,6 +293,88 @@ export const createWorkspaceSlice = (set, get) => ({
     if (page) await enqueueMutation("page", pageId, "upsert", { ...page, title: uniqueTitle, updatedAt });
   },
 
+  archivePage: async (pageId) => {
+    const page = get().pages.find((item) => item.id === pageId);
+    if (!page) return;
+
+    pushUndoSnapshot(get, set, `archive ${page.title}`);
+    const updatedAt = nowIso();
+    const updatedPage = {
+      ...page,
+      archived: true,
+      archivedAt: updatedAt,
+      sectionId: null,
+      updatedAt
+    };
+
+    await db.pages.put(updatedPage);
+    await enqueueMutation("page", pageId, "upsert", updatedPage);
+
+    const remainingActivePages = get().pages.filter(
+      (item) => item.id !== pageId && !item.archived
+    );
+
+    let nextActiveId = get().activePageId;
+    if (nextActiveId === pageId) {
+      nextActiveId = remainingActivePages[0]?.id || undefined;
+    }
+
+    set((state) => ({
+      pages: state.pages.map((p) => (p.id === pageId ? updatedPage : p)),
+      activePageId: nextActiveId,
+      view: nextActiveId ? state.view : "workspace"
+    }));
+
+    get().setNotification(`Page "${page.title}" archived`);
+  },
+
+  unarchivePage: async (pageId, { sectionId = null, newSectionTitle = "" } = {}) => {
+    const page = get().pages.find((item) => item.id === pageId);
+    if (!page) return;
+
+    pushUndoSnapshot(get, set, `unarchive ${page.title}`);
+    const updatedAt = nowIso();
+    let targetSectionId = sectionId;
+
+    if (newSectionTitle && newSectionTitle.trim()) {
+      const workspaceId = get().workspaces[0]?.id;
+      if (workspaceId) {
+        const newSec = {
+          id: createId("section"),
+          workspaceId,
+          title: newSectionTitle.trim(),
+          order: get().sections.length + 1,
+          createdAt: updatedAt,
+          updatedAt
+        };
+        await db.sections.add(newSec);
+        await enqueueMutation("section", newSec.id, "upsert", newSec);
+        set((state) => ({ sections: sortSections([...state.sections, newSec]) }));
+        targetSectionId = newSec.id;
+      }
+    }
+
+    const updatedPage = {
+      ...page,
+      archived: false,
+      archivedAt: undefined,
+      sectionId: targetSectionId || null,
+      updatedAt
+    };
+
+    await db.pages.put(updatedPage);
+    await enqueueMutation("page", pageId, "upsert", updatedPage);
+
+    set((state) => ({
+      pages: state.pages.map((p) => (p.id === pageId ? updatedPage : p)),
+      activePageId: pageId,
+      view: "workspace",
+      unarchiveModalPage: null
+    }));
+
+    get().setNotification(`Page "${page.title}" restored`);
+  },
+
   deletePage: async (pageId) => {
     const page = get().pages.find((item) => item.id === pageId);
     if (!page) return;
@@ -311,9 +394,9 @@ export const createWorkspaceSlice = (set, get) => ({
       await enqueueMutation("block", block.id, "delete", block);
     }
 
-    const currentPages = get().pages;
-    const remainingPages = currentPages.filter((item) => item.id !== pageId);
-    const nextActiveId = remainingPages[0]?.id || null;
+    const remainingPages = get().pages.filter((item) => item.id !== pageId);
+    const remainingActivePages = remainingPages.filter((item) => !item.archived);
+    const nextActiveId = remainingActivePages[0]?.id || null;
 
     const deletedItem = makeDeletedItem(
       "page",

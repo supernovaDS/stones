@@ -10,7 +10,7 @@ import { AuthPage } from "./components/auth/AuthPage";
 import { Sidebar } from "./components/layout/Sidebar";
 import { Topbar } from "./components/layout/Topbar";
 import { WorkspaceView, TaskListView, CalendarView, InsightsView } from "./components/views";
-import { TaskDetailPanel, TaskModal, CommandPalette, SettingsModal, RecurringTasksModal, RecoveryModal, RecycleBinModal } from "./components/modals";
+import { TaskDetailPanel, TaskModal, CommandPalette, SettingsModal, RecurringTasksModal, RecoveryModal, RecycleBinModal, ArchivedPagesModal, UnarchivePageModal } from "./components/modals";
 import { ContextMenu } from "./components/ui";
 
 function App() {
@@ -35,6 +35,8 @@ function App() {
     recycleBinOpen,
     setRecycleBinOpen,
     recoveryOpen,
+    archivedPagesOpen,
+    unarchiveModalPage,
     sidebarHidden,
     setSidebarHidden,
     theme,
@@ -347,6 +349,8 @@ function App() {
       {recurringTasksOpen ? <RecurringTasksModal onClose={() => setRecurringTasksOpen(false)} /> : null}
       {recycleBinOpen ? <RecycleBinModal /> : null}
       {recoveryOpen ? <RecoveryModal /> : null}
+      {archivedPagesOpen ? <ArchivedPagesModal /> : null}
+      {unarchiveModalPage ? <UnarchivePageModal /> : null}
       <ContextMenu />
       <Toaster 
         position="top-center" 
