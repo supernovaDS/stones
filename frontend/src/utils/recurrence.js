@@ -1,4 +1,4 @@
-import { toLocalDateString, todayIso } from "./date";
+import { isOverdue, toLocalDateString, todayIso } from "./date";
 
 // Helper to parse date string safely in local time
 function parseLocalDate(dateStr) {
@@ -11,18 +11,19 @@ function parseLocalDate(dateStr) {
  */
 function isOccurringOnDate(template, dateStr) {
   if (template.metadata?.status === "paused") {
-    const pausedAt = template.metadata?.pausedAt || todayIso();
+    const pausedAt = (template.metadata?.pausedAt || todayIso()).slice(0, 10);
     if (dateStr > pausedAt) return false;
   }
   if (template.metadata?.status === "ended") {
-    const statusEndStr = template.metadata?.endDate || todayIso();
+    const statusEndStr = (template.metadata?.endDate || todayIso()).slice(0, 10);
     if (dateStr > statusEndStr) return false;
   }
 
-  const startStr = template.metadata?.startDate;
+  const rawStart = template.metadata?.startDate || template.metadata?.createdAt;
+  const startStr = rawStart ? rawStart.slice(0, 10) : null;
   if (!startStr || dateStr < startStr) return false;
 
-  const endStr = template.metadata?.endDate;
+  const endStr = template.metadata?.endDate ? template.metadata.endDate.slice(0, 10) : null;
   if (endStr && dateStr > endStr) return false;
 
   const recurrence = template.metadata?.recurrence || "none";
@@ -178,16 +179,9 @@ export function getVirtualTasksForFilter(filter, blocks) {
   }
 
   if (filter === "overdue") {
-    // Scan past 30 days (excluding today)
-    const list = [];
-    for (let i = 30; i >= 1; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      const dateStr = toLocalDateString(date);
-      const dayTasks = getVirtualTasksForDate(dateStr, blocks);
-      list.push(...dayTasks.filter((t) => !t.metadata.completed && !t.metadata.failed));
-    }
-    return list;
+    return getHistoryVirtualTasks(blocks).filter(
+      (t) => !t.metadata.completed && !t.metadata.failed && isOverdue(t.metadata.deadline)
+    );
   }
 
   if (filter === "upcoming") {
@@ -240,9 +234,7 @@ export function getVirtualTasksForFilter(filter, blocks) {
   }
 
   if (filter === "open") {
-    const todayTasks = getVirtualTasksForDate(todayStr, blocks).filter((t) => !t.metadata.completed && !t.metadata.failed);
-    const overdueTasks = getVirtualTasksForFilter("overdue", blocks);
-    return [...todayTasks, ...overdueTasks];
+    return getHistoryVirtualTasks(blocks).filter((t) => !t.metadata.completed && !t.metadata.failed);
   }
 
   if (filter === "high") {
@@ -262,34 +254,44 @@ export function getVirtualTasksForFilter(filter, blocks) {
 }
 
 /**
- * Returns past virtual task occurrences for statistics and streak checking.
+ * Returns past and current virtual task occurrences for statistics and streak checking.
  */
-export function getHistoryVirtualTasks(blocks, limitDays = 30) {
+export function getHistoryVirtualTasks(blocks, limitDays = null) {
   const list = [];
+  const seenKeys = new Set();
   const templates = blocks.filter((b) => b.type === "recurring_template" && !b.deleted);
   const completions = blocks.filter((b) => b.type === "completed_repeat" && !b.deleted);
   const failures = blocks.filter((b) => b.type === "failed_repeat" && !b.deleted);
 
+  const todayStr = todayIso();
+  const scanEnd = parseLocalDate(todayStr);
+
   templates.forEach((template) => {
-    const startStr = template.metadata?.startDate;
-    if (!startStr) return;
+    const rawStart = template.metadata?.startDate || template.metadata?.createdAt;
+    if (!rawStart) return;
 
-    const start = parseLocalDate(startStr);
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - limitDays);
+    const start = parseLocalDate(rawStart);
+    let scanStart = start;
 
-    const scanStart = start > thirtyDaysAgo ? start : thirtyDaysAgo;
-    const scanEnd = new Date(); // up to today
+    if (typeof limitDays === "number" && limitDays > 0) {
+      const cutoff = parseLocalDate(todayStr);
+      cutoff.setDate(cutoff.getDate() - limitDays);
+      if (cutoff > scanStart) scanStart = cutoff;
+    }
 
     for (let d = new Date(scanStart); d <= scanEnd; d.setDate(d.getDate() + 1)) {
       const dateStr = toLocalDateString(d);
-      if (isOccurringOnDate(template, dateStr)) {
-        const comp = completions.find(
-          (c) => c.content?.templateId === template.id && c.metadata?.completedDate === dateStr
-        );
-        const fail = failures.find(
-          (f) => f.content?.templateId === template.id && f.metadata?.failedDate === dateStr
-        );
+      const comp = completions.find(
+        (c) => c.content?.templateId === template.id && c.metadata?.completedDate === dateStr
+      );
+      const fail = failures.find(
+        (f) => f.content?.templateId === template.id && f.metadata?.failedDate === dateStr
+      );
+
+      if (isOccurringOnDate(template, dateStr) || !!comp || !!fail) {
+        const key = `${template.id}_${dateStr}`;
+        seenKeys.add(key);
+
         const instance = blocks.find(
           (b) => b.type === "recurring_instance" && b.content?.templateId === template.id && b.content?.dateStr === dateStr && !b.deleted
         );
@@ -303,6 +305,47 @@ export function getHistoryVirtualTasks(blocks, limitDays = 30) {
         }));
       }
     }
+  });
+
+  // Also include any completed or failed repeat instances whose template was removed or outside template bounds
+  completions.forEach((c) => {
+    const templateId = c.content?.templateId;
+    const dateStr = c.metadata?.completedDate;
+    if (!dateStr || dateStr > todayStr) return;
+    const key = `${templateId}_${dateStr}`;
+    if (seenKeys.has(key)) return;
+    seenKeys.add(key);
+
+    const template = templates.find((t) => t.id === templateId);
+    const instance = blocks.find(
+      (b) => b.type === "recurring_instance" && b.content?.templateId === templateId && b.content?.dateStr === dateStr && !b.deleted
+    );
+    const subtasks = instance ? (instance.content?.subtasks || []) : (template?.content?.subtasks || []);
+    list.push(buildVirtualTask(template || { id: templateId }, dateStr, {
+      isCompleted: true,
+      completedAt: c.metadata?.completedAt,
+      subtasks
+    }));
+  });
+
+  failures.forEach((f) => {
+    const templateId = f.content?.templateId;
+    const dateStr = f.metadata?.failedDate;
+    if (!dateStr || dateStr > todayStr) return;
+    const key = `${templateId}_${dateStr}`;
+    if (seenKeys.has(key)) return;
+    seenKeys.add(key);
+
+    const template = templates.find((t) => t.id === templateId);
+    const instance = blocks.find(
+      (b) => b.type === "recurring_instance" && b.content?.templateId === templateId && b.content?.dateStr === dateStr && !b.deleted
+    );
+    const subtasks = instance ? (instance.content?.subtasks || []) : (template?.content?.subtasks || []);
+    list.push(buildVirtualTask(template || { id: templateId }, dateStr, {
+      isFailed: true,
+      failedAt: f.metadata?.failedAt,
+      subtasks
+    }));
   });
 
   return list;

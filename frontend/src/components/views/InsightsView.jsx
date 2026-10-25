@@ -30,7 +30,7 @@ export function InsightsView() {
     return () => observer.disconnect();
   }, []);
 
-  const historyVirtualTasks = useMemo(() => getHistoryVirtualTasks(blocks, 30), [blocks]);
+  const historyVirtualTasks = useMemo(() => getHistoryVirtualTasks(blocks), [blocks]);
 
   const tasks = useMemo(() => {
     const realTasks = blocks.filter((block) => block.type === "task");

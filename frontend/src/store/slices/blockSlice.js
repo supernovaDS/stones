@@ -1,7 +1,7 @@
 import { db } from "../../db/schema";
 import { deleteTaskImage, uploadTaskImage } from "../../services/imageUploadService";
 import { enqueueMutation } from "../../sync/syncQueue";
-import { nextRecurringDate } from "../../utils/date";
+import { nextRecurringDate, todayIso } from "../../utils/date";
 import { getVirtualTasksForDate } from "../../utils/recurrence";
 import {
   addBlock,
@@ -873,7 +873,7 @@ export const createBlockSlice = (set, get) => ({
       metadata: {
         ...template.metadata,
         status: "paused",
-        pausedAt: updatedAt.slice(0, 10),
+        pausedAt: todayIso(),
         updatedAt
       }
     };
@@ -925,7 +925,7 @@ export const createBlockSlice = (set, get) => ({
       metadata: {
         ...template.metadata,
         status: "ended",
-        endDate: updatedAt.slice(0, 10),
+        endDate: todayIso(),
         updatedAt
       }
     };
@@ -1004,7 +1004,7 @@ export const createBlockSlice = (set, get) => ({
         recurrence: taskData.recurrence || "daily",
         customInterval: taskData.customInterval,
         customUnit: taskData.customUnit,
-        startDate: taskData.startDate || createdAt.slice(0, 10),
+        startDate: taskData.startDate || todayIso(),
         endDate: taskData.endDate || undefined,
         deadlineTime: taskData.deadlineTime || undefined,
         createdAt,
@@ -1031,6 +1031,29 @@ export const createBlockSlice = (set, get) => ({
     if (!template) return;
 
     pushUndoSnapshot(get, set, "delete recurring task");
+
+    if (!options.completed && !options.failed && !options.due) {
+      const updatedAt = nowIso();
+      const archivedTemplate = {
+        ...template,
+        metadata: {
+          ...template.metadata,
+          isArchived: true,
+          status: "ended",
+          endDate: todayIso(),
+          updatedAt
+        }
+      };
+      await db.blocks.put(archivedTemplate);
+      await enqueueMutation("block", archivedTemplate.id, "upsert", archivedTemplate);
+      set((state) => ({
+        blocks: sortBlocks(
+          state.blocks.map((b) => (b.id === templateId ? archivedTemplate : b))
+        )
+      }));
+      get().setNotification("Future recurring tasks deleted");
+      return;
+    }
 
     await db.blocks.delete(templateId);
     await enqueueMutation("block", templateId, "delete", template);
